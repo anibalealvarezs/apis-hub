@@ -4,7 +4,7 @@
 
     namespace Tests\Unit\Services\Aggregation;
 
-    use Traits\AggregationTelemetryEventRecorder;
+    use Services\Aggregation\AggregationTelemetryEventRecorder;
     use Tests\Unit\BaseUnitTestCase;
 
     final class AggregationTelemetryEventRecorderTest extends BaseUnitTestCase

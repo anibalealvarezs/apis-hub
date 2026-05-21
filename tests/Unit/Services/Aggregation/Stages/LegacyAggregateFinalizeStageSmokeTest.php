@@ -6,9 +6,9 @@
 
     use Doctrine\DBAL\Query\QueryBuilder;
     use Doctrine\DBAL\Result;
-    use Traits\AggregationPlan;
-    use Traits\LegacyAggregateExecutionContext;
-    use Traits\Stages\LegacyAggregateFinalizeStage;
+    use Services\Aggregation\AggregationPlan;
+    use Services\Aggregation\LegacyAggregateExecutionContext;
+    use Services\Aggregation\Stages\LegacyAggregateFinalizeStage;
     use Tests\Unit\BaseUnitTestCase;
 
     final class LegacyAggregateFinalizeStageSmokeTest extends BaseUnitTestCase
@@ -64,13 +64,7 @@
                     $this->assertNull($endDate);
                 },
                 function (
-                    array  $results,
-                    string $temporalField,
-                    string $temporalType,
-                    string $startDate,
-                    string $endDate,
-                    array  $aggregations,
-                    array  $groupBy
+                    array $results
                 ) use (&$fillCalled): array {
                     $fillCalled = true;
 

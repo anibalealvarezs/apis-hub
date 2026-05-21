@@ -4,7 +4,7 @@
 
     namespace Tests\Unit\Services\Aggregation;
 
-    use Traits\MetricDefaultFormulaBuilder;
+    use Services\Aggregation\MetricDefaultFormulaBuilder;
     use Tests\Unit\BaseUnitTestCase;
 
     final class MetricDefaultFormulaBuilderTest extends BaseUnitTestCase

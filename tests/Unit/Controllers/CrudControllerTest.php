@@ -1,1104 +1,1113 @@
 <?php
 
-namespace Tests\Unit\Controllers;
+    namespace Tests\Unit\Controllers;
 
-use Controllers\CrudController;
-use Doctrine\ORM\EntityManager;
-use Doctrine\ORM\Exception\NotSupported;
-use Exception;
-use InvalidArgumentException;
-use JsonException;
-use PHPUnit\Framework\MockObject\MockObject;
-use Tests\Unit\BaseUnitTestCase;
-use ReflectionException;
-use Services\CacheKeyGenerator;
-use Services\CacheService;
-use stdClass;
-use Doctrine\Common\Collections\ArrayCollection;
-use Symfony\Component\HttpFoundation\Response;
+    use Controllers\CrudController;
+    use Doctrine\ORM\EntityManager;
+    use Doctrine\ORM\Exception\NotSupported;
+    use Exception;
+    use InvalidArgumentException;
+    use JsonException;
+    use PHPUnit\Framework\MockObject\MockObject;
+    use Repositories\JobRepository;
+    use Tests\Unit\BaseUnitTestCase;
+    use ReflectionException;
+    use Services\CacheKeyGenerator;
+    use Services\CacheService;
+    use stdClass;
+    use Doctrine\Common\Collections\ArrayCollection;
+    use Symfony\Component\HttpFoundation\Response;
 
-class CrudControllerTest extends BaseUnitTestCase
-{
-    private MockObject|EntityManager $entityManager;
-    private MockObject|CacheService $cacheService;
-    private MockObject|CacheKeyGenerator $cacheKeyGenerator;
-    private ConcreteCrudController $controller;
-
-    protected function setUp(): void
+    class CrudControllerTest extends BaseUnitTestCase
     {
-        parent::setUp();
-
-        // Mock dependencies
-        $this->entityManager = $this->createMock(EntityManager::class);
-        $this->cacheService = $this->createMock(CacheService::class);
-        $this->cacheKeyGenerator = $this->createMock(CacheKeyGenerator::class);
-
-        // Create a concrete class for testing the CrudController
-        $this->controller = new ConcreteCrudController(
-            $this->entityManager,
-            $this->cacheService,
-            $this->cacheKeyGenerator
-        );
-    }
-
-    /**
-     * @throws ReflectionException
-     * @throws NotSupported
-     */
-    public function testInvokeReturnsErrorForInvalidEntity(): void
-    {
-        $entity = 'customer';
-        $method = 'read';
-        $this->controller->setMockCrudEntities([]);
-
-        $response = $this->controller->__invoke($entity, $method);
-
-        if ($response->getStatusCode() !== Response::HTTP_NOT_FOUND) {
-        }
-
-        $this->assertEquals(Response::HTTP_NOT_FOUND, $response->getStatusCode());
-        $this->assertEquals('application/json', $response->headers->get('Content-Type'));
-        $this->assertEquals(
-            json_encode(['data' => null, 'status' => 'error', 'error' => 'Invalid crudable entity']),
-            $response->getContent()
-        );
-    }
-
-    /**
-     * @throws ReflectionException
-     * @throws NotSupported
-     */
-    public function testInvokeRoutesToReadMethod(): void
-    {
-        $entity = 'customer';
-        $method = 'read';
-        $id = $this->faker->randomNumber();
-        $data = ['id' => $id, 'name' => $this->faker->word];
-        $cacheKey = "entity_{$entity}_{$id}";
-
-        // Mock custom repository
-        $repository = $this->getMockBuilder(\Repositories\JobRepository::class)
-            ->disableOriginalConstructor()
-            ->onlyMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete', 'setHideFields', 'aggregate'])
-            ->getMock();
-        $repository->expects($this->once())
-            ->method('read')
-            ->with($id)
-            ->willReturn($data);
-
-        $this->entityManager->expects($this->once())
-            ->method('getRepository')
-            ->with('Entities\\' . $entity)
-            ->willReturn($repository);
-
-        $this->cacheKeyGenerator->expects($this->once())
-            ->method('forEntity')
-            ->with($entity, $id)
-            ->willReturn($cacheKey);
-
-        $this->cacheService->expects($this->once())
-            ->method('get')
-            ->with($cacheKey, $this->anything())
-            ->willReturnCallback(function ($key, $callback) {
-                return $callback();
-            });
-
-        $this->controller->setMockCrudEntities([strtolower($entity) => ['class' => 'Entities\\' . $entity]]);
-        $this->controller->setMockEntitiesConfig([strtolower($entity) => ['class' => 'Entities\\' . $entity]]);
-
-        $response = $this->controller->__invoke($entity, $method, $id);
-
-        if ($response->getStatusCode() !== Response::HTTP_OK) {
-        }
-
-        $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
-        $this->assertEquals(
-            json_encode(['data' => $data, 'status' => 'success', 'error' => null]),
-            $response->getContent()
-        );
-    }
-
-    /**
-     * @throws ReflectionException
-     * @throws NotSupported
-     */
-    public function testInvokeReturnsErrorForInvalidMethod(): void
-    {
-        $entity = 'customer';
-        $method = 'invalid';
-
-        $this->controller->setMockCrudEntities([strtolower($entity) => ['class' => 'Entities\\' . $entity]]);
-
-        $response = $this->controller->__invoke($entity, $method);
-
-        if ($response->getStatusCode() !== Response::HTTP_NOT_FOUND) {
-        }
-
-        $this->assertEquals(Response::HTTP_NOT_FOUND, $response->getStatusCode());
-        $this->assertEquals('application/json', $response->headers->get('Content-Type'));
-        $this->assertEquals(
-            json_encode(['data' => null, 'status' => 'error', 'error' => 'Method not found']),
-            $response->getContent()
-        );
-    }
-
-    /**
-     * @throws JsonException
-     */
-    public function testPrepareReadMultipleParamsMergesBodyAndParams(): void
-    {
-        $body = json_encode(['key' => 'value']);
-        $params = ['extra' => 'param'];
-        $entity = 'Customer';
-        $filters = (object) ['key' => 'value'];
-        $expected = [
-            'extra' => 'param',
-            'filters' => $filters
-        ];
-
-        $this->controller->setMockEntitiesConfig([
-            'customer' => [
-                'class' => 'Entities\\customer',
-                'repository_methods' => [
-                    'readMultiple' => ['parameters' => ['extra', 'filters']]
-                ]
-            ]
-        ]);
-
-        $result = $this->controller->prepareReadMultipleParams($params, $entity, $body);
-
-        $this->assertEquals($expected, $result);
-    }
-
-    /**
-     * @throws JsonException
-     */
-    public function testPrepareReadMultipleParamsThrowsExceptionForInvalidParams(): void
-    {
-        $params = ['invalid' => 'param'];
-        $entity = 'Customer';
-
-        $this->controller->setMockEntitiesConfig([
-            'customer' => [
-                'class' => 'Entities\\customer',
-                'repository_methods' => [
-                    'readMultiple' => ['parameters' => ['valid', 'filters']]
-                ]
-            ]
-        ]);
-
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Invalid parameters');
-
-        $this->controller->prepareReadMultipleParams($params, $entity, null);
-    }
-
-    /**
-     * @throws NotSupported
-     */
-    public function testReadReturnsCachedData(): void
-    {
-        $entity = 'customer';
-        $id = $this->faker->randomNumber();
-        $data = ['id' => $id, 'name' => $this->faker->word];
-        $cacheKey = "entity_{$entity}_{$id}";
-
-        // Mock custom repository
-        $repository = $this->getMockBuilder(\Repositories\JobRepository::class)
-            ->disableOriginalConstructor()
-            ->onlyMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete', 'setHideFields', 'aggregate'])
-            ->getMock();
-        $repository->expects($this->once())
-            ->method('read')
-            ->with($id)
-            ->willReturn($data);
-
-        $this->entityManager->expects($this->once())
-            ->method('getRepository')
-            ->with('Entities\\' . $entity)
-            ->willReturn($repository);
-
-        $this->cacheKeyGenerator->expects($this->once())
-            ->method('forEntity')
-            ->with($entity, $id)
-            ->willReturn($cacheKey);
-
-        $this->cacheService->expects($this->once())
-            ->method('get')
-            ->with($cacheKey, $this->anything())
-            ->willReturnCallback(function ($key, $callback) {
-                return $callback();
-            });
-
-        $this->controller->setMockCrudEntities([strtolower($entity) => ['class' => 'Entities\\' . $entity]]);
-        $this->controller->setMockEntitiesConfig([strtolower($entity) => ['class' => 'Entities\\' . $entity]]);
-
-        $response = $this->controller->read($entity, $id);
-
-        if ($response->getStatusCode() !== Response::HTTP_OK) {
-        }
-
-        $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
-        $this->assertEquals(
-            json_encode(['data' => $data, 'status' => 'success', 'error' => null]),
-            $response->getContent()
-        );
-    }
-
-    /**
-     * @throws NotSupported
-     */
-    public function testReadHandlesException(): void
-    {
-        $entity = 'customer';
-        $id = $this->faker->randomNumber();
-        $exceptionMessage = 'Repository error';
-        $cacheKey = "entity_{$entity}_{$id}";
-
-        // Mock custom repository
-        $repository = $this->getMockBuilder(\Repositories\JobRepository::class)
-            ->disableOriginalConstructor()
-            ->onlyMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete', 'setHideFields', 'aggregate'])
-            ->getMock();
-        $repository->expects($this->once())
-            ->method('read')
-            ->with($id)
-            ->willThrowException(new Exception($exceptionMessage));
-
-        $this->entityManager->expects($this->once())
-            ->method('getRepository')
-            ->with('Entities\\' . $entity)
-            ->willReturn($repository);
-
-        $this->cacheKeyGenerator->expects($this->once())
-            ->method('forEntity')
-            ->with($entity, $id)
-            ->willReturn($cacheKey);
-
-        $this->cacheService->expects($this->once())
-            ->method('get')
-            ->with($cacheKey, $this->anything())
-            ->willReturnCallback(function ($key, $callback) {
-                return $callback();
-            });
-
-        $this->controller->setMockCrudEntities([strtolower($entity) => ['class' => 'Entities\\' . $entity]]);
-        $this->controller->setMockEntitiesConfig([strtolower($entity) => ['class' => 'Entities\\' . $entity]]);
-
-        $response = $this->controller->read($entity, $id);
-
-        if ($response->getStatusCode() !== Response::HTTP_INTERNAL_SERVER_ERROR) {
-        }
-
-        $this->assertEquals(Response::HTTP_INTERNAL_SERVER_ERROR, $response->getStatusCode());
-        $this->assertEquals(
-            json_encode(['data' => null, 'status' => 'error', 'error' => $exceptionMessage]),
-            $response->getContent()
-        );
-    }
-
-    /**
-     * @throws ReflectionException
-     * @throws NotSupported
-     */
-    public function testCountReturnsCount(): void
-    {
-        $entity = 'customer';
-        $body = json_encode(['key' => 'value']);
-        $params = [];
-        $count = $this->faker->numberBetween(0, 100);
-        $filters = (object) ['key' => 'value'];
-
-        $this->controller->setMockCrudEntities([strtolower($entity) => ['class' => 'Entities\\' . $entity]]);
-        $this->controller->setMockEntitiesConfig([
-            strtolower($entity) => [
-                'class' => 'Entities\\' . $entity,
-                'repository_methods' => [
-                    'readMultiple' => ['parameters' => ['filters']],
-                    'countElements' => ['parameters' => ['filters']]
-                ]
-            ]
-        ]);
-
-        // Set mock count data to bypass repository and cache logic
-        $this->controller->setMockCountData($count, $filters);
-
-        $response = $this->controller->count($entity, $body, $params);
-
-        if ($response->getStatusCode() !== Response::HTTP_OK) {
-        }
-
-        $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
-        $this->assertEquals(
-            json_encode(['data' => ['count' => $count], 'status' => 'success', 'error' => null]),
-            $response->getContent()
-        );
-    }
-
-    /**
-     * @throws ReflectionException
-     * @throws NotSupported
-     */
-    public function testListReturnsData(): void
-    {
-        $entity = 'customer';
-        $body = null;
-        $params = ['extra' => ['param']];
-        $data = [['id' => 1, 'name' => $this->faker->word]];
-        $filters = new stdClass();
-        $cacheKey = 'list_' . $entity . '_' . md5(json_encode(['extra' => ['param'], 'filters' => $filters]));
-
-        $result = new ArrayCollection($data);
-
-        // Mock custom repository
-        $repository = $this->getMockBuilder(\Repositories\JobRepository::class)
-            ->disableOriginalConstructor()
-            ->onlyMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete', 'setHideFields', 'aggregate'])
-            ->getMock();
-        $repository->expects($this->once())
-            ->method('readMultiple')
-            ->with(
-                $this->anything(), // limit
-                $this->anything(), // pagination
-                $this->anything(), // ids
-                $filters,          // filters
-                $this->anything(), // orderBy
-                $this->anything(), // orderDir
-                $this->anything(), // startDate
-                $this->anything(), // endDate
-                ['param']          // extra
-            )
-            ->willReturn($result);
-
-        $this->entityManager->expects($this->once())
-            ->method('getRepository')
-            ->with('Entities\\' . $entity)
-            ->willReturn($repository);
-
-        $this->cacheService->expects($this->once())
-            ->method('get')
-            ->with($cacheKey, $this->anything())
-            ->willReturnCallback(function ($key, $callback) {
-                return $callback();
-            });
-
-        $this->controller->setMockCrudEntities([strtolower($entity) => ['class' => 'Entities\\' . $entity]]);
-        $this->controller->setMockEntitiesConfig([
-            strtolower($entity) => [
-                'class' => 'Entities\\' . $entity,
-                'repository_methods' => [
-                    'readMultiple' => ['parameters' => ['filters', 'extra']]
-                ]
-            ]
-        ]);
-
-        $response = $this->controller->list($entity, $body, $params);
-
-        if ($response->getStatusCode() !== Response::HTTP_OK) {
-        }
-
-        $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
-        $this->assertEquals(
-            json_encode(['data' => $data, 'status' => 'success', 'error' => null]),
-            $response->getContent()
-        );
-    }
-
-    public function testAggregateReturnsData(): void
-    {
-        $entity = 'customer';
-        $body = json_encode(['filters' => ['status' => 'active']]);
-        $params = [
-            'aggregations' => ['total' => 'SUM(amount)'],
-            'groupBy' => ['category']
-        ];
-        $expectedData = [['total' => 1000, 'category' => 'finance']];
-
-        // Mock custom repository
-        $repository = $this->getMockBuilder(\Repositories\JobRepository::class)
-            ->disableOriginalConstructor()
-            ->onlyMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete', 'setHideFields', 'aggregate'])
-            ->getMock();
-        $repository->expects($this->once())
-            ->method('aggregate')
-            ->with(
-                ['total' => 'SUM(amount)'],
-                ['category'],
-                $this->callback(fn($filters) => $filters->status === 'active')
-            )
-            ->willReturn($expectedData);
-
-        $this->entityManager->expects($this->once())
-            ->method('getRepository')
-            ->with('Entities\\' . $entity)
-            ->willReturn($repository);
-
-        $this->controller->setMockCrudEntities([strtolower($entity) => ['class' => 'Entities\\' . $entity]]);
-        $this->controller->setMockEntitiesConfig([
-            strtolower($entity) => [
-                'class' => 'Entities\\' . $entity,
-                'repository_methods' => [
-                    'aggregate' => ['parameters' => ['filters', 'aggregations', 'groupBy']]
-                ]
-            ]
-        ]);
-
-        $response = $this->controller->aggregate($entity, $body, $params);
-
-        $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
-        $this->assertEquals(
-            json_encode(['data' => $expectedData, 'status' => 'success', 'error' => null]),
-            $response->getContent()
-        );
-    }
-
-    /**
-     * @throws NotSupported
-     */
-    public function testCreateReturnsCreatedEntity(): void
-    {
-        $entity = 'customer';
-        $body = json_encode(['name' => $this->faker->word]);
-        $id = $this->faker->numberBetween(1, 1000000); // Ensure truthy ID
-        $channel = 'shopify';
-        $data = ['id' => $id, 'name' => $this->faker->word, 'channel' => $channel];
-
-        $result = $data;
-
-        // Mock custom repository
-        $repository = $this->getMockBuilder(\Repositories\JobRepository::class)
-            ->disableOriginalConstructor()
-            ->onlyMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete', 'setHideFields', 'aggregate'])
-            ->getMock();
-        $repository->expects($this->once())
-            ->method('create')
-            ->with($this->isInstanceOf(stdClass::class))
-            ->willReturn($result);
-
-        $this->entityManager->expects($this->once())
-            ->method('getRepository')
-            ->with('Entities\\' . $entity)
-            ->willReturn($repository);
-
-        $this->cacheService->expects($this->once())
-            ->method('invalidateMultipleEntities')
-            ->with([$entity => $id], $channel);
-
-        $this->controller->setMockCrudEntities([strtolower($entity) => ['class' => 'Entities\\' . $entity]]);
-        $this->controller->setMockEntitiesConfig([strtolower($entity) => ['class' => 'Entities\\' . $entity]]);
-
-        // Debug: Verify ID is truthy
-        $this->assertNotEmpty($id, 'Generated ID must be truthy');
-
-        $response = $this->controller->create($entity, $body);
-
-        if ($response->getStatusCode() !== Response::HTTP_CREATED) {
-        }
-
-        $this->assertEquals(Response::HTTP_CREATED, $response->getStatusCode());
-        $this->assertEquals(
-            json_encode(['data' => $data, 'status' => 'success', 'error' => null]),
-            $response->getContent()
-        );
-    }
-
-    /**
-     * @throws NotSupported
-     */
-    public function testCreateReturnsErrorForInvalidData(): void
-    {
-        $entity = 'customer';
-        $body = json_encode(['name' => $this->faker->word]);
-
-        // Mock custom repository
-        $repository = $this->getMockBuilder(\Repositories\JobRepository::class)
-            ->disableOriginalConstructor()
-            ->onlyMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete', 'setHideFields', 'aggregate'])
-            ->getMock();
-        $repository->expects($this->once())
-            ->method('create')
-            ->with($this->isInstanceOf(stdClass::class))
-            ->willReturn(null);
-
-        $this->entityManager->expects($this->once())
-            ->method('getRepository')
-            ->with('Entities\\' . $entity)
-            ->willReturn($repository);
-
-        $this->controller->setMockCrudEntities([strtolower($entity) => ['class' => 'Entities\\' . $entity]]);
-        $this->controller->setMockEntitiesConfig([strtolower($entity) => ['class' => 'Entities\\' . $entity]]);
-
-        $response = $this->controller->create($entity, $body);
-
-        if ($response->getStatusCode() !== Response::HTTP_BAD_REQUEST) {
-        }
-
-        $this->assertEquals(Response::HTTP_BAD_REQUEST, $response->getStatusCode());
-        $this->assertEquals(
-            json_encode(['data' => null, 'status' => 'error', 'error' => 'Invalid or missing data']),
-            $response->getContent()
-        );
-    }
-
-    /**
-     * @throws NotSupported
-     */
-    public function testUpdateReturnsUpdatedEntity(): void
-    {
-        $entity = 'customer';
-        $id = $this->faker->numberBetween(1, 1000000); // Ensure truthy ID
-        $body = json_encode(['name' => $this->faker->word]);
-        $channel = 'shopify';
-        $data = ['id' => $id, 'name' => $this->faker->word, 'channel' => $channel];
-
-        $result = $data;
-
-        // Mock custom repository
-        $repository = $this->getMockBuilder(\Repositories\JobRepository::class)
-            ->disableOriginalConstructor()
-            ->onlyMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete', 'setHideFields', 'aggregate'])
-            ->getMock();
-        $repository->expects($this->once())
-            ->method('update')
-            ->with($id, $this->isInstanceOf(stdClass::class))
-            ->willReturn($result);
-
-        $this->entityManager->expects($this->once())
-            ->method('getRepository')
-            ->with('Entities\\' . $entity)
-            ->willReturn($repository);
-
-        $this->cacheService->expects($this->once())
-            ->method('invalidateMultipleEntities')
-            ->with([$entity => $id], $channel);
-
-        $this->controller->setMockCrudEntities([strtolower($entity) => ['class' => 'Entities\\' . $entity]]);
-        $this->controller->setMockEntitiesConfig([strtolower($entity) => ['class' => 'Entities\\' . $entity]]);
-
-        $response = $this->controller->update($entity, $id, $body);
-
-        if ($response->getStatusCode() !== Response::HTTP_OK) {
-        }
-
-        if ($response->getStatusCode() !== Response::HTTP_OK) {
-        }
-
-        $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
-        $this->assertEquals(
-            json_encode(['data' => $data, 'status' => 'success', 'error' => null]),
-            $response->getContent()
-        );
-    }
-
-    /**
-     * @throws NotSupported
-     */
-    public function testUpdateReturnsErrorForMissingId(): void
-    {
-        $entity = 'customer';
-        $body = json_encode(['name' => $this->faker->word]);
-
-        $this->controller->setMockCrudEntities([strtolower($entity) => ['class' => 'Entities\\' . $entity]]);
-
-        $response = $this->controller->update($entity, null, $body);
-
-        if ($response->getStatusCode() !== Response::HTTP_BAD_REQUEST) {
-        }
-
-        $this->assertEquals(Response::HTTP_BAD_REQUEST, $response->getStatusCode());
-        $this->assertEquals(
-            json_encode(['data' => null, 'status' => 'error', 'error' => 'Invalid or missing ID']),
-            $response->getContent()
-        );
-    }
-
-    /**
-     * @throws NotSupported
-     */
-    public function testDeleteReturnsSuccess(): void
-    {
-        $entity = 'customer';
-        $id = $this->faker->numberBetween(1, 1000000); // Ensure truthy ID
-
-        // Mock custom repository
-        $repository = $this->getMockBuilder(\Repositories\JobRepository::class)
-            ->disableOriginalConstructor()
-            ->onlyMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete', 'setHideFields', 'aggregate'])
-            ->getMock();
-        $repository->expects($this->once())
-            ->method('delete')
-            ->with($id)
-            ->willReturn(true);
-
-        $this->entityManager->expects($this->once())
-            ->method('getRepository')
-            ->with('Entities\\' . $entity)
-            ->willReturn($repository);
-
-        $this->cacheService->expects($this->once())
-            ->method('invalidateMultipleEntities')
-            ->with([$entity => $id]);
-
-        $this->controller->setMockCrudEntities([strtolower($entity) => ['class' => 'Entities\\' . $entity]]);
-        $this->controller->setMockEntitiesConfig([strtolower($entity) => ['class' => 'Entities\\' . $entity]]);
-
-        $response = $this->controller->delete($entity, $id);
-
-        if ($response->getStatusCode() !== Response::HTTP_OK) {
-        }
-
-        $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
-        $this->assertEquals(
-            json_encode(['data' => null, 'status' => 'success', 'error' => null]),
-            $response->getContent()
-        );
-    }
-
-    /**
-     * @throws NotSupported
-     */
-    public function testDeleteReturnsErrorForMissingId(): void
-    {
-        $entity = 'customer';
-
-        $this->controller->setMockCrudEntities([strtolower($entity) => ['class' => 'Entities\\' . $entity]]);
-
-        $response = $this->controller->delete($entity);
-
-        if ($response->getStatusCode() !== Response::HTTP_BAD_REQUEST) {
-        }
-
-        $this->assertEquals(Response::HTTP_BAD_REQUEST, $response->getStatusCode());
-        $this->assertEquals(
-            json_encode(['data' => null, 'status' => 'error', 'error' => 'Missing ID']),
-            $response->getContent()
-        );
-    }
-
-    public function testExtractIdFromObjectWithGetId(): void
-    {
-        $id = $this->faker->randomNumber();
-        $result = new class ($id) {
-            private int $id;
-            public function __construct(int $id)
-            {
-                $this->id = $id;
-            }
-            public function getId(): int
-            {
-                return $this->id;
-            }
-        };
-
-        $extractedId = $this->controller->extractId($result);
-
-        $this->assertEquals($id, $extractedId);
-    }
-
-    public function testExtractIdFromArray(): void
-    {
-        $id = $this->faker->randomNumber();
-        $result = ['id' => $id];
-
-        $extractedId = $this->controller->extractId($result);
-
-        $this->assertEquals($id, $extractedId);
-    }
-
-    public function testExtractChannelFromObject(): void
-    {
-        $channel = 'shopify';
-        $result = new class ($channel) {
-            private string $channel;
-            public function __construct(string $channel)
-            {
-                $this->channel = $channel;
-            }
-            public function getChannel(): string
-            {
-                return $this->channel;
-            }
-        };
-
-        $extractedChannel = $this->controller->extractChannel($result);
-
-        $this->assertEquals($channel, $extractedChannel);
-    }
-
-    public function testExtractChannelFromArray(): void
-    {
-        $channel = 'shopify';
-        $result = ['channel' => $channel];
-
-        $extractedChannel = $this->controller->extractChannel($result);
-
-        $this->assertEquals($channel, $extractedChannel);
-    }
-
-    /**
-     * @throws ReflectionException
-     * @throws NotSupported
-     */
-    public function testInvokeReadJobBypassesCache(): void
-    {
-        $entity = 'job';
-        $method = 'read';
-        $id = 123;
-        $data = ['id' => $id, 'status' => 'scheduled'];
-
-        $this->controller->setMockCrudEntities([$entity => ['class' => 'Entities\\' . $entity]]);
-        $this->controller->setMockEntitiesConfig([$entity => ['class' => 'Entities\\' . $entity]]);
-
-        $repository = $this->getMockBuilder(\Repositories\JobRepository::class)
-            ->disableOriginalConstructor()
-            ->onlyMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete', 'setHideFields'])
-            ->getMock();
-
-        $repository->expects($this->once())
-            ->method('read')
-            ->with($id)
-            ->willReturn($data);
-
-        $this->entityManager->expects($this->once())
-            ->method('getRepository')
-            ->willReturn($repository);
-
-        // Expect cacheService->get to NEVER be called for job
-        $this->cacheService->expects($this->never())->method('get');
-
-        $response = $this->controller->__invoke($entity, $method, $id);
-
-        if ($response->getStatusCode() !== Response::HTTP_OK) {
-        }
-
-        $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
-    }
-
-    /**
-     * @throws ReflectionException
-     * @throws NotSupported
-     */
-    public function testInvokeListJobBypassesCache(): void
-    {
-        $entity = 'job';
-        $method = 'list';
-        $data = [['id' => 1, 'status' => 'scheduled']];
-
-        $this->controller->setMockCrudEntities([$entity => ['class' => 'Entities\\' . $entity]]);
-        $this->controller->setMockEntitiesConfig([$entity => ['class' => 'Entities\\' . $entity]]);
-        $this->controller->setMockEntitiesConfig([
-            $entity => [
-                'class' => 'Entities\\' . $entity,
-                'repository_methods' => [
-                    'readMultiple' => ['parameters' => ['filters']]
-                ]
-            ]
-        ]);
-
-        $repository = $this->getMockBuilder(\Repositories\JobRepository::class)
-            ->disableOriginalConstructor()
-            ->onlyMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete', 'setHideFields'])
-            ->getMock();
-
-        $result = new ArrayCollection($data);
-
-        $repository->expects($this->once())
-            ->method('readMultiple')
-            ->willReturn($result);
-
-        $this->entityManager->expects($this->once())
-            ->method('getRepository')
-            ->willReturn($repository);
-
-        // Expect cacheService->get to NEVER be called for job
-        $this->cacheService->expects($this->never())->method('get');
-
-        $response = $this->controller->__invoke($entity, $method);
-
-        $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
-    }
-}
-
-// Concrete class to test the CrudController
-class ConcreteCrudController extends CrudController
-{
-    private array $mockCrudEntities = [];
-    private array $mockEntitiesConfig = [];
-    private ?int $mockCountData = null;
-    public function __construct(
-        EntityManager $entityManager,
-        CacheService $cacheService,
-        CacheKeyGenerator $cacheKeyGenerator
-    ) {
-        // Don't call parent::__construct() because it will overwrite the mocks with real instances
-        $this->em = $entityManager;
-        $this->cacheService = $cacheService;
-        $this->cacheKeyGenerator = $cacheKeyGenerator;
-    }
-
-    // Test methods to set mock data
-    public function setMockCrudEntities(array $entities): void
-    {
-        $this->mockCrudEntities = $entities;
-    }
-
-    public function setMockEntitiesConfig(array $config): void
-    {
-        $this->mockEntitiesConfig = $config;
-    }
-
-    public function setMockCountData(int $count, stdClass $filters): void
-    {
-        $this->mockCountData = $count;
-    }
-
-    // Override methods as public for testing
-    public function isValidCrudableEntity(string $entity): bool
-    {
-        return in_array(needle: strtolower($entity), haystack: array_keys($this->mockCrudEntities));
-    }
-
-    public function getRepository(string $entity, string $configKey = 'class'): object
-    {
-        $config = $this->mockEntitiesConfig;
-        $entityKey = strtolower($entity);
-        if (!isset($config[$entityKey][$configKey])) {
-            throw new Exception("Entity configuration for '$entity' with key '$configKey' not found");
-        }
-        return $this->em->getRepository(
-            entityName: $config[$entityKey][$configKey]
-        );
-    }
-
-    public function validateParams(array $params, string $entity, string $method): bool
-    {
-        $config = $this->mockEntitiesConfig[strtolower($entity)] ?? null;
-        if (!$config || empty($config['repository_methods'][$method]['parameters'])) {
-            return false;
-        }
-
-        $validParams = $config['repository_methods'][$method]['parameters'];
-        return empty(array_diff($params, $validParams));
-    }
-
-    public function prepareReadMultipleParams(?array $params, string $entityName, ?string $body): array
-    {
-        if (!empty($params) && !$this->validateParams(array_keys($params), $entityName, 'readMultiple')) {
-            throw new InvalidArgumentException('Invalid parameters');
-        }
-
-        $params = $params ?? [];
-        $params['filters'] = $body ? json_decode($body, false, 512, JSON_THROW_ON_ERROR) : new stdClass();
-        return $params;
-    }
-
-    public function prepareCrudParams(?array $params, ?string $body): array
-    {
-        return parent::prepareCrudParams($params, $body);
-    }
-
-    public function read(string $entity, string|int|null $id = null, array $hideFields = []): Response
-
-    {
-        return parent::read($entity, $id, $hideFields);
-    }
-
-    public function count(string $entity, ?string $body = null, ?array $params = null): Response
-    {
-        if ($this->mockCountData !== null) {
-            return $this->createResponse(
-                data: ['count' => $this->mockCountData],
-                status: 'success'
+        protected \Doctrine\ORM\EntityManagerInterface|MockObject $entityManager;
+        private MockObject|CacheService $cacheService;
+        private MockObject|CacheKeyGenerator $cacheKeyGenerator;
+        private ConcreteCrudController $controller;
+
+        protected function setUp(): void
+        {
+            parent::setUp();
+
+            // Mock dependencies
+            $this->entityManager = $this->createMock(EntityManager::class);
+            $this->cacheService = $this->createMock(CacheService::class);
+            $this->cacheKeyGenerator = $this->createMock(CacheKeyGenerator::class);
+
+            // Create a concrete class for testing the CrudController
+            $this->controller = new ConcreteCrudController(
+                $this->entityManager,
+                $this->cacheService,
+                $this->cacheKeyGenerator
             );
         }
-        return parent::count($entity, $body, $params);
-    }
 
-    public function list(string $entity, ?string $body = null, ?array $params = null, array $hideFields = []): Response
-    {
-        return parent::list($entity, $body, $params, $hideFields);
-    }
+        /**
+         * @throws ReflectionException
+         * @throws NotSupported
+         */
+        public function testInvokeReturnsErrorForInvalidEntity(): void
+        {
+            $entity = 'customer';
+            $method = 'read';
+            $this->controller->setMockCrudEntities([]);
 
-    public function create(string $entity, ?string $body = null): Response
-    {
-        try {
-            if (!$body || json_decode($body, true) === null && json_last_error() !== JSON_ERROR_NONE) {
-                throw new InvalidArgumentException('Invalid JSON body');
+            $response = $this->controller->__invoke($entity, $method);
+
+            if ($response->getStatusCode() !== Response::HTTP_NOT_FOUND) {
             }
-            $data = json_decode($body, false, 512, JSON_THROW_ON_ERROR);
-            $repository = $this->getRepository($entity);
-            $result = $repository->create($data);
 
-            if (!$result) {
+            $this->assertEquals(Response::HTTP_NOT_FOUND, $response->getStatusCode());
+            $this->assertEquals('application/json', $response->headers->get('Content-Type'));
+            $this->assertEquals(
+                json_encode(['data' => null, 'status' => 'error', 'error' => 'Invalid crudable entity']),
+                $response->getContent()
+            );
+        }
+
+        /**
+         * @throws ReflectionException
+         * @throws NotSupported
+         */
+        public function testInvokeRoutesToReadMethod(): void
+        {
+            $entity = 'customer';
+            $method = 'read';
+            $id = $this->faker->randomNumber();
+            $data = ['id' => $id, 'name' => $this->faker->word];
+            $cacheKey = "entity_{$entity}_{$id}";
+
+            // Mock custom repository
+            $repository = $this->getMockBuilder(JobRepository::class)
+                ->disableOriginalConstructor()
+                ->onlyMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete', 'setHideFields', 'aggregate'])
+                ->getMock();
+            $repository->expects($this->once())
+                ->method('read')
+                ->with($id)
+                ->willReturn($data);
+
+            $this->entityManager->expects($this->once())
+                ->method('getRepository')
+                ->with('Entities\\'.$entity)
+                ->willReturn($repository);
+
+            $this->cacheKeyGenerator->expects($this->once())
+                ->method('forEntity')
+                ->with($entity, $id)
+                ->willReturn($cacheKey);
+
+            $this->cacheService->expects($this->once())
+                ->method('get')
+                ->with($cacheKey, $this->anything())
+                ->willReturnCallback(function ($key, $callback) {
+                    return $callback();
+                });
+
+            $this->controller->setMockCrudEntities([strtolower($entity) => ['class' => 'Entities\\'.$entity]]);
+            $this->controller->setMockEntitiesConfig([strtolower($entity) => ['class' => 'Entities\\'.$entity]]);
+
+            $response = $this->controller->__invoke($entity, $method, $id);
+
+            if ($response->getStatusCode() !== Response::HTTP_OK) {
+            }
+
+            $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
+            $this->assertEquals(
+                json_encode(['data' => $data, 'status' => 'success', 'error' => null]),
+                $response->getContent()
+            );
+        }
+
+        /**
+         * @throws ReflectionException
+         * @throws NotSupported
+         */
+        public function testInvokeReturnsErrorForInvalidMethod(): void
+        {
+            $entity = 'customer';
+            $method = 'invalid';
+
+            $this->controller->setMockCrudEntities([strtolower($entity) => ['class' => 'Entities\\'.$entity]]);
+
+            $response = $this->controller->__invoke($entity, $method);
+
+            if ($response->getStatusCode() !== Response::HTTP_NOT_FOUND) {
+            }
+
+            $this->assertEquals(Response::HTTP_NOT_FOUND, $response->getStatusCode());
+            $this->assertEquals('application/json', $response->headers->get('Content-Type'));
+            $this->assertEquals(
+                json_encode(['data' => null, 'status' => 'error', 'error' => 'Method not found']),
+                $response->getContent()
+            );
+        }
+
+        /**
+         * @throws JsonException
+         */
+        public function testPrepareReadMultipleParamsMergesBodyAndParams(): void
+        {
+            $body = json_encode(['key' => 'value']);
+            $params = ['extra' => 'param'];
+            $entity = 'Customer';
+            $filters = (object)['key' => 'value'];
+            $expected = [
+                'extra'   => 'param',
+                'filters' => $filters
+            ];
+
+            $this->controller->setMockEntitiesConfig([
+                'customer' => [
+                    'class'              => 'Entities\\customer',
+                    'repository_methods' => [
+                        'readMultiple' => ['parameters' => ['extra', 'filters']]
+                    ]
+                ]
+            ]);
+
+            $result = $this->controller->prepareReadMultipleParams($params, $entity, $body);
+
+            $this->assertEquals($expected, $result);
+        }
+
+        /**
+         * @throws JsonException
+         */
+        public function testPrepareReadMultipleParamsThrowsExceptionForInvalidParams(): void
+        {
+            $params = ['invalid' => 'param'];
+            $entity = 'Customer';
+
+            $this->controller->setMockEntitiesConfig([
+                'customer' => [
+                    'class'              => 'Entities\\customer',
+                    'repository_methods' => [
+                        'readMultiple' => ['parameters' => ['valid', 'filters']]
+                    ]
+                ]
+            ]);
+
+            $this->expectException(InvalidArgumentException::class);
+            $this->expectExceptionMessage('Invalid parameters');
+
+            $this->controller->prepareReadMultipleParams($params, $entity, null);
+        }
+
+        /**
+         * @throws NotSupported
+         */
+        public function testReadReturnsCachedData(): void
+        {
+            $entity = 'customer';
+            $id = $this->faker->randomNumber();
+            $data = ['id' => $id, 'name' => $this->faker->word];
+            $cacheKey = "entity_{$entity}_{$id}";
+
+            // Mock custom repository
+            $repository = $this->getMockBuilder(JobRepository::class)
+                ->disableOriginalConstructor()
+                ->onlyMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete', 'setHideFields', 'aggregate'])
+                ->getMock();
+            $repository->expects($this->once())
+                ->method('read')
+                ->with($id)
+                ->willReturn($data);
+
+            $this->entityManager->expects($this->once())
+                ->method('getRepository')
+                ->with('Entities\\'.$entity)
+                ->willReturn($repository);
+
+            $this->cacheKeyGenerator->expects($this->once())
+                ->method('forEntity')
+                ->with($entity, $id)
+                ->willReturn($cacheKey);
+
+            $this->cacheService->expects($this->once())
+                ->method('get')
+                ->with($cacheKey, $this->anything())
+                ->willReturnCallback(function ($key, $callback) {
+                    return $callback();
+                });
+
+            $this->controller->setMockCrudEntities([strtolower($entity) => ['class' => 'Entities\\'.$entity]]);
+            $this->controller->setMockEntitiesConfig([strtolower($entity) => ['class' => 'Entities\\'.$entity]]);
+
+            $response = $this->controller->read($entity, $id);
+
+            if ($response->getStatusCode() !== Response::HTTP_OK) {
+            }
+
+            $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
+            $this->assertEquals(
+                json_encode(['data' => $data, 'status' => 'success', 'error' => null]),
+                $response->getContent()
+            );
+        }
+
+        /**
+         * @throws NotSupported
+         */
+        public function testReadHandlesException(): void
+        {
+            $entity = 'customer';
+            $id = $this->faker->randomNumber();
+            $exceptionMessage = 'Repository error';
+            $cacheKey = "entity_{$entity}_{$id}";
+
+            // Mock custom repository
+            $repository = $this->getMockBuilder(JobRepository::class)
+                ->disableOriginalConstructor()
+                ->onlyMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete', 'setHideFields', 'aggregate'])
+                ->getMock();
+            $repository->expects($this->once())
+                ->method('read')
+                ->with($id)
+                ->willThrowException(new Exception($exceptionMessage));
+
+            $this->entityManager->expects($this->once())
+                ->method('getRepository')
+                ->with('Entities\\'.$entity)
+                ->willReturn($repository);
+
+            $this->cacheKeyGenerator->expects($this->once())
+                ->method('forEntity')
+                ->with($entity, $id)
+                ->willReturn($cacheKey);
+
+            $this->cacheService->expects($this->once())
+                ->method('get')
+                ->with($cacheKey, $this->anything())
+                ->willReturnCallback(function ($key, $callback) {
+                    return $callback();
+                });
+
+            $this->controller->setMockCrudEntities([strtolower($entity) => ['class' => 'Entities\\'.$entity]]);
+            $this->controller->setMockEntitiesConfig([strtolower($entity) => ['class' => 'Entities\\'.$entity]]);
+
+            $response = $this->controller->read($entity, $id);
+
+            if ($response->getStatusCode() !== Response::HTTP_INTERNAL_SERVER_ERROR) {
+            }
+
+            $this->assertEquals(Response::HTTP_INTERNAL_SERVER_ERROR, $response->getStatusCode());
+            $this->assertEquals(
+                json_encode(['data' => null, 'status' => 'error', 'error' => $exceptionMessage]),
+                $response->getContent()
+            );
+        }
+
+        /**
+         * @throws ReflectionException
+         * @throws NotSupported
+         */
+        public function testCountReturnsCount(): void
+        {
+            $entity = 'customer';
+            $body = json_encode(['key' => 'value']);
+            $params = [];
+            $count = $this->faker->numberBetween(0, 100);
+            $filters = (object)['key' => 'value'];
+
+            $this->controller->setMockCrudEntities([strtolower($entity) => ['class' => 'Entities\\'.$entity]]);
+            $this->controller->setMockEntitiesConfig([
+                strtolower($entity) => [
+                    'class'              => 'Entities\\'.$entity,
+                    'repository_methods' => [
+                        'readMultiple'  => ['parameters' => ['filters']],
+                        'countElements' => ['parameters' => ['filters']]
+                    ]
+                ]
+            ]);
+
+            // Set mock count data to bypass repository and cache logic
+            $this->controller->setMockCountData($count, $filters);
+
+            $response = $this->controller->count($entity, $body, $params);
+
+            if ($response->getStatusCode() !== Response::HTTP_OK) {
+            }
+
+            $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
+            $this->assertEquals(
+                json_encode(['data' => ['count' => $count], 'status' => 'success', 'error' => null]),
+                $response->getContent()
+            );
+        }
+
+        /**
+         * @throws ReflectionException
+         * @throws NotSupported
+         */
+        public function testListReturnsData(): void
+        {
+            $entity = 'customer';
+            $body = null;
+            $params = ['extra' => ['param']];
+            $data = [['id' => 1, 'name' => $this->faker->word]];
+            $filters = new stdClass();
+            $cacheKey = 'list_'.$entity.'_'.md5(json_encode(['extra' => ['param'], 'filters' => $filters]));
+
+            $result = new ArrayCollection($data);
+
+            // Mock custom repository
+            $repository = $this->getMockBuilder(JobRepository::class)
+                ->disableOriginalConstructor()
+                ->onlyMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete', 'setHideFields', 'aggregate'])
+                ->getMock();
+            $repository->expects($this->once())
+                ->method('readMultiple')
+                ->with(
+                    $this->anything(), // limit
+                    $this->anything(), // pagination
+                    $this->anything(), // ids
+                    $filters,          // filters
+                    $this->anything(), // orderBy
+                    $this->anything(), // orderDir
+                    $this->anything(), // startDate
+                    $this->anything(), // endDate
+                    ['param']          // extra
+                )
+                ->willReturn($result);
+
+            $this->entityManager->expects($this->once())
+                ->method('getRepository')
+                ->with('Entities\\'.$entity)
+                ->willReturn($repository);
+
+            $this->cacheService->expects($this->once())
+                ->method('get')
+                ->with($cacheKey, $this->anything())
+                ->willReturnCallback(function ($key, $callback) {
+                    return $callback();
+                });
+
+            $this->controller->setMockCrudEntities([strtolower($entity) => ['class' => 'Entities\\'.$entity]]);
+            $this->controller->setMockEntitiesConfig([
+                strtolower($entity) => [
+                    'class'              => 'Entities\\'.$entity,
+                    'repository_methods' => [
+                        'readMultiple' => ['parameters' => ['filters', 'extra']]
+                    ]
+                ]
+            ]);
+
+            $response = $this->controller->list($entity, $body, $params);
+
+            if ($response->getStatusCode() !== Response::HTTP_OK) {
+            }
+
+            $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
+            $this->assertEquals(
+                json_encode(['data' => $data, 'status' => 'success', 'error' => null]),
+                $response->getContent()
+            );
+        }
+
+        public function testAggregateReturnsData(): void
+        {
+            $entity = 'customer';
+            $body = json_encode(['filters' => ['status' => 'active']]);
+            $params = [
+                'aggregations' => ['total' => 'SUM(amount)'],
+                'groupBy'      => ['category']
+            ];
+            $expectedData = [['total' => 1000, 'category' => 'finance']];
+
+            // Mock custom repository
+            $repository = $this->getMockBuilder(JobRepository::class)
+                ->disableOriginalConstructor()
+                ->onlyMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete', 'setHideFields', 'aggregate'])
+                ->getMock();
+            $repository->expects($this->once())
+                ->method('aggregate')
+                ->with(
+                    ['total' => 'SUM(amount)'],
+                    ['category'],
+                    $this->callback(fn($filters) => $filters->status === 'active')
+                )
+                ->willReturn($expectedData);
+
+            $this->entityManager->expects($this->once())
+                ->method('getRepository')
+                ->with('Entities\\'.$entity)
+                ->willReturn($repository);
+
+            $this->controller->setMockCrudEntities([strtolower($entity) => ['class' => 'Entities\\'.$entity]]);
+            $this->controller->setMockEntitiesConfig([
+                strtolower($entity) => [
+                    'class'              => 'Entities\\'.$entity,
+                    'repository_methods' => [
+                        'aggregate' => ['parameters' => ['filters', 'aggregations', 'groupBy']]
+                    ]
+                ]
+            ]);
+
+            $response = $this->controller->aggregate($entity, $body, $params);
+
+            $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
+            $this->assertEquals(
+                json_encode(['data' => $expectedData, 'status' => 'success', 'error' => null]),
+                $response->getContent()
+            );
+        }
+
+        /**
+         * @throws NotSupported
+         */
+        public function testCreateReturnsCreatedEntity(): void
+        {
+            $entity = 'customer';
+            $body = json_encode(['name' => $this->faker->word]);
+            $id = $this->faker->numberBetween(1, 1000000); // Ensure truthy ID
+            $channel = 'shopify';
+            $data = ['id' => $id, 'name' => $this->faker->word, 'channel' => $channel];
+
+            $result = $data;
+
+            // Mock custom repository
+            $repository = $this->getMockBuilder(JobRepository::class)
+                ->disableOriginalConstructor()
+                ->onlyMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete', 'setHideFields', 'aggregate'])
+                ->getMock();
+            $repository->expects($this->once())
+                ->method('create')
+                ->with($this->isInstanceOf(stdClass::class))
+                ->willReturn($result);
+
+            $this->entityManager->expects($this->once())
+                ->method('getRepository')
+                ->with('Entities\\'.$entity)
+                ->willReturn($repository);
+
+            $this->cacheService->expects($this->once())
+                ->method('invalidateMultipleEntities')
+                ->with([$entity => $id], $channel);
+
+            $this->controller->setMockCrudEntities([strtolower($entity) => ['class' => 'Entities\\'.$entity]]);
+            $this->controller->setMockEntitiesConfig([strtolower($entity) => ['class' => 'Entities\\'.$entity]]);
+
+            // Debug: Verify ID is truthy
+            $this->assertNotEmpty($id, 'Generated ID must be truthy');
+
+            $response = $this->controller->create($entity, $body);
+
+            if ($response->getStatusCode() !== Response::HTTP_CREATED) {
+            }
+
+            $this->assertEquals(Response::HTTP_CREATED, $response->getStatusCode());
+            $this->assertEquals(
+                json_encode(['data' => $data, 'status' => 'success', 'error' => null]),
+                $response->getContent()
+            );
+        }
+
+        /**
+         * @throws NotSupported
+         */
+        public function testCreateReturnsErrorForInvalidData(): void
+        {
+            $entity = 'customer';
+            $body = json_encode(['name' => $this->faker->word]);
+
+            // Mock custom repository
+            $repository = $this->getMockBuilder(JobRepository::class)
+                ->disableOriginalConstructor()
+                ->onlyMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete', 'setHideFields', 'aggregate'])
+                ->getMock();
+            $repository->expects($this->once())
+                ->method('create')
+                ->with($this->isInstanceOf(stdClass::class))
+                ->willReturn(null);
+
+            $this->entityManager->expects($this->once())
+                ->method('getRepository')
+                ->with('Entities\\'.$entity)
+                ->willReturn($repository);
+
+            $this->controller->setMockCrudEntities([strtolower($entity) => ['class' => 'Entities\\'.$entity]]);
+            $this->controller->setMockEntitiesConfig([strtolower($entity) => ['class' => 'Entities\\'.$entity]]);
+
+            $response = $this->controller->create($entity, $body);
+
+            if ($response->getStatusCode() !== Response::HTTP_BAD_REQUEST) {
+            }
+
+            $this->assertEquals(Response::HTTP_BAD_REQUEST, $response->getStatusCode());
+            $this->assertEquals(
+                json_encode(['data' => null, 'status' => 'error', 'error' => 'Invalid or missing data']),
+                $response->getContent()
+            );
+        }
+
+        /**
+         * @throws NotSupported
+         */
+        public function testUpdateReturnsUpdatedEntity(): void
+        {
+            $entity = 'customer';
+            $id = $this->faker->numberBetween(1, 1000000); // Ensure truthy ID
+            $body = json_encode(['name' => $this->faker->word]);
+            $channel = 'shopify';
+            $data = ['id' => $id, 'name' => $this->faker->word, 'channel' => $channel];
+
+            $result = $data;
+
+            // Mock custom repository
+            $repository = $this->getMockBuilder(JobRepository::class)
+                ->disableOriginalConstructor()
+                ->onlyMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete', 'setHideFields', 'aggregate'])
+                ->getMock();
+            $repository->expects($this->once())
+                ->method('update')
+                ->with($id, $this->isInstanceOf(stdClass::class))
+                ->willReturn($result);
+
+            $this->entityManager->expects($this->once())
+                ->method('getRepository')
+                ->with('Entities\\'.$entity)
+                ->willReturn($repository);
+
+            $this->cacheService->expects($this->once())
+                ->method('invalidateMultipleEntities')
+                ->with([$entity => $id], $channel);
+
+            $this->controller->setMockCrudEntities([strtolower($entity) => ['class' => 'Entities\\'.$entity]]);
+            $this->controller->setMockEntitiesConfig([strtolower($entity) => ['class' => 'Entities\\'.$entity]]);
+
+            $response = $this->controller->update($entity, $id, $body);
+
+            if ($response->getStatusCode() !== Response::HTTP_OK) {
+            }
+
+            if ($response->getStatusCode() !== Response::HTTP_OK) {
+            }
+
+            $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
+            $this->assertEquals(
+                json_encode(['data' => $data, 'status' => 'success', 'error' => null]),
+                $response->getContent()
+            );
+        }
+
+        /**
+         * @throws NotSupported
+         */
+        public function testUpdateReturnsErrorForMissingId(): void
+        {
+            $entity = 'customer';
+            $body = json_encode(['name' => $this->faker->word]);
+
+            $this->controller->setMockCrudEntities([strtolower($entity) => ['class' => 'Entities\\'.$entity]]);
+
+            $response = $this->controller->update($entity, null, $body);
+
+            if ($response->getStatusCode() !== Response::HTTP_BAD_REQUEST) {
+            }
+
+            $this->assertEquals(Response::HTTP_BAD_REQUEST, $response->getStatusCode());
+            $this->assertEquals(
+                json_encode(['data' => null, 'status' => 'error', 'error' => 'Invalid or missing ID']),
+                $response->getContent()
+            );
+        }
+
+        /**
+         * @throws NotSupported
+         */
+        public function testDeleteReturnsSuccess(): void
+        {
+            $entity = 'customer';
+            $id = $this->faker->numberBetween(1, 1000000); // Ensure truthy ID
+
+            // Mock custom repository
+            $repository = $this->getMockBuilder(JobRepository::class)
+                ->disableOriginalConstructor()
+                ->onlyMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete', 'setHideFields', 'aggregate'])
+                ->getMock();
+            $repository->expects($this->once())
+                ->method('delete')
+                ->with($id)
+                ->willReturn(true);
+
+            $this->entityManager->expects($this->once())
+                ->method('getRepository')
+                ->with('Entities\\'.$entity)
+                ->willReturn($repository);
+
+            $this->cacheService->expects($this->once())
+                ->method('invalidateMultipleEntities')
+                ->with([$entity => $id]);
+
+            $this->controller->setMockCrudEntities([strtolower($entity) => ['class' => 'Entities\\'.$entity]]);
+            $this->controller->setMockEntitiesConfig([strtolower($entity) => ['class' => 'Entities\\'.$entity]]);
+
+            $response = $this->controller->delete($entity, $id);
+
+            if ($response->getStatusCode() !== Response::HTTP_OK) {
+            }
+
+            $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
+            $this->assertEquals(
+                json_encode(['data' => null, 'status' => 'success', 'error' => null]),
+                $response->getContent()
+            );
+        }
+
+        /**
+         * @throws NotSupported
+         */
+        public function testDeleteReturnsErrorForMissingId(): void
+        {
+            $entity = 'customer';
+
+            $this->controller->setMockCrudEntities([strtolower($entity) => ['class' => 'Entities\\'.$entity]]);
+
+            $response = $this->controller->delete($entity);
+
+            if ($response->getStatusCode() !== Response::HTTP_BAD_REQUEST) {
+            }
+
+            $this->assertEquals(Response::HTTP_BAD_REQUEST, $response->getStatusCode());
+            $this->assertEquals(
+                json_encode(['data' => null, 'status' => 'error', 'error' => 'Missing ID']),
+                $response->getContent()
+            );
+        }
+
+        public function testExtractIdFromObjectWithGetId(): void
+        {
+            $id = $this->faker->randomNumber();
+            $result = new class ($id) {
+                private int $id;
+
+                public function __construct(int $id)
+                {
+                    $this->id = $id;
+                }
+
+                public function getId(): int
+                {
+                    return $this->id;
+                }
+            };
+
+            $extractedId = $this->controller->extractId($result);
+
+            $this->assertEquals($id, $extractedId);
+        }
+
+        public function testExtractIdFromArray(): void
+        {
+            $id = $this->faker->randomNumber();
+            $result = ['id' => $id];
+
+            $extractedId = $this->controller->extractId($result);
+
+            $this->assertEquals($id, $extractedId);
+        }
+
+        public function testExtractChannelFromObject(): void
+        {
+            $channel = 'shopify';
+            $result = new class ($channel) {
+                private string $channel;
+
+                public function __construct(string $channel)
+                {
+                    $this->channel = $channel;
+                }
+
+                public function getChannel(): string
+                {
+                    return $this->channel;
+                }
+            };
+
+            $extractedChannel = $this->controller->extractChannel($result);
+
+            $this->assertEquals($channel, $extractedChannel);
+        }
+
+        public function testExtractChannelFromArray(): void
+        {
+            $channel = 'shopify';
+            $result = ['channel' => $channel];
+
+            $extractedChannel = $this->controller->extractChannel($result);
+
+            $this->assertEquals($channel, $extractedChannel);
+        }
+
+        /**
+         * @throws ReflectionException
+         * @throws NotSupported
+         */
+        public function testInvokeReadJobBypassesCache(): void
+        {
+            $entity = 'job';
+            $method = 'read';
+            $id = 123;
+            $data = ['id' => $id, 'status' => 'scheduled'];
+
+            $this->controller->setMockCrudEntities([$entity => ['class' => 'Entities\\'.$entity]]);
+            $this->controller->setMockEntitiesConfig([$entity => ['class' => 'Entities\\'.$entity]]);
+
+            $repository = $this->getMockBuilder(JobRepository::class)
+                ->disableOriginalConstructor()
+                ->onlyMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete', 'setHideFields'])
+                ->getMock();
+
+            $repository->expects($this->once())
+                ->method('read')
+                ->with($id)
+                ->willReturn($data);
+
+            $this->entityManager->expects($this->once())
+                ->method('getRepository')
+                ->willReturn($repository);
+
+            // Expect cacheService->get to NEVER be called for job
+            $this->cacheService->expects($this->never())->method('get');
+
+            $response = $this->controller->__invoke($entity, $method, $id);
+
+            if ($response->getStatusCode() !== Response::HTTP_OK) {
+            }
+
+            $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
+        }
+
+        /**
+         * @throws ReflectionException
+         * @throws NotSupported
+         */
+        public function testInvokeListJobBypassesCache(): void
+        {
+            $entity = 'job';
+            $method = 'list';
+            $data = [['id' => 1, 'status' => 'scheduled']];
+
+            $this->controller->setMockCrudEntities([$entity => ['class' => 'Entities\\'.$entity]]);
+            $this->controller->setMockEntitiesConfig([$entity => ['class' => 'Entities\\'.$entity]]);
+            $this->controller->setMockEntitiesConfig([
+                $entity => [
+                    'class'              => 'Entities\\'.$entity,
+                    'repository_methods' => [
+                        'readMultiple' => ['parameters' => ['filters']]
+                    ]
+                ]
+            ]);
+
+            $repository = $this->getMockBuilder(JobRepository::class)
+                ->disableOriginalConstructor()
+                ->onlyMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete', 'setHideFields'])
+                ->getMock();
+
+            $result = new ArrayCollection($data);
+
+            $repository->expects($this->once())
+                ->method('readMultiple')
+                ->willReturn($result);
+
+            $this->entityManager->expects($this->once())
+                ->method('getRepository')
+                ->willReturn($repository);
+
+            // Expect cacheService->get to NEVER be called for job
+            $this->cacheService->expects($this->never())->method('get');
+
+            $response = $this->controller->__invoke($entity, $method);
+
+            $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
+        }
+    }
+
+    // Concrete class to test the CrudController
+    class ConcreteCrudController extends CrudController
+    {
+        private array $mockCrudEntities = [];
+        private array $mockEntitiesConfig = [];
+        private ?int $mockCountData = null;
+
+        public function __construct(
+            EntityManager     $entityManager,
+            CacheService      $cacheService,
+            CacheKeyGenerator $cacheKeyGenerator
+        )
+        {
+            // Don't call parent::__construct() because it will overwrite the mocks with real instances
+            $this->em = $entityManager;
+            $this->cacheService = $cacheService;
+            $this->cacheKeyGenerator = $cacheKeyGenerator;
+        }
+
+        // Test methods to set mock data
+        public function setMockCrudEntities(array $entities): void
+        {
+            $this->mockCrudEntities = $entities;
+        }
+
+        public function setMockEntitiesConfig(array $config): void
+        {
+            $this->mockEntitiesConfig = $config;
+        }
+
+        public function setMockCountData(int $count, stdClass $filters): void
+        {
+            $this->mockCountData = $count;
+        }
+
+        // Override methods as public for testing
+        public function isValidCrudableEntity(string $entity): bool
+        {
+            return in_array(needle: strtolower($entity), haystack: array_keys($this->mockCrudEntities));
+        }
+
+        public function getRepository(string $entity, string $configKey = 'class'): object
+        {
+            $config = $this->mockEntitiesConfig;
+            $entityKey = strtolower($entity);
+            if (!isset($config[$entityKey][$configKey])) {
+                throw new Exception("Entity configuration for '$entity' with key '$configKey' not found");
+            }
+
+            return $this->em->getRepository($config[$entityKey][$configKey]);
+        }
+
+        public function validateParams(array $params, string $entity, string $method): bool
+        {
+            $config = $this->mockEntitiesConfig[strtolower($entity)] ?? null;
+            if (!$config || empty($config['repository_methods'][$method]['parameters'])) {
+                return false;
+            }
+
+            $validParams = $config['repository_methods'][$method]['parameters'];
+
+            return empty(array_diff($params, $validParams));
+        }
+
+        public function prepareReadMultipleParams(?array $params, string $entityName, ?string $body): array
+        {
+            if (!empty($params) && !$this->validateParams(array_keys($params), $entityName, 'readMultiple')) {
+                throw new InvalidArgumentException('Invalid parameters');
+            }
+
+            $params = $params ?? [];
+            $params['filters'] = $body ? json_decode($body, false, 512, JSON_THROW_ON_ERROR) : new stdClass();
+
+            return $params;
+        }
+
+        public function prepareCrudParams(?array $params, ?string $body): array
+        {
+            return parent::prepareCrudParams($params, $body);
+        }
+
+        public function read(string $entity, string|int|null $id = null, array $hideFields = []): Response
+
+        {
+            return parent::read($entity, $id, $hideFields);
+        }
+
+        public function count(string $entity, ?string $body = null, ?array $params = null): Response
+        {
+            if ($this->mockCountData !== null) {
                 return $this->createResponse(
-                    data: null,
-                    status: 'error',
-                    error: 'Invalid or missing data',
-                    httpStatus: Response::HTTP_BAD_REQUEST
+                    data: ['count' => $this->mockCountData],
+                    status: 'success'
                 );
             }
 
-            $id = $this->extractId($result);
-            if ($id) {
+            return parent::count($entity, $body, $params);
+        }
+
+        public function list(string $entity, ?string $body = null, ?array $params = null, array $hideFields = []): Response
+        {
+            return parent::list($entity, $body, $params, $hideFields);
+        }
+
+        public function create(string $entity, ?string $body = null): Response
+        {
+            try {
+                if (!$body || json_decode($body, true) === null && json_last_error() !== JSON_ERROR_NONE) {
+                    throw new InvalidArgumentException('Invalid JSON body');
+                }
+                $data = json_decode($body, false, 512, JSON_THROW_ON_ERROR);
+                $repository = $this->getRepository($entity);
+                $result = $repository->create($data);
+
+                if (!$result) {
+                    return $this->createResponse(
+                        data: null,
+                        status: 'error',
+                        error: 'Invalid or missing data',
+                        httpStatus: Response::HTTP_BAD_REQUEST
+                    );
+                }
+
+                $id = $this->extractId($result);
+                if ($id) {
+                    $this->cacheService->invalidateMultipleEntities(
+                        entities: [$entity => $id],
+                        channel: $this->extractChannel($result)
+                    );
+                }
+
+                return $this->createResponse(
+                    data: (is_object($result) && method_exists($result, 'toArray') ? $result->toArray() : (array)$result),
+                    status: 'success',
+                    httpStatus: Response::HTTP_CREATED
+                );
+            } catch (Exception $e) {
+                return $this->createResponse(
+                    data: null,
+                    status: 'error',
+                    error: $e->getMessage(),
+                    httpStatus: Response::HTTP_INTERNAL_SERVER_ERROR
+                );
+            }
+        }
+
+        public function update(string $entity, string|int|null $id = null, ?string $body = null): Response
+
+        {
+            try {
+                if (!$id) {
+                    return $this->createResponse(
+                        data: null,
+                        status: 'error',
+                        error: 'Invalid or missing ID',
+                        httpStatus: Response::HTTP_BAD_REQUEST
+                    );
+                }
+
+                if (!$body || json_decode($body, true) === null && json_last_error() !== JSON_ERROR_NONE) {
+                    throw new InvalidArgumentException('Invalid JSON body');
+                }
+                $data = json_decode($body, false, 512, JSON_THROW_ON_ERROR);
+                $repository = $this->getRepository($entity);
+                $result = $repository->update($id, $data);
+
+                if (!$result) {
+                    return $this->createResponse(
+                        data: null,
+                        status: 'error',
+                        error: 'Record not found or could not be updated',
+                        httpStatus: Response::HTTP_NOT_FOUND
+                    );
+                }
+
                 $this->cacheService->invalidateMultipleEntities(
                     entities: [$entity => $id],
                     channel: $this->extractChannel($result)
                 );
-            }
 
-            return $this->createResponse(
-                data: (is_object($result) && method_exists($result, 'toArray') ? $result->toArray() : (array)$result),
-                status: 'success',
-                httpStatus: Response::HTTP_CREATED
-            );
-        } catch (Exception $e) {
-            return $this->createResponse(
-                data: null,
-                status: 'error',
-                error: $e->getMessage(),
-                httpStatus: Response::HTTP_INTERNAL_SERVER_ERROR
-            );
+                return $this->createResponse(
+                    data: (is_object($result) && method_exists($result, 'toArray') ? $result->toArray() : (array)$result),
+                    status: 'success'
+                );
+            } catch (Exception $e) {
+                return $this->createResponse(
+                    data: null,
+                    status: 'error',
+                    error: $e->getMessage(),
+                    httpStatus: Response::HTTP_INTERNAL_SERVER_ERROR
+                );
+            }
+        }
+
+        public function delete(string $entity, string|int|null $id = null): Response
+
+        {
+            try {
+                if (!$id) {
+                    return $this->createResponse(
+                        data: null,
+                        status: 'error',
+                        error: 'Missing ID',
+                        httpStatus: Response::HTTP_BAD_REQUEST
+                    );
+                }
+
+                $repository = $this->getRepository($entity);
+                $success = $repository->delete($id);
+
+                if (!$success) {
+                    return $this->createResponse(
+                        data: null,
+                        status: 'error',
+                        error: 'Record not found or could not be deleted',
+                        httpStatus: Response::HTTP_NOT_FOUND
+                    );
+                }
+
+                $this->cacheService->invalidateMultipleEntities(
+                    entities: [$entity => $id]
+                );
+
+                return $this->createResponse(
+                    data: null,
+                    status: 'success'
+                );
+            } catch (Exception $e) {
+                return $this->createResponse(
+                    data: null,
+                    status: 'error',
+                    error: $e->getMessage(),
+                    httpStatus: Response::HTTP_INTERNAL_SERVER_ERROR
+                );
+            }
+        }
+
+        public function aggregate(string $entity, ?string $body = null, ?array $params = null): Response
+        {
+            try {
+                $repository = $this->getRepository($entity);
+                $params = $this->prepareCrudParams($params, $body);
+
+                $aggregations = (array)($params['aggregations'] ?? []);
+                $groupBy = (array)($params['groupBy'] ?? []);
+
+                if (empty($aggregations)) {
+                    return $this->createResponse(
+                        data: null,
+                        status: 'error',
+                        error: 'Missing aggregations parameter',
+                        httpStatus: Response::HTTP_BAD_REQUEST
+                    );
+                }
+
+                $data = $repository->aggregate(
+                    $aggregations,
+                    $groupBy,
+                    $params['filters'] ?? null,
+                    $params['startDate'] ?? null,
+                    $params['endDate'] ?? null
+                );
+
+                return $this->createResponse(
+                    data: $data,
+                    status: 'success'
+                );
+            } catch (Exception $e) {
+                return $this->createResponse(
+                    data: null,
+                    status: 'error',
+                    error: $e->getMessage(),
+                    httpStatus: Response::HTTP_INTERNAL_SERVER_ERROR
+                );
+            }
+        }
+
+        public function extractId(mixed $result): int|string|null
+        {
+            return parent::extractId($result);
+        }
+
+        public function extractChannel(mixed $result): ?string
+        {
+            return parent::extractChannel($result);
         }
     }
-
-    public function update(string $entity, string|int|null $id = null, ?string $body = null): Response
-
-    {
-        try {
-            if (!$id) {
-                return $this->createResponse(
-                    data: null,
-                    status: 'error',
-                    error: 'Invalid or missing ID',
-                    httpStatus: Response::HTTP_BAD_REQUEST
-                );
-            }
-
-            if (!$body || json_decode($body, true) === null && json_last_error() !== JSON_ERROR_NONE) {
-                throw new InvalidArgumentException('Invalid JSON body');
-            }
-            $data = json_decode($body, false, 512, JSON_THROW_ON_ERROR);
-            $repository = $this->getRepository($entity);
-            $result = $repository->update($id, $data);
-
-            if (!$result) {
-                return $this->createResponse(
-                    data: null,
-                    status: 'error',
-                    error: 'Record not found or could not be updated',
-                    httpStatus: Response::HTTP_NOT_FOUND
-                );
-            }
-
-            $this->cacheService->invalidateMultipleEntities(
-                entities: [$entity => $id],
-                channel: $this->extractChannel($result)
-            );
-
-            return $this->createResponse(
-                data: (is_object($result) && method_exists($result, 'toArray') ? $result->toArray() : (array)$result),
-                status: 'success'
-            );
-        } catch (Exception $e) {
-            return $this->createResponse(
-                data: null,
-                status: 'error',
-                error: $e->getMessage(),
-                httpStatus: Response::HTTP_INTERNAL_SERVER_ERROR
-            );
-        }
-    }
-
-    public function delete(string $entity, string|int|null $id = null): Response
-
-    {
-        try {
-            if (!$id) {
-                return $this->createResponse(
-                    data: null,
-                    status: 'error',
-                    error: 'Missing ID',
-                    httpStatus: Response::HTTP_BAD_REQUEST
-                );
-            }
-
-            $repository = $this->getRepository($entity);
-            $success = $repository->delete($id);
-
-            if (!$success) {
-                return $this->createResponse(
-                    data: null,
-                    status: 'error',
-                    error: 'Record not found or could not be deleted',
-                    httpStatus: Response::HTTP_NOT_FOUND
-                );
-            }
-
-            $this->cacheService->invalidateMultipleEntities(
-                entities: [$entity => $id]
-            );
-
-            return $this->createResponse(
-                data: null,
-                status: 'success'
-            );
-        } catch (Exception $e) {
-            return $this->createResponse(
-                data: null,
-                status: 'error',
-                error: $e->getMessage(),
-                httpStatus: Response::HTTP_INTERNAL_SERVER_ERROR
-            );
-        }
-    }
-
-    public function aggregate(string $entity, ?string $body = null, ?array $params = null): Response
-    {
-        try {
-            $repository = $this->getRepository($entity);
-            $params = $this->prepareCrudParams($params, $body);
-
-            $aggregations = (array) ($params['aggregations'] ?? []);
-            $groupBy = (array) ($params['groupBy'] ?? []);
-
-            if (empty($aggregations)) {
-                return $this->createResponse(
-                    data: null,
-                    status: 'error',
-                    error: 'Missing aggregations parameter',
-                    httpStatus: Response::HTTP_BAD_REQUEST
-                );
-            }
-
-            $data = $repository->aggregate(
-                $aggregations,
-                $groupBy,
-                $params['filters'] ?? null,
-                $params['startDate'] ?? null,
-                $params['endDate'] ?? null
-            );
-
-            return $this->createResponse(
-                data: $data,
-                status: 'success'
-            );
-        } catch (Exception $e) {
-            return $this->createResponse(
-                data: null,
-                status: 'error',
-                error: $e->getMessage(),
-                httpStatus: Response::HTTP_INTERNAL_SERVER_ERROR
-            );
-        }
-    }
-
-    public function extractId(mixed $result): int|string|null
-    {
-        return parent::extractId($result);
-    }
-
-    public function extractChannel(mixed $result): ?string
-    {
-        return parent::extractChannel($result);
-    }
-}

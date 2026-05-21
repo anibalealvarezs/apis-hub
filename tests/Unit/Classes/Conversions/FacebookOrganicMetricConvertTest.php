@@ -10,7 +10,6 @@ use Entities\Analytics\Account;
 use Entities\Analytics\Channeled\ChanneledAccount;
 use Entities\Analytics\Page;
 use Entities\Analytics\Post;
-use Anibalealvarezs\ApiSkeleton\Enums\Channel;
 use Anibalealvarezs\ApiSkeleton\Enums\Period;
 use PHPUnit\Framework\MockObject\MockObject;
 use Tests\Unit\BaseUnitTestCase;
@@ -29,27 +28,27 @@ class FacebookOrganicMetricConvertTest extends BaseUnitTestCase
         $this->page->method('getUrl')->willReturn($this->faker->url);
 
         $this->post = $this->createMock(Post::class);
-        $this->post->method('getPostId')->willReturn('post' . $this->faker->randomNumber());
+        $this->post->method('getPostId')->willReturn('post'.$this->faker->randomNumber());
 
         $this->account = $this->createMock(Account::class);
         $this->account->method('getName')->willReturn($this->faker->word);
 
         $this->channeledAccount = $this->createMock(ChanneledAccount::class);
-        $this->channeledAccount->method('getPlatformId')->willReturn('ca' . $this->faker->randomNumber());
+        $this->channeledAccount->method('getId')->willReturn($this->faker->randomNumber());
     }
 
     public function testPageMetrics(): void
     {
         $value = $this->faker->numberBetween(1, 1000);
-        $platformId = 'page' . $this->faker->randomNumber();
+        $platformId = 'page'.$this->faker->randomNumber();
         $date = $this->faker->iso8601;
 
         $rows = [
             [
-                'name' => 'page_impressions',
+                'name'   => 'page_impressions',
                 'values' => [
                     [
-                        'value' => $value,
+                        'value'    => $value,
                         'end_time' => $date
                     ]
                 ]
@@ -72,7 +71,7 @@ class FacebookOrganicMetricConvertTest extends BaseUnitTestCase
         $this->assertEquals('page_impressions', $metric->name);
         $this->assertEquals($value, $metric->value);
         $this->assertEquals($platformId, $metric->platformId);
-        $this->assertEquals(Channel::facebook_organic->value, $metric->channel);
+        $this->assertEquals('facebook_organic', $metric->channel);
     }
 
     public function testIgAccountMetrics(): void
@@ -82,7 +81,7 @@ class FacebookOrganicMetricConvertTest extends BaseUnitTestCase
 
         $rows = [
             [
-                'name' => 'impressions',
+                'name'        => 'impressions',
                 'total_value' => [
                     'value' => $value
                 ]
@@ -104,7 +103,7 @@ class FacebookOrganicMetricConvertTest extends BaseUnitTestCase
         $metric = $result->first();
         $this->assertEquals('impressions', $metric->name);
         $this->assertEquals($value, $metric->value);
-        $this->assertEquals($this->channeledAccount->getPlatformId(), $metric->platformId);
+        $this->assertEquals($this->channeledAccount->getId(), $metric->platformId);
     }
 
     public function testIgMediaMetrics(): void
@@ -112,7 +111,7 @@ class FacebookOrganicMetricConvertTest extends BaseUnitTestCase
         $likes = $this->faker->numberBetween(1, 100);
         $rows = [
             [
-                'name' => 'likes',
+                'name'   => 'likes',
                 'values' => [
                     [
                         'value' => $likes
@@ -127,8 +126,7 @@ class FacebookOrganicMetricConvertTest extends BaseUnitTestCase
             $this->page,
             $this->post,
             $this->account,
-            $this->channeledAccount,
-            null
+            $this->channeledAccount
         );
 
         $this->assertInstanceOf(ArrayCollection::class, $result);

@@ -7,9 +7,9 @@
     use Doctrine\DBAL\Connection;
     use Doctrine\DBAL\Query\QueryBuilder;
     use InvalidArgumentException;
-    use Traits\AggregationPlan;
-    use Traits\LegacyAggregateExecutionContext;
-    use Traits\Stages\LegacyAggregateDateStage;
+    use Services\Aggregation\AggregationPlan;
+    use Services\Aggregation\LegacyAggregateExecutionContext;
+    use Services\Aggregation\Stages\LegacyAggregateDateStage;
     use Tests\Unit\BaseUnitTestCase;
 
     final class LegacyAggregateDateStageSmokeTest extends BaseUnitTestCase

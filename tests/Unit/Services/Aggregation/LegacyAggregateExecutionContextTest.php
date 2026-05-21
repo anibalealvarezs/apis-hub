@@ -6,8 +6,8 @@
 
     use Doctrine\DBAL\Connection;
     use Doctrine\DBAL\Query\QueryBuilder;
-    use Traits\AggregationPlan;
-    use Traits\LegacyAggregateExecutionContext;
+    use Services\Aggregation\AggregationPlan;
+    use Services\Aggregation\LegacyAggregateExecutionContext;
     use Tests\Unit\BaseUnitTestCase;
 
     final class LegacyAggregateExecutionContextTest extends BaseUnitTestCase

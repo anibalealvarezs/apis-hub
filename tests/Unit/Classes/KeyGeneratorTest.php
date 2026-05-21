@@ -1,138 +1,136 @@
 <?php
 
-declare(strict_types=1);
+    declare(strict_types=1);
 
-namespace Tests\Unit\Classes;
+    namespace Tests\Unit\Classes;
 
-use Anibalealvarezs\ApiDriverCore\Classes\KeyGenerator;
-use Anibalealvarezs\ApiSkeleton\Enums\Channel;
-use Anibalealvarezs\ApiSkeleton\Enums\Period;
-use Tests\Unit\BaseUnitTestCase;
-use DateTime;
+    use Anibalealvarezs\ApiDriverCore\Classes\KeyGenerator;
+    use Anibalealvarezs\ApiSkeleton\Enums\Country;
+    use Anibalealvarezs\ApiSkeleton\Enums\Device;
+    use Anibalealvarezs\ApiSkeleton\Enums\Period;
+    use Tests\Unit\BaseUnitTestCase;
+    use DateTime;
 
-class KeyGeneratorTest extends BaseUnitTestCase
-{
-    public function testGenerateMetricConfigKeyConsistency(): void
+    class KeyGeneratorTest extends BaseUnitTestCase
     {
-        $channel = Channel::facebook_marketing;
-        $name = $this->faker->word();
-        $period = Period::Daily;
-        $date = $this->faker->date();
-        $account = $this->faker->uuid();
-        $customer = $this->faker->email();
+        public function testGenerateMetricConfigKeyConsistency(): void
+        {
+            $channel = 'facebook_marketing';
+            $name = $this->faker->word();
+            $period = Period::Daily;
+            $account = $this->faker->uuid();
+            $customer = $this->faker->email();
 
-        $key1 = KeyGenerator::generateMetricConfigKey(
-            channel: $channel,
-            name: $name,
-            period: $period,
-            account: $account,
-            customer: $customer
-        );
+            $key1 = KeyGenerator::generateMetricConfigKey(
+                channel: $channel,
+                name: $name,
+                period: $period,
+                account: $account,
+                customer: $customer
+            );
 
-        $key2 = KeyGenerator::generateMetricConfigKey(
-            channel: $channel,
-            name: $name,
-            period: $period,
-            account: $account,
-            customer: $customer
-        );
+            $key2 = KeyGenerator::generateMetricConfigKey(
+                channel: $channel,
+                name: $name,
+                period: $period,
+                account: $account,
+                customer: $customer
+            );
 
-        $this->assertEquals($key1, $key2, "Same inputs should yield same key");
-        $this->assertEquals(32, strlen($key1), "MD5 should be 32 chars");
-    }
-
-    public function testGenerateMetricConfigKeyUniqueness(): void
-    {
-        $channel = Channel::facebook_marketing;
-        $name = $this->faker->word();
-        $period = Period::Daily;
-        $date = $this->faker->date();
-        $account = $this->faker->uuid();
-
-        $key1 = KeyGenerator::generateMetricConfigKey(
-            channel: $channel,
-            name: $name,
-            period: $period,
-            account: $account,
-            customer: $this->faker->email()
-        );
-
-        $key2 = KeyGenerator::generateMetricConfigKey(
-            channel: $channel,
-            name: $name,
-            period: $period,
-            account: $account,
-            customer: $this->faker->email() // different customer
-        );
-
-        $this->assertNotEquals($key1, $key2, "Different inputs should yield different keys");
-    }
-
-    public function testGenerateMetricConfigKeyWithManyDimensions(): void
-    {
-        // Testing that all fields are indeed considered
-        $params = [
-            'channel' => Channel::google_ads,
-            'name' => $this->faker->word(),
-            'period' => Period::Daily,
-            'account' => $this->faker->company(),
-            'channeledAccount' => $this->faker->uuid(),
-            'campaign' => $this->faker->sentence(),
-            'channeledCampaign' => $this->faker->uuid(),
-            'channeledAdGroup' => $this->faker->uuid(),
-            'channeledAd' => $this->faker->uuid(),
-            'creative' => $this->faker->uuid(),
-            'page' => $this->faker->url(),
-            'query' => $this->faker->word(),
-            'post' => $this->faker->uuid(),
-            'product' => $this->faker->isbn13(),
-            'customer' => $this->faker->email(),
-            'order' => $this->faker->uuid(),
-            'country' => 'USA',
-            'device' => 'mobile'
-        ];
-
-        $baseKey = KeyGenerator::generateMetricConfigKey(...$params);
-
-        foreach ($params as $key => $value) {
-            $modifiedParams = $params;
-            if (is_string($value)) {
-                $modifiedParams[$key] = $value . '_modified';
-            } else {
-                continue; // Skip Enums for this specific modification test
-            }
-            
-            // Skip the ones that might have special formatting if modified blindly
-            if (in_array($key, ['channel', 'period'])) continue;
-
-            $newKey = KeyGenerator::generateMetricConfigKey(...$modifiedParams);
-            $this->assertNotEquals($baseKey, $newKey, "Modifying $key should change the hash");
+            $this->assertEquals($key1, $key2, "Same inputs should yield same key");
+            $this->assertEquals(32, strlen($key1), "MD5 should be 32 chars");
         }
+
+        public function testGenerateMetricConfigKeyUniqueness(): void
+        {
+            $channel = 'facebook_marketing';
+            $name = $this->faker->word();
+            $period = Period::Daily;
+            $date = $this->faker->date();
+            $account = $this->faker->uuid();
+
+            $key1 = KeyGenerator::generateMetricConfigKey(
+                channel: $channel,
+                name: $name,
+                period: $period,
+                account: $account,
+                customer: $this->faker->email()
+            );
+
+            $key2 = KeyGenerator::generateMetricConfigKey(
+                channel: $channel,
+                name: $name,
+                period: $period,
+                account: $account,
+                customer: $this->faker->email() // different customer
+            );
+
+            $this->assertNotEquals($key1, $key2, "Different inputs should yield different keys");
+        }
+
+        public function testGenerateMetricConfigKeyWithManyDimensions(): void
+        {
+            // Testing that all fields are indeed considered
+            $params = [
+                'channel'           => 'google_ads',
+                'name'              => $this->faker->word(),
+                'period'            => Period::Daily,
+                'account'           => $this->faker->company(),
+                'channeledAccount'  => $this->faker->uuid(),
+                'campaign'          => $this->faker->sentence(),
+                'channeledCampaign' => $this->faker->uuid(),
+                'channeledAdGroup'  => $this->faker->uuid(),
+                'channeledAd'       => $this->faker->uuid(),
+                'creative'          => $this->faker->uuid(),
+                'page'              => $this->faker->url(),
+                'query'             => $this->faker->word(),
+                'post'              => $this->faker->uuid(),
+                'product'           => $this->faker->isbn13(),
+                'customer'          => $this->faker->email(),
+                'order'             => $this->faker->uuid(),
+                'country'           => 'USA',
+                'device'            => 'mobile'
+            ];
+
+            $baseKey = KeyGenerator::generateMetricConfigKey(...$params);
+
+            foreach ($params as $key => $value) {
+                $modifiedParams = $params;
+                if (is_string($value)) {
+                    $modifiedParams[$key] = $value.'_modified';
+                } else {
+                    continue; // Skip Enums for this specific modification test
+                }
+
+                // Skip the ones that might have special formatting if modified blindly
+                if (in_array($key, ['channel', 'period'])) continue;
+
+                $newKey = KeyGenerator::generateMetricConfigKey(...$modifiedParams);
+                $this->assertNotEquals($baseKey, $newKey, "Modifying $key should change the hash");
+            }
+        }
+
+        public function testGSCSpecialCase(): void
+        {
+            $dateStr = $this->faker->date();
+            $date = new DateTime($dateStr);
+            $key1 = KeyGenerator::generateMetricConfigKey(
+                channel: 'google_search_console',
+                name: 'clicks',
+                period: Period::Daily,
+                country: Country::USA,
+                device: Device::MOBILE
+            );
+
+            $key2 = KeyGenerator::generateMetricConfigKey(
+                channel: 'google_search_console',
+                name: 'clicks',
+                period: Period::Daily,
+                country: 'USA', // match enum value 'USA'
+                device: 'mobile' // match enum value 'mobile'
+            );
+
+            $this->assertEquals($key1, $key2, "Enum vs String and DateTime vs String should yield same key if values match");
+        }
+
     }
-
-    public function testGSCSpecialCase(): void
-    {
-        $dateStr = $this->faker->date();
-        $date = new DateTime($dateStr);
-        $key1 = KeyGenerator::generateMetricConfigKey(
-            channel: Channel::google_search_console,
-            name: 'clicks',
-            period: Period::Daily,
-            country: \Anibalealvarezs\ApiSkeleton\Enums\Country::USA,
-            device: \Anibalealvarezs\ApiSkeleton\Enums\Device::MOBILE
-        );
-
-        $key2 = KeyGenerator::generateMetricConfigKey(
-            channel: Channel::google_search_console,
-            name: 'clicks',
-            period: Period::Daily,
-            country: 'USA', // match enum value 'USA'
-            device: 'mobile' // match enum value 'mobile'
-        );
-
-        $this->assertEquals($key1, $key2, "Enum vs String and DateTime vs String should yield same key if values match");
-    }
-
-
-
-}

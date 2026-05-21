@@ -5,7 +5,7 @@
     namespace Tests\Unit\Services\Aggregation;
 
     use Anibalealvarezs\ApiDriverCore\Interfaces\AggregationProfileProviderInterface;
-    use Traits\AggregationProfileResolver;
+    use Services\Aggregation\AggregationProfileResolver;
     use Tests\Unit\BaseUnitTestCase;
 
     final class AggregationProfileResolverTest extends BaseUnitTestCase

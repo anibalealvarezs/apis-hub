@@ -1,173 +1,191 @@
 <?php
 
-namespace Tests\Unit\Repositories\Channeled;
+    namespace Tests\Unit\Repositories\Channeled;
 
-use Doctrine\ORM\AbstractQuery;
-use Doctrine\ORM\EntityManager;
-use Doctrine\ORM\Mapping\ClassMetadata;
-use Doctrine\ORM\NonUniqueResultException;
-use Doctrine\ORM\NoResultException;
-use Doctrine\ORM\QueryBuilder;
-use Entities\Analytics\Metric;
-use Enums\QueryBuilderType;
-use PHPUnit\Framework\MockObject\MockObject;
-use PHPUnit\Framework\TestCase;
-use ReflectionClass;
-use ReflectionException;
-use ReflectionMethod;
-use Repositories\Channeled\ChanneledMetricRepository;
+    use DateTime;
+    use Doctrine\ORM\EntityManager;
+    use Doctrine\ORM\EntityRepository;
+    use Doctrine\ORM\Mapping\ClassMetadata;
+    use Doctrine\ORM\NonUniqueResultException;
+    use Doctrine\ORM\NoResultException;
+    use Doctrine\ORM\Query;
+    use Doctrine\ORM\QueryBuilder;
+    use Entities\Analytics\Channel;
+    use Entities\Analytics\Metric;
+    use Enums\QueryBuilderType;
+    use Helpers\Helpers;
+    use PHPUnit\Framework\MockObject\MockObject;
+    use PHPUnit\Framework\TestCase;
+    use ReflectionClass;
+    use ReflectionException;
+    use ReflectionMethod;
+    use Repositories\Channeled\ChanneledMetricRepository;
 
-class ChanneledMetricRepositoryTest extends TestCase
-{
-    private MockObject|EntityManager $entityManager;
-    private MockObject|QueryBuilder $queryBuilder;
-    private MockObject|AbstractQuery $query;
-    private ChanneledMetricRepository $repository;
-    private string $entityName = 'Entities\Analytics\Channeled\ChanneledMetric';
-
-    protected function setUp(): void
+    class ChanneledMetricRepositoryTest extends TestCase
     {
-        $this->entityManager = $this->createMock(EntityManager::class);
-        $this->queryBuilder = $this->createMock(QueryBuilder::class);
-        $this->query = $this->createMock(AbstractQuery::class);
+        private MockObject|QueryBuilder $queryBuilder;
+        private MockObject|Query $query;
+        private ChanneledMetricRepository $repository;
+        private string $entityName = 'Entities\Analytics\Channeled\ChanneledMetric';
 
-        $this->entityManager->method('createQueryBuilder')
-            ->willReturn($this->queryBuilder);
+        protected function setUp(): void
+        {
+            $entityManager = $this->createMock(EntityManager::class);
+            $this->queryBuilder = $this->createMock(QueryBuilder::class);
+            $this->query = $this->createMock(Query::class);
 
-        $this->queryBuilder->method('select')->willReturnSelf();
-        $this->queryBuilder->method('addSelect')->willReturnSelf();
-        $this->queryBuilder->method('from')->willReturnSelf();
-        $this->queryBuilder->method('leftJoin')->willReturnSelf();
-        $this->queryBuilder->method('join')->willReturnSelf();
-        $this->queryBuilder->method('where')->willReturnSelf();
-        $this->queryBuilder->method('andWhere')->willReturnSelf();
-        $this->queryBuilder->method('setParameter')->willReturnSelf();
-        $this->queryBuilder->method('setMaxResults')->willReturnSelf();
-        $this->queryBuilder->method('getQuery')->willReturn($this->query);
+            $entityManager->method('createQueryBuilder')
+                ->willReturn($this->queryBuilder);
 
-        $classMetadata = $this->createMock(ClassMetadata::class);
-        $classMetadata->fieldMappings = [];
-        $classMetadata->name = $this->entityName;
-        $this->entityManager->method('getClassMetadata')
-            ->with($this->entityName)
-            ->willReturn($classMetadata);
+            $this->queryBuilder->method('select')->willReturnSelf();
+            $this->queryBuilder->method('addSelect')->willReturnSelf();
+            $this->queryBuilder->method('from')->willReturnSelf();
+            $this->queryBuilder->method('leftJoin')->willReturnSelf();
+            $this->queryBuilder->method('join')->willReturnSelf();
+            $this->queryBuilder->method('where')->willReturnSelf();
+            $this->queryBuilder->method('andWhere')->willReturnSelf();
+            $this->queryBuilder->method('setParameter')->willReturnSelf();
+            $this->queryBuilder->method('setMaxResults')->willReturnSelf();
+            $this->queryBuilder->method('getQuery')->willReturn($this->query);
 
-        $this->repository = new ChanneledMetricRepository($this->entityManager, $classMetadata);
-        $reflection = new ReflectionClass($this->repository);
-        $entityNameProperty = $reflection->getProperty('_entityName');
-        $entityNameProperty->setValue($this->repository, $this->entityName);
-        $emProperty = $reflection->getProperty('_em');
-        $emProperty->setValue($this->repository, $this->entityManager);
-    }
+            $classMetadata = $this->createMock(ClassMetadata::class);
+            $classMetadata->fieldMappings = [];
+            $classMetadata->name = $this->entityName;
+            $entityManager->method('getClassMetadata')
+                ->with($this->entityName)
+                ->willReturn($classMetadata);
 
-    /**
-     * @throws ReflectionException
-     */
-    public function testCreateBaseQueryBuilderSelect(): void
-    {
-        $this->queryBuilder->expects($this->once())
-            ->method('select')
-            ->with('e')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->exactly(3))
-            ->method('addSelect')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('from')
-            ->with($this->entityName, 'e')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->exactly(3))
-            ->method('leftJoin')
-            ->willReturnSelf();
+            $channelRepository = $this->createMock(EntityRepository::class);
+            $mockChannel = $this->createMock(Channel::class);
+            $mockChannel->method('getName')->willReturn('shopify');
+            $channelRepository->method('find')->with(1)->willReturn($mockChannel);
 
-        $reflection = new ReflectionMethod($this->repository, 'createBaseQueryBuilder');
-        $result = $reflection->invoke($this->repository, QueryBuilderType::SELECT);
+            $entityManager->method('getRepository')
+                ->willReturnCallback(
+                    function ($className) use ($channelRepository) {
+                        if (str_contains($className, 'Channel') && !str_contains($className, 'Channeled')) {
+                            return $channelRepository;
+                        }
 
-        $this->assertInstanceOf(QueryBuilder::class, $result);
-    }
+                        return $this->createMock(EntityRepository::class);
+                    }
+                );
+            Helpers::setEntityManager($entityManager);
 
-    /**
-     * @throws ReflectionException
-     */
-    public function testCreateBaseQueryBuilderCount(): void
-    {
-        $this->queryBuilder->expects($this->once())
-            ->method('select')
-            ->with('count(e.id)')
-            ->willReturnSelf();
+            $this->repository = new ChanneledMetricRepository($entityManager, $classMetadata);
+            $reflection = new ReflectionClass($this->repository);
+            $emProperty = $reflection->getProperty('_em');
+            $emProperty->setValue($this->repository, $entityManager);
+        }
 
-        $reflection = new ReflectionMethod($this->repository, 'createBaseQueryBuilder');
-        $result = $reflection->invoke($this->repository, QueryBuilderType::COUNT);
+        /**
+         * @throws ReflectionException
+         */
+        public function testCreateBaseQueryBuilderSelect(): void
+        {
+            $this->queryBuilder->expects($this->once())
+                ->method('select')
+                ->with('e')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->exactly(3))
+                ->method('addSelect')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('from')
+                ->with($this->entityName, 'e')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->exactly(3))
+                ->method('leftJoin')
+                ->willReturnSelf();
 
-        $this->assertInstanceOf(QueryBuilder::class, $result);
-    }
+            $reflection = new ReflectionMethod($this->repository, 'createBaseQueryBuilder');
+            $result = $reflection->invoke($this->repository, QueryBuilderType::SELECT);
 
-    /**
-     * @throws NoResultException
-     * @throws NonUniqueResultException
-     */
-    public function testExistsByPlatformIdAndMetric(): void
-    {
-        $platformId = 'test_id';
-        $channel = 1;
-        $metric = $this->createMock(Metric::class);
+            $this->assertInstanceOf(QueryBuilder::class, $result);
+        }
 
-        $this->query->method('getSingleScalarResult')->willReturn(1);
+        /**
+         * @throws ReflectionException
+         */
+        public function testCreateBaseQueryBuilderCount(): void
+        {
+            $this->queryBuilder->expects($this->once())
+                ->method('select')
+                ->with('count(e.id)')
+                ->willReturnSelf();
 
-        $result = $this->repository->existsByPlatformIdAndMetric($platformId, $channel, $metric);
-        $this->assertTrue($result);
-    }
+            $reflection = new ReflectionMethod($this->repository, 'createBaseQueryBuilder');
+            $result = $reflection->invoke($this->repository, QueryBuilderType::COUNT);
 
-    /**
-     * @throws ReflectionException
-     */
-    public function testProcessResultIncludeRawData(): void
-    {
-        $this->repository->setIncludeRawData(true);
+            $this->assertInstanceOf(QueryBuilder::class, $result);
+        }
 
-        $input = [
-            'id' => 1,
-            'channel' => 1,
-            'data' => ['raw' => 'data'],
-            'metricDate' => new \DateTime('2026-03-03'),
-            'metric' => [
-                'id' => 2,
-                'value' => 10,
-                'metricConfig' => [
-                    'name' => 'test'
+        /**
+         * @throws NoResultException
+         * @throws NonUniqueResultException
+         */
+        public function testExistsByPlatformIdAndMetric(): void
+        {
+            $platformId = 'test_id';
+            $channel = 1;
+            $metric = $this->createMock(Metric::class);
+
+            $this->query->method('getSingleScalarResult')->willReturn(1);
+
+            $result = $this->repository->existsByPlatformIdAndMetric($platformId, $channel, $metric);
+            $this->assertTrue($result);
+        }
+
+        /**
+         * @throws ReflectionException
+         */
+        public function testProcessResultIncludeRawData(): void
+        {
+            $this->repository->setIncludeRawData(true);
+
+            $input = [
+                'id'         => 1,
+                'channel'    => 1,
+                'data'       => ['raw' => 'data'],
+                'metricDate' => new DateTime('2026-03-03'),
+                'metric'     => [
+                    'id'           => 2,
+                    'value'        => 10,
+                    'metricConfig' => [
+                        'name' => 'test'
+                    ]
                 ]
-            ]
-        ];
+            ];
 
-        $reflection = new ReflectionMethod($this->repository, 'processResult');
-        $reflection->setAccessible(true);
-        $result = $reflection->invoke($this->repository, $input);
+            $reflection = new ReflectionMethod($this->repository, 'processResult');
+            $reflection->setAccessible(true);
+            $result = $reflection->invoke($this->repository, $input);
 
-        $this->assertEquals('shopify', $result['channel']);
-        $this->assertEquals('2026-03-03', $result['metricDate']);
-        $this->assertEquals('test', $result['name']);
-        $this->assertEquals(2, $result['metricId']);
-        $this->assertEquals(10, $result['value']);
-        $this->assertArrayHasKey('data', $result);
+            $this->assertEquals('shopify', $result['channel']);
+            $this->assertEquals('2026-03-03', $result['metricDate']);
+            $this->assertEquals('test', $result['name']);
+            $this->assertEquals(2, $result['metricId']);
+            $this->assertEquals(10, $result['value']);
+            $this->assertArrayHasKey('data', $result);
+        }
+
+        /**
+         * @throws ReflectionException
+         */
+        public function testProcessResultExcludeRawData(): void
+        {
+            $this->repository->setIncludeRawData(false);
+
+            $input = [
+                'id'      => 1,
+                'channel' => 1,
+                'data'    => ['raw' => 'data'],
+            ];
+
+            $reflection = new ReflectionMethod($this->repository, 'processResult');
+            $reflection->setAccessible(true);
+            $result = $reflection->invoke($this->repository, $input);
+
+            $this->assertArrayNotHasKey('data', $result);
+        }
     }
-
-    /**
-     * @throws ReflectionException
-     */
-    public function testProcessResultExcludeRawData(): void
-    {
-        $this->repository->setIncludeRawData(false);
-
-        $input = [
-            'id' => 1,
-            'channel' => 1,
-            'data' => ['raw' => 'data'],
-        ];
-
-        $reflection = new ReflectionMethod($this->repository, 'processResult');
-        $reflection->setAccessible(true);
-        $result = $reflection->invoke($this->repository, $input);
-
-        $this->assertArrayNotHasKey('data', $result);
-    }
-}

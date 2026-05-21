@@ -4,7 +4,7 @@
 
     namespace Tests\Unit\Services\Aggregation;
 
-    use Traits\DateSqlFieldResolver;
+    use Services\Aggregation\DateSqlFieldResolver;
     use Tests\Unit\BaseUnitTestCase;
 
     final class DateSqlFieldResolverTest extends BaseUnitTestCase

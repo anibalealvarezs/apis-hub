@@ -4,7 +4,7 @@
 
     namespace Tests\Unit\Services\Aggregation;
 
-    use Traits\CompanionTimeWeightedAverageFormulaBuilder;
+    use Services\Aggregation\CompanionTimeWeightedAverageFormulaBuilder;
     use Tests\Unit\BaseUnitTestCase;
 
     final class CompanionTimeWeightedAverageFormulaBuilderTest extends BaseUnitTestCase

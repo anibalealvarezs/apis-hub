@@ -4,7 +4,7 @@
 
     namespace Tests\Unit\Services\Aggregation;
 
-    use Traits\AggregationPlan;
+    use Services\Aggregation\AggregationPlan;
     use Tests\Unit\BaseUnitTestCase;
 
     final class AggregationPlanTest extends BaseUnitTestCase

@@ -4,7 +4,6 @@ namespace Tests\Unit\Classes\Conversions;
 
 use Anibalealvarezs\NetSuiteHubDriver\Conversions\NetSuiteConvert;
 use Doctrine\Common\Collections\ArrayCollection;
-use Anibalealvarezs\ApiSkeleton\Enums\Channel;
 use Tests\Unit\BaseUnitTestCase;
 
 class NetSuiteConvertTest extends BaseUnitTestCase
@@ -34,7 +33,7 @@ class NetSuiteConvertTest extends BaseUnitTestCase
         $customer = $result->first();
         $this->assertEquals($id, $customer->platformId);
         $this->assertEquals($email, $customer->email);
-        $this->assertEquals(Channel::netsuite->value, $customer->channel);
+        $this->assertEquals('netsuite', $customer->channel);
         $this->assertIsArray($customer->data['addresses']);
         $this->assertCount(1, $customer->data['addresses']);
         $this->assertEquals($city, $customer->data['addresses'][0]['addresscity']);

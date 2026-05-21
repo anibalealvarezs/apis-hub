@@ -4,7 +4,6 @@ namespace Tests\Unit\Classes\Conversions;
 
 use Anibalealvarezs\ShopifyHubDriver\Conversions\ShopifyConvert;
 use Doctrine\Common\Collections\ArrayCollection;
-use Anibalealvarezs\ApiSkeleton\Enums\Channel;
 use Tests\Unit\BaseUnitTestCase;
 
 class ShopifyConvertTest extends BaseUnitTestCase
@@ -30,7 +29,7 @@ class ShopifyConvertTest extends BaseUnitTestCase
         $customer = $result->first();
         $this->assertEquals($id, $customer->platformId);
         $this->assertEquals($email, $customer->email);
-        $this->assertEquals(Channel::shopify->value, $customer->channel);
+        $this->assertEquals('shopify', $customer->channel);
         $this->assertEquals($input[0], $customer->data);
     }
 
@@ -54,7 +53,7 @@ class ShopifyConvertTest extends BaseUnitTestCase
         $discount = $result->first();
         $this->assertEquals($id, $discount->platformId);
         $this->assertEquals($code, $discount->code);
-        $this->assertEquals(Channel::shopify->value, $discount->channel);
+        $this->assertEquals('shopify', $discount->channel);
         $this->assertEquals($input[0], $discount->data);
     }
 
@@ -74,7 +73,7 @@ class ShopifyConvertTest extends BaseUnitTestCase
         $this->assertCount(1, $result);
         $priceRule = $result->first();
         $this->assertEquals($id, $priceRule->platformId);
-        $this->assertEquals(Channel::shopify->value, $priceRule->channel);
+        $this->assertEquals('shopify', $priceRule->channel);
         $this->assertEquals($input[0], $priceRule->data);
     }
 
@@ -105,7 +104,7 @@ class ShopifyConvertTest extends BaseUnitTestCase
         $this->assertCount(1, $result);
         $order = $result->first();
         $this->assertEquals($id, $order->platformId);
-        $this->assertEquals(Channel::shopify->value, $order->channel);
+        $this->assertEquals('shopify', $order->channel);
         $this->assertEquals($input[0], $order->data);
         $this->assertEquals((object) ['id' => $custId], $order->customer);
         $this->assertEquals([$code], $order->discountCodes);
@@ -144,7 +143,7 @@ class ShopifyConvertTest extends BaseUnitTestCase
         $this->assertEquals($prodId, $product->platformId);
         $this->assertEquals($prodSku, $product->sku);
         $this->assertEquals($vendor, $product->vendor);
-        $this->assertEquals(Channel::shopify->value, $product->channel);
+        $this->assertEquals('shopify', $product->channel);
         $this->assertEquals($input[0], $product->data);
 
         $this->assertInstanceOf(ArrayCollection::class, $product->variants);
@@ -173,7 +172,7 @@ class ShopifyConvertTest extends BaseUnitTestCase
         $variant = $result->first();
         $this->assertEquals($id, $variant->platformId);
         $this->assertEquals($sku, $variant->sku);
-        $this->assertEquals(Channel::shopify->value, $variant->channel);
+        $this->assertEquals('shopify', $variant->channel);
         $this->assertEquals($input[0], $variant->data);
     }
 
@@ -196,7 +195,7 @@ class ShopifyConvertTest extends BaseUnitTestCase
         $category = $result->first();
         $this->assertEquals($id, $category->platformId);
         $this->assertTrue($category->isSmartCollection);
-        $this->assertEquals(Channel::shopify->value, $category->channel);
+        $this->assertEquals('shopify', $category->channel);
         $this->assertEquals($input[0], $category->data);
     }
 

@@ -4,13 +4,14 @@
 
     namespace Tests\Unit\Services\Aggregation;
 
-    use Traits\TemporalGapFiller;
+    use Exception;
+    use Services\Aggregation\TemporalGapFiller;
     use Tests\Unit\BaseUnitTestCase;
 
     final class TemporalGapFillerTest extends BaseUnitTestCase
     {
         /**
-         * @throws \Exception
+         * @throws Exception
          */
         public function testFillsMissingDailyBucketsForTemporalOnlyGrouping(): void
         {
@@ -35,7 +36,7 @@
         }
 
         /**
-         * @throws \Exception
+         * @throws Exception
          */
         public function testFillsMissingBucketsPerNonTemporalCombination(): void
         {

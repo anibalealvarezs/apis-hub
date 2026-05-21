@@ -1,675 +1,692 @@
 <?php
 
-namespace Tests\Unit\Repositories;
+    namespace Tests\Unit\Repositories;
 
-use Doctrine\ORM\AbstractQuery;
-use Doctrine\ORM\EntityManager;
-use Doctrine\ORM\Mapping\ClassMetadata;
-use Doctrine\ORM\NonUniqueResultException;
-use Doctrine\ORM\NoResultException;
-use Doctrine\ORM\QueryBuilder;
-use Entities\Entity;
-use Enums\QueryBuilderType;
-use Faker\Factory;
-use Faker\Generator;
-use PHPUnit\Framework\MockObject\MockObject;
-use PHPUnit\Framework\TestCase;
-use ReflectionClass;
-use ReflectionException;
-use ReflectionMethod;
-use Repositories\ProductVariantRepository;
+    use Doctrine\ORM\AbstractQuery;
+    use Doctrine\ORM\EntityManager;
+    use Doctrine\ORM\EntityRepository;
+    use Doctrine\ORM\Mapping\ClassMetadata;
+    use Doctrine\ORM\NonUniqueResultException;
+    use Doctrine\ORM\NoResultException;
+    use Doctrine\ORM\Query;
+    use Doctrine\ORM\QueryBuilder;
+    use Entities\Analytics\Channel;
+    use Entities\Entity;
+    use Enums\QueryBuilderType;
+    use Faker\Factory;
+    use Faker\Generator;
+    use Helpers\Helpers;
+    use PHPUnit\Framework\MockObject\MockObject;
+    use PHPUnit\Framework\TestCase;
+    use ReflectionClass;
+    use ReflectionException;
+    use ReflectionMethod;
+    use Repositories\ProductVariantRepository;
 
-class ProductVariantRepositoryTest extends TestCase
-{
-    private Generator $faker;
-    private MockObject|EntityManager $entityManager;
-    private MockObject|QueryBuilder $queryBuilder;
-    private MockObject|AbstractQuery $query;
-    private ProductVariantRepository $repository;
-    private string $entityName = 'Entities\Entity';
-
-    protected function setUp(): void
+    class ProductVariantRepositoryTest extends TestCase
     {
-        $this->faker = Factory::create();
+        protected Generator $faker;
+        private MockObject|EntityManager $entityManager;
+        private MockObject|QueryBuilder $queryBuilder;
+        private MockObject|Query $query;
+        private ProductVariantRepository $repository;
+        private string $entityName = 'Entities\Entity';
 
-        $this->entityManager = $this->createMock(EntityManager::class);
-        $this->queryBuilder = $this->createMock(QueryBuilder::class);
-        $this->query = $this->createMock(AbstractQuery::class);
+        protected function setUp(): void
+        {
+            $this->faker = Factory::create();
 
-        $this->entityManager->method('createQueryBuilder')
-            ->willReturnCallback(function () {
+            $this->entityManager = $this->createMock(EntityManager::class);
+            $this->queryBuilder = $this->createMock(QueryBuilder::class);
+            $this->query = $this->createMock(Query::class);
+
+            $this->entityManager->method('createQueryBuilder')
+                ->willReturnCallback(function () {
+                    return $this->queryBuilder;
+                });
+
+            $channelRepository = $this->createMock(EntityRepository::class);
+            $mockChannel = $this->createMock(Channel::class);
+            $mockChannel->method('getName')->willReturn('shopify');
+            $channelRepository->method('find')->with(1)->willReturn($mockChannel);
+
+            $this->entityManager->method('getRepository')
+                ->willReturnCallback(function ($className) use ($channelRepository) {
+                    if (str_contains($className, 'Channel') && !str_contains($className, 'Channeled')) {
+                        return $channelRepository;
+                    }
+
+                    return $this->createMock(EntityRepository::class);
+                });
+            Helpers::setEntityManager($this->entityManager);
+
+            $this->queryBuilder->method('select')->willReturnCallback(function () {
                 return $this->queryBuilder;
             });
-
-        $this->queryBuilder->method('select')->willReturnCallback(function ($alias) {
-            return $this->queryBuilder;
-        });
-        $this->queryBuilder->method('addSelect')->willReturnCallback(function ($select) {
-            return $this->queryBuilder;
-        });
-        $this->queryBuilder->method('from')->willReturnSelf();
-        $this->queryBuilder->method('leftJoin')->willReturnCallback(function ($join, $alias, $conditionType, $condition, $indexBy) {
-            return $this->queryBuilder;
-        });
-        $this->queryBuilder->method('where')->willReturnSelf();
-        $this->queryBuilder->method('setParameter')->willReturnCallback(function ($key, $value) {
-            return $this->queryBuilder;
-        });
-        $this->queryBuilder->method('setMaxResults')->willReturnSelf();
-        $this->queryBuilder->method('getQuery')->willReturn($this->query);
-
-        $classMetadata = $this->createMock(ClassMetadata::class);
-        $classMetadata->fieldMappings = [];
-        $classMetadata->name = $this->entityName;
-        $this->entityManager->method('getClassMetadata')
-            ->with($this->entityName)
-            ->willReturn($classMetadata);
-
-        $this->repository = $this->getMockBuilder(ProductVariantRepository::class)
-            ->setConstructorArgs([$this->entityManager, $classMetadata])
-            ->onlyMethods(['createBaseQueryBuilderNoJoins', 'create', 'update'])
-            ->getMock();
-
-        $this->repository->method('createBaseQueryBuilderNoJoins')
-            ->willReturnCallback(function ($type) {
-                $query = $this->entityManager->createQueryBuilder();
-                match ($type) {
-                    QueryBuilderType::LAST, QueryBuilderType::SELECT => $query->select('e'),
-                    QueryBuilderType::COUNT => $query->select('count(e.id)'),
-                    default => clone $query,
-                };
-                return $query->from($this->entityName, 'e');
+            $this->queryBuilder->method('addSelect')->willReturnCallback(function () {
+                return $this->queryBuilder;
             });
-        $this->repository->method('create')
-            ->willReturnCallback(function ($data) {
-                return ['id' => 1, 'productVariantId' => $data->productVariantId ?? $this->faker->uuid];
+            $this->queryBuilder->method('from')->willReturnSelf();
+            $this->queryBuilder->method('leftJoin')->willReturnCallback(function () {
+                return $this->queryBuilder;
             });
-        $this->repository->method('update')
-            ->willReturnCallback(function ($id, $data) {
-                return ['id' => $id];
+            $this->queryBuilder->method('where')->willReturnSelf();
+            $this->queryBuilder->method('setParameter')->willReturnCallback(function () {
+                return $this->queryBuilder;
             });
+            $this->queryBuilder->method('setMaxResults')->willReturnSelf();
+            $this->queryBuilder->method('getQuery')->willReturn($this->query);
 
-        $reflection = new ReflectionClass($this->repository);
-        $entityNameProperty = $reflection->getProperty('_entityName');
-        $entityNameProperty->setValue($this->repository, $this->entityName);
-        $emProperty = $reflection->getProperty('_em');
-        $emProperty->setValue($this->repository, $this->entityManager);
-    }
+            $classMetadata = $this->createMock(ClassMetadata::class);
+            $classMetadata->fieldMappings = [];
+            $classMetadata->name = $this->entityName;
+            $this->entityManager->method('getClassMetadata')
+                ->with($this->entityName)
+                ->willReturn($classMetadata);
 
-    /**
-     * @throws ReflectionException
-     */
-    public function testCreateBaseQueryBuilderSelect(): void
-    {
-        $this->queryBuilder->expects($this->once())
-            ->method('select')
-            ->with('e')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->exactly(4))
-            ->method('addSelect')
-            ->with($this->anything())
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('from')
-            ->with($this->entityName, 'e')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->exactly(4))
-            ->method('leftJoin')
-            ->with($this->anything(), $this->anything(), $this->anything(), $this->anything(), $this->anything())
-            ->willReturnSelf();
+            $this->repository = $this->getMockBuilder(ProductVariantRepository::class)
+                ->setConstructorArgs([$this->entityManager, $classMetadata])
+                ->onlyMethods(['createBaseQueryBuilderNoJoins', 'create', 'update'])
+                ->getMock();
 
-        $reflection = new ReflectionMethod($this->repository, 'createBaseQueryBuilder');
-        $result = $reflection->invoke($this->repository, QueryBuilderType::SELECT);
+            $this->repository->method('createBaseQueryBuilderNoJoins')
+                ->willReturnCallback(function ($type) {
+                    $query = $this->entityManager->createQueryBuilder();
+                    match ($type) {
+                        QueryBuilderType::LAST, QueryBuilderType::SELECT => $query->select('e'),
+                        QueryBuilderType::COUNT => $query->select('count(e.id)'),
+                        default => clone $query,
+                    };
 
-        $this->assertInstanceOf(QueryBuilder::class, $result);
-    }
+                    return $query->from($this->entityName, 'e');
+                });
+            $this->repository->method('create')
+                ->willReturnCallback(function ($data) {
+                    return ['id' => 1, 'productVariantId' => $data->productVariantId ?? $this->faker->uuid];
+                });
+            $this->repository->method('update')
+                ->willReturnCallback(function ($id) {
+                    return ['id' => $id];
+                });
 
-    /**
-     * @throws ReflectionException
-     */
-    public function testCreateBaseQueryBuilderCount(): void
-    {
-        $this->queryBuilder->expects($this->once())
-            ->method('select')
-            ->with('count(e.id)')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->exactly(4))
-            ->method('addSelect')
-            ->with($this->anything())
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('from')
-            ->with($this->entityName, 'e')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->exactly(4))
-            ->method('leftJoin')
-            ->with($this->anything(), $this->anything(), $this->anything(), $this->anything(), $this->anything())
-            ->willReturnSelf();
+            $reflection = new ReflectionClass($this->repository);
+            $emProperty = $reflection->getProperty('_em');
+            $emProperty->setValue($this->repository, $this->entityManager);
+        }
 
-        $reflection = new ReflectionMethod($this->repository, 'createBaseQueryBuilder');
-        $result = $reflection->invoke($this->repository, QueryBuilderType::COUNT);
+        /**
+         * @throws ReflectionException
+         */
+        public function testCreateBaseQueryBuilderSelect(): void
+        {
+            $this->queryBuilder->expects($this->once())
+                ->method('select')
+                ->with('e')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->exactly(4))
+                ->method('addSelect')
+                ->with($this->anything())
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('from')
+                ->with($this->entityName, 'e')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->exactly(4))
+                ->method('leftJoin')
+                ->with($this->anything(), $this->anything(), $this->anything(), $this->anything(), $this->anything())
+                ->willReturnSelf();
 
-        $this->assertInstanceOf(QueryBuilder::class, $result);
-    }
+            $reflection = new ReflectionMethod($this->repository, 'createBaseQueryBuilder');
+            $result = $reflection->invoke($this->repository, QueryBuilderType::SELECT);
 
-    /**
-     * @throws ReflectionException
-     */
-    public function testProcessResultReplacesChannelName(): void
-    {
-        $input = [
-            'id' => 1,
-            'channeledProductVariants' => [
-                [
-                    'channel' => 1,
-                    'channeledProduct' => [
-                        'channel' => 1,
-                        'channeledVendor' => ['channel' => 1],
-                        'channeledProductCategories' => [['channel' => 1]]
+            $this->assertInstanceOf(QueryBuilder::class, $result);
+        }
+
+        /**
+         * @throws ReflectionException
+         */
+        public function testCreateBaseQueryBuilderCount(): void
+        {
+            $this->queryBuilder->expects($this->once())
+                ->method('select')
+                ->with('count(e.id)')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->exactly(4))
+                ->method('addSelect')
+                ->with($this->anything())
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('from')
+                ->with($this->entityName, 'e')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->exactly(4))
+                ->method('leftJoin')
+                ->with($this->anything(), $this->anything(), $this->anything(), $this->anything(), $this->anything())
+                ->willReturnSelf();
+
+            $reflection = new ReflectionMethod($this->repository, 'createBaseQueryBuilder');
+            $result = $reflection->invoke($this->repository, QueryBuilderType::COUNT);
+
+            $this->assertInstanceOf(QueryBuilder::class, $result);
+        }
+
+        /**
+         * @throws ReflectionException
+         */
+        public function testProcessResultReplacesChannelName(): void
+        {
+            $input = [
+                'id'                       => 1,
+                'channeledProductVariants' => [
+                    [
+                        'channel'          => 1,
+                        'channeledProduct' => [
+                            'channel'                    => 1,
+                            'channeledVendor'            => ['channel' => 1],
+                            'channeledProductCategories' => [['channel' => 1]]
+                        ]
                     ]
                 ]
-            ]
-        ];
-        $expected = [
-            'id' => 1,
-            'channeledProductVariants' => [
-                [
-                    'channel' => 'shopify',
-                    'channeledProduct' => [
-                        'channeledVendor' => [],
-                        'channeledProductCategories' => [[]]
+            ];
+            $expected = [
+                'id'                       => 1,
+                'channeledProductVariants' => [
+                    [
+                        'channel'          => 'shopify',
+                        'channeledProduct' => [
+                            'channel'                    => 'shopify',
+                            'channeledVendor'            => ['channel' => 'shopify'],
+                            'channeledProductCategories' => [['channel' => 'shopify']]
+                        ]
                     ]
                 ]
-            ]
-        ];
+            ];
 
+            $reflection = new ReflectionMethod($this->repository, 'processResult');
+            $result = $reflection->invoke($this->repository, $input);
 
-        $reflection = new ReflectionMethod($this->repository, 'processResult');
-        $result = $reflection->invoke($this->repository, $input);
+            $this->assertEquals($expected, $result);
+        }
 
+        /**
+         * @throws NonUniqueResultException
+         */
+        public function testGetByProductVariantIdReturnsEntity(): void
+        {
+            $productVariantId = $this->faker->uuid;
+            $entity = new Entity();
 
-        $this->assertEquals($expected, $result);
+            $this->queryBuilder->expects($this->once())
+                ->method('select')
+                ->with('e')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->exactly(4))
+                ->method('addSelect')
+                ->with($this->anything())
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('from')
+                ->with($this->entityName, 'e')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->exactly(4))
+                ->method('leftJoin')
+                ->with($this->anything(), $this->anything(), $this->anything(), $this->anything(), $this->anything())
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('where')
+                ->with('e.productVariantId = :productVariantId')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('setParameter')
+                ->with('productVariantId', $productVariantId)
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('getQuery')
+                ->willReturn($this->query);
+            $this->query->expects($this->once())
+                ->method('getOneOrNullResult')
+                ->with(AbstractQuery::HYDRATE_OBJECT)
+                ->willReturn($entity);
+
+            $result = $this->repository->getByProductVariantId($productVariantId);
+
+            $this->assertSame($entity, $result);
+        }
+
+        /**
+         * @throws NonUniqueResultException
+         */
+        public function testGetByProductVariantIdReturnsNull(): void
+        {
+            $productVariantId = $this->faker->uuid;
+
+            $this->queryBuilder->expects($this->once())
+                ->method('select')
+                ->with('e')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->exactly(4))
+                ->method('addSelect')
+                ->with($this->anything())
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('from')
+                ->with($this->entityName, 'e')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->exactly(4))
+                ->method('leftJoin')
+                ->with($this->anything(), $this->anything(), $this->anything(), $this->anything(), $this->anything())
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('where')
+                ->with('e.productVariantId = :productVariantId')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('setParameter')
+                ->with('productVariantId', $productVariantId)
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('getQuery')
+                ->willReturn($this->query);
+            $this->query->expects($this->once())
+                ->method('getOneOrNullResult')
+                ->with(AbstractQuery::HYDRATE_OBJECT)
+                ->willReturn(null);
+
+            $result = $this->repository->getByProductVariantId($productVariantId);
+
+            $this->assertNull($result);
+        }
+
+        /**
+         * @throws NonUniqueResultException
+         * @throws NoResultException
+         */
+        public function testExistsByProductVariantIdReturnsTrue(): void
+        {
+            $productVariantId = $this->faker->uuid;
+
+            $this->queryBuilder->expects($this->once())
+                ->method('select')
+                ->with('count(e.id)')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('from')
+                ->with($this->entityName, 'e')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->never())
+                ->method('leftJoin');
+            $this->queryBuilder->expects($this->once())
+                ->method('where')
+                ->with('e.productVariantId = :productVariantId')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('setParameter')
+                ->with('productVariantId', $productVariantId)
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('getQuery')
+                ->willReturn($this->query);
+            $this->query->expects($this->once())
+                ->method('getSingleScalarResult')
+                ->willReturn(1);
+
+            $result = $this->repository->existsByProductVariantId($productVariantId);
+
+            $this->assertTrue($result);
+        }
+
+        /**
+         * @throws NonUniqueResultException
+         * @throws NoResultException
+         */
+        public function testExistsByProductVariantIdReturnsFalse(): void
+        {
+            $productVariantId = $this->faker->uuid;
+
+            $this->queryBuilder->expects($this->once())
+                ->method('select')
+                ->with('count(e.id)')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('from')
+                ->with($this->entityName, 'e')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->never())
+                ->method('leftJoin');
+            $this->queryBuilder->expects($this->once())
+                ->method('where')
+                ->with('e.productVariantId = :productVariantId')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('setParameter')
+                ->with('productVariantId', $productVariantId)
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('getQuery')
+                ->willReturn($this->query);
+            $this->query->expects($this->once())
+                ->method('getSingleScalarResult')
+                ->willReturn(0);
+
+            $result = $this->repository->existsByProductVariantId($productVariantId);
+
+            $this->assertFalse($result);
+        }
+
+        /**
+         * @throws NonUniqueResultException
+         * @throws NoResultException
+         */
+        public function testExistsByProductVariantIdThrowsNonUniqueResultException(): void
+        {
+            $productVariantId = $this->faker->uuid;
+
+            $this->queryBuilder->expects($this->once())
+                ->method('select')
+                ->with('count(e.id)')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('from')
+                ->with($this->entityName, 'e')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->never())
+                ->method('leftJoin');
+            $this->queryBuilder->expects($this->once())
+                ->method('where')
+                ->with('e.productVariantId = :productVariantId')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('setParameter')
+                ->with('productVariantId', $productVariantId)
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('getQuery')
+                ->willReturn($this->query);
+            $this->query->expects($this->once())
+                ->method('getSingleScalarResult')
+                ->willThrowException(new NonUniqueResultException());
+
+            $this->expectException(NonUniqueResultException::class);
+
+            $this->repository->existsByProductVariantId($productVariantId);
+        }
+
+        /**
+         * @throws NonUniqueResultException
+         * @throws NoResultException
+         */
+        public function testExistsByProductVariantIdThrowsNoResultException(): void
+        {
+            $productVariantId = $this->faker->uuid;
+
+            $this->queryBuilder->expects($this->once())
+                ->method('select')
+                ->with('count(e.id)')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('from')
+                ->with($this->entityName, 'e')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->never())
+                ->method('leftJoin');
+            $this->queryBuilder->expects($this->once())
+                ->method('where')
+                ->with('e.productVariantId = :productVariantId')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('setParameter')
+                ->with('productVariantId', $productVariantId)
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('getQuery')
+                ->willReturn($this->query);
+            $this->query->expects($this->once())
+                ->method('getSingleScalarResult')
+                ->willThrowException(new NoResultException());
+
+            $this->expectException(NoResultException::class);
+
+            $this->repository->existsByProductVariantId($productVariantId);
+        }
+
+        /**
+         * @throws NonUniqueResultException
+         */
+        public function testGetBySkuReturnsEntity(): void
+        {
+            $sku = $this->faker->word;
+            $entity = new Entity();
+
+            $this->queryBuilder->expects($this->once())
+                ->method('select')
+                ->with('e')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->exactly(4))
+                ->method('addSelect')
+                ->with($this->anything())
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('from')
+                ->with($this->entityName, 'e')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->exactly(4))
+                ->method('leftJoin')
+                ->with($this->anything(), $this->anything(), $this->anything(), $this->anything(), $this->anything())
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('where')
+                ->with('e.sku = :sku')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('setParameter')
+                ->with('sku', $sku)
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('getQuery')
+                ->willReturn($this->query);
+            $this->query->expects($this->once())
+                ->method('getOneOrNullResult')
+                ->with(AbstractQuery::HYDRATE_OBJECT)
+                ->willReturn($entity);
+
+            $result = $this->repository->getBySku($sku);
+
+            $this->assertSame($entity, $result);
+        }
+
+        /**
+         * @throws NonUniqueResultException
+         */
+        public function testGetBySkuReturnsNull(): void
+        {
+            $sku = $this->faker->word;
+
+            $this->queryBuilder->expects($this->once())
+                ->method('select')
+                ->with('e')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->exactly(4))
+                ->method('addSelect')
+                ->with($this->anything())
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('from')
+                ->with($this->entityName, 'e')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->exactly(4))
+                ->method('leftJoin')
+                ->with($this->anything(), $this->anything(), $this->anything(), $this->anything(), $this->anything())
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('where')
+                ->with('e.sku = :sku')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('setParameter')
+                ->with('sku', $sku)
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('getQuery')
+                ->willReturn($this->query);
+            $this->query->expects($this->once())
+                ->method('getOneOrNullResult')
+                ->with(AbstractQuery::HYDRATE_OBJECT)
+                ->willReturn(null);
+
+            $result = $this->repository->getBySku($sku);
+
+            $this->assertNull($result);
+        }
+
+        /**
+         * @throws NonUniqueResultException
+         * @throws NoResultException
+         */
+        public function testExistsBySkuReturnsTrue(): void
+        {
+            $sku = $this->faker->word;
+
+            $this->queryBuilder->expects($this->once())
+                ->method('select')
+                ->with('count(e.id)')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('from')
+                ->with($this->entityName, 'e')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->never())
+                ->method('leftJoin');
+            $this->queryBuilder->expects($this->once())
+                ->method('where')
+                ->with('e.sku = :sku')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('setParameter')
+                ->with('sku', $sku)
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('getQuery')
+                ->willReturn($this->query);
+            $this->query->expects($this->once())
+                ->method('getSingleScalarResult')
+                ->willReturn(1);
+
+            $result = $this->repository->existsBySku($sku);
+
+            $this->assertTrue($result);
+        }
+
+        /**
+         * @throws NonUniqueResultException
+         * @throws NoResultException
+         */
+        public function testExistsBySkuReturnsFalse(): void
+        {
+            $sku = $this->faker->word;
+
+            $this->queryBuilder->expects($this->once())
+                ->method('select')
+                ->with('count(e.id)')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('from')
+                ->with($this->entityName, 'e')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->never())
+                ->method('leftJoin');
+            $this->queryBuilder->expects($this->once())
+                ->method('where')
+                ->with('e.sku = :sku')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('setParameter')
+                ->with('sku', $sku)
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('getQuery')
+                ->willReturn($this->query);
+            $this->query->expects($this->once())
+                ->method('getSingleScalarResult')
+                ->willReturn(0);
+
+            $result = $this->repository->existsBySku($sku);
+
+            $this->assertFalse($result);
+        }
+
+        /**
+         * @throws NonUniqueResultException
+         * @throws NoResultException
+         */
+        public function testExistsBySkuThrowsNonUniqueResultException(): void
+        {
+            $sku = $this->faker->word;
+
+            $this->queryBuilder->expects($this->once())
+                ->method('select')
+                ->with('count(e.id)')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('from')
+                ->with($this->entityName, 'e')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->never())
+                ->method('leftJoin');
+            $this->queryBuilder->expects($this->once())
+                ->method('where')
+                ->with('e.sku = :sku')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('setParameter')
+                ->with('sku', $sku)
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('getQuery')
+                ->willReturn($this->query);
+            $this->query->expects($this->once())
+                ->method('getSingleScalarResult')
+                ->willThrowException(new NonUniqueResultException());
+
+            $this->expectException(NonUniqueResultException::class);
+
+            $this->repository->existsBySku($sku);
+        }
+
+        /**
+         * @throws NonUniqueResultException
+         * @throws NoResultException
+         */
+        public function testExistsBySkuThrowsNoResultException(): void
+        {
+            $sku = $this->faker->word;
+
+            $this->queryBuilder->expects($this->once())
+                ->method('select')
+                ->with('count(e.id)')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('from')
+                ->with($this->entityName, 'e')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->never())
+                ->method('leftJoin');
+            $this->queryBuilder->expects($this->once())
+                ->method('where')
+                ->with('e.sku = :sku')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('setParameter')
+                ->with('sku', $sku)
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('getQuery')
+                ->willReturn($this->query);
+            $this->query->expects($this->once())
+                ->method('getSingleScalarResult')
+                ->willThrowException(new NoResultException());
+
+            $this->expectException(NoResultException::class);
+
+            $this->repository->existsBySku($sku);
+        }
     }
-
-    /**
-     * @throws NonUniqueResultException
-     */
-    public function testGetByProductVariantIdReturnsEntity(): void
-    {
-        $productVariantId = $this->faker->uuid;
-        $entity = new Entity();
-
-        $this->queryBuilder->expects($this->once())
-            ->method('select')
-            ->with('e')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->exactly(4))
-            ->method('addSelect')
-            ->with($this->anything())
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('from')
-            ->with($this->entityName, 'e')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->exactly(4))
-            ->method('leftJoin')
-            ->with($this->anything(), $this->anything(), $this->anything(), $this->anything(), $this->anything())
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('where')
-            ->with('e.productVariantId = :productVariantId')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('setParameter')
-            ->with('productVariantId', $productVariantId)
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('getQuery')
-            ->willReturn($this->query);
-        $this->query->expects($this->once())
-            ->method('getOneOrNullResult')
-            ->with(AbstractQuery::HYDRATE_OBJECT)
-            ->willReturn($entity);
-
-        $result = $this->repository->getByProductVariantId($productVariantId);
-
-        $this->assertSame($entity, $result);
-    }
-
-    /**
-     * @throws NonUniqueResultException
-     */
-    public function testGetByProductVariantIdReturnsNull(): void
-    {
-        $productVariantId = $this->faker->uuid;
-
-        $this->queryBuilder->expects($this->once())
-            ->method('select')
-            ->with('e')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->exactly(4))
-            ->method('addSelect')
-            ->with($this->anything())
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('from')
-            ->with($this->entityName, 'e')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->exactly(4))
-            ->method('leftJoin')
-            ->with($this->anything(), $this->anything(), $this->anything(), $this::anything(), $this::anything())
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('where')
-            ->with('e.productVariantId = :productVariantId')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('setParameter')
-            ->with('productVariantId', $productVariantId)
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('getQuery')
-            ->willReturn($this->query);
-        $this->query->expects($this->once())
-            ->method('getOneOrNullResult')
-            ->with(AbstractQuery::HYDRATE_OBJECT)
-            ->willReturn(null);
-
-        $result = $this->repository->getByProductVariantId($productVariantId);
-
-        $this->assertNull($result);
-    }
-
-    /**
-     * @throws NonUniqueResultException
-     * @throws NoResultException
-     */
-    public function testExistsByProductVariantIdReturnsTrue(): void
-    {
-        $productVariantId = $this->faker->uuid;
-
-        $this->queryBuilder->expects($this->once())
-            ->method('select')
-            ->with('count(e.id)')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('from')
-            ->with($this->entityName, 'e')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->never())
-            ->method('leftJoin');
-        $this->queryBuilder->expects($this->once())
-            ->method('where')
-            ->with('e.productVariantId = :productVariantId')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('setParameter')
-            ->with('productVariantId', $productVariantId)
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('getQuery')
-            ->willReturn($this->query);
-        $this->query->expects($this->once())
-            ->method('getSingleScalarResult')
-            ->willReturn(1);
-
-        $result = $this->repository->existsByProductVariantId($productVariantId);
-
-        $this->assertTrue($result);
-    }
-
-    /**
-     * @throws NonUniqueResultException
-     * @throws NoResultException
-     */
-    public function testExistsByProductVariantIdReturnsFalse(): void
-    {
-        $productVariantId = $this->faker->uuid;
-
-        $this->queryBuilder->expects($this->once())
-            ->method('select')
-            ->with('count(e.id)')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('from')
-            ->with($this->entityName, 'e')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->never())
-            ->method('leftJoin');
-        $this->queryBuilder->expects($this->once())
-            ->method('where')
-            ->with('e.productVariantId = :productVariantId')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('setParameter')
-            ->with('productVariantId', $productVariantId)
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('getQuery')
-            ->willReturn($this->query);
-        $this->query->expects($this->once())
-            ->method('getSingleScalarResult')
-            ->willReturn(0);
-
-        $result = $this->repository->existsByProductVariantId($productVariantId);
-
-        $this->assertFalse($result);
-    }
-
-    /**
-     * @throws NonUniqueResultException
-     * @throws NoResultException
-     */
-    public function testExistsByProductVariantIdThrowsNonUniqueResultException(): void
-    {
-        $productVariantId = $this->faker->uuid;
-
-        $this->queryBuilder->expects($this->once())
-            ->method('select')
-            ->with('count(e.id)')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('from')
-            ->with($this->entityName, 'e')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->never())
-            ->method('leftJoin');
-        $this->queryBuilder->expects($this->once())
-            ->method('where')
-            ->with('e.productVariantId = :productVariantId')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('setParameter')
-            ->with('productVariantId', $productVariantId)
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('getQuery')
-            ->willReturn($this->query);
-        $this->query->expects($this->once())
-            ->method('getSingleScalarResult')
-            ->willThrowException(new NonUniqueResultException());
-
-        $this->expectException(NonUniqueResultException::class);
-
-        $this->repository->existsByProductVariantId($productVariantId);
-    }
-
-    /**
-     * @throws NonUniqueResultException
-     * @throws NoResultException
-     */
-    public function testExistsByProductVariantIdThrowsNoResultException(): void
-    {
-        $productVariantId = $this->faker->uuid;
-
-        $this->queryBuilder->expects($this->once())
-            ->method('select')
-            ->with('count(e.id)')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('from')
-            ->with($this->entityName, 'e')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->never())
-            ->method('leftJoin');
-        $this->queryBuilder->expects($this->once())
-            ->method('where')
-            ->with('e.productVariantId = :productVariantId')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('setParameter')
-            ->with('productVariantId', $productVariantId)
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('getQuery')
-            ->willReturn($this->query);
-        $this->query->expects($this->once())
-            ->method('getSingleScalarResult')
-            ->willThrowException(new NoResultException());
-
-        $this->expectException(NoResultException::class);
-
-        $this->repository->existsByProductVariantId($productVariantId);
-    }
-
-    /**
-     * @throws NonUniqueResultException
-     */
-    public function testGetBySkuReturnsEntity(): void
-    {
-        $sku = $this->faker->word;
-        $entity = new Entity();
-
-        $this->queryBuilder->expects($this->once())
-            ->method('select')
-            ->with('e')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->exactly(4))
-            ->method('addSelect')
-            ->with($this->anything())
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('from')
-            ->with($this->entityName, 'e')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->exactly(4))
-            ->method('leftJoin')
-            ->with($this->anything(), $this->anything(), $this->anything(), $this::anything(), $this::anything())
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('where')
-            ->with('e.sku = :sku')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('setParameter')
-            ->with('sku', $sku)
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('getQuery')
-            ->willReturn($this->query);
-        $this->query->expects($this->once())
-            ->method('getOneOrNullResult')
-            ->with(AbstractQuery::HYDRATE_OBJECT)
-            ->willReturn($entity);
-
-        $result = $this->repository->getBySku($sku);
-
-        $this->assertSame($entity, $result);
-    }
-
-    /**
-     * @throws NonUniqueResultException
-     */
-    public function testGetBySkuReturnsNull(): void
-    {
-        $sku = $this->faker->word;
-
-        $this->queryBuilder->expects($this->once())
-            ->method('select')
-            ->with('e')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->exactly(4))
-            ->method('addSelect')
-            ->with($this->anything())
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('from')
-            ->with($this->entityName, 'e')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->exactly(4))
-            ->method('leftJoin')
-            ->with($this->anything(), $this->anything(), $this->anything(), $this::anything(), $this::anything())
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('where')
-            ->with('e.sku = :sku')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('setParameter')
-            ->with('sku', $sku)
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('getQuery')
-            ->willReturn($this->query);
-        $this->query->expects($this->once())
-            ->method('getOneOrNullResult')
-            ->with(AbstractQuery::HYDRATE_OBJECT)
-            ->willReturn(null);
-
-        $result = $this->repository->getBySku($sku);
-
-        $this->assertNull($result);
-    }
-
-    /**
-     * @throws NonUniqueResultException
-     * @throws NoResultException
-     */
-    public function testExistsBySkuReturnsTrue(): void
-    {
-        $sku = $this->faker->word;
-
-        $this->queryBuilder->expects($this->once())
-            ->method('select')
-            ->with('count(e.id)')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('from')
-            ->with($this->entityName, 'e')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->never())
-            ->method('leftJoin');
-        $this->queryBuilder->expects($this->once())
-            ->method('where')
-            ->with('e.sku = :sku')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('setParameter')
-            ->with('sku', $sku)
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('getQuery')
-            ->willReturn($this->query);
-        $this->query->expects($this->once())
-            ->method('getSingleScalarResult')
-            ->willReturn(1);
-
-        $result = $this->repository->existsBySku($sku);
-
-        $this->assertTrue($result);
-    }
-
-    /**
-     * @throws NonUniqueResultException
-     * @throws NoResultException
-     */
-    public function testExistsBySkuReturnsFalse(): void
-    {
-        $sku = $this->faker->word;
-
-        $this->queryBuilder->expects($this->once())
-            ->method('select')
-            ->with('count(e.id)')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('from')
-            ->with($this->entityName, 'e')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->never())
-            ->method('leftJoin');
-        $this->queryBuilder->expects($this->once())
-            ->method('where')
-            ->with('e.sku = :sku')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('setParameter')
-            ->with('sku', $sku)
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('getQuery')
-            ->willReturn($this->query);
-        $this->query->expects($this->once())
-            ->method('getSingleScalarResult')
-            ->willReturn(0);
-
-        $result = $this->repository->existsBySku($sku);
-
-        $this->assertFalse($result);
-    }
-
-    /**
-     * @throws NonUniqueResultException
-     * @throws NoResultException
-     */
-    public function testExistsBySkuThrowsNonUniqueResultException(): void
-    {
-        $sku = $this->faker->word;
-
-        $this->queryBuilder->expects($this->once())
-            ->method('select')
-            ->with('count(e.id)')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('from')
-            ->with($this->entityName, 'e')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->never())
-            ->method('leftJoin');
-        $this->queryBuilder->expects($this->once())
-            ->method('where')
-            ->with('e.sku = :sku')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('setParameter')
-            ->with('sku', $sku)
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('getQuery')
-            ->willReturn($this->query);
-        $this->query->expects($this->once())
-            ->method('getSingleScalarResult')
-            ->willThrowException(new NonUniqueResultException());
-
-        $this->expectException(NonUniqueResultException::class);
-
-        $this->repository->existsBySku($sku);
-    }
-
-    /**
-     * @throws NonUniqueResultException
-     * @throws NoResultException
-     */
-    public function testExistsBySkuThrowsNoResultException(): void
-    {
-        $sku = $this->faker->word;
-
-        $this->queryBuilder->expects($this->once())
-            ->method('select')
-            ->with('count(e.id)')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('from')
-            ->with($this->entityName, 'e')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->never())
-            ->method('leftJoin');
-        $this->queryBuilder->expects($this->once())
-            ->method('where')
-            ->with('e.sku = :sku')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('setParameter')
-            ->with('sku', $sku)
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('getQuery')
-            ->willReturn($this->query);
-        $this->query->expects($this->once())
-            ->method('getSingleScalarResult')
-            ->willThrowException(new NoResultException());
-
-        $this->expectException(NoResultException::class);
-
-        $this->repository->existsBySku($sku);
-    }
-}

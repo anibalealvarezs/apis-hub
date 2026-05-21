@@ -4,7 +4,7 @@
 
     namespace Tests\Unit\Services\Aggregation;
 
-    use Traits\AggregationFallbackTelemetryReporter;
+    use Services\Aggregation\AggregationFallbackTelemetryReporter;
     use Tests\Unit\BaseUnitTestCase;
 
     final class AggregationFallbackTelemetryReporterTest extends BaseUnitTestCase

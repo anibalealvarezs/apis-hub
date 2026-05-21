@@ -4,8 +4,6 @@ namespace Tests\Unit\Classes\Conversions;
 
 use Anibalealvarezs\KlaviyoHubDriver\Conversions\KlaviyoConvert;
 use Doctrine\Common\Collections\ArrayCollection;
-use Anibalealvarezs\ApiSkeleton\Enums\Channel;
-use Anibalealvarezs\ApiSkeleton\Enums\Period;
 use Tests\Unit\BaseUnitTestCase;
 
 class KlaviyoConvertTest extends BaseUnitTestCase
@@ -33,7 +31,7 @@ class KlaviyoConvertTest extends BaseUnitTestCase
         $customer = $result->first();
         $this->assertEquals($id, $customer->platformId);
         $this->assertEquals($email, $customer->email);
-        $this->assertEquals(Channel::klaviyo->value, $customer->channel);
+        $this->assertEquals('klaviyo', $customer->channel);
         $this->assertEquals($input[0], $customer->data);
     }
 
@@ -72,7 +70,7 @@ class KlaviyoConvertTest extends BaseUnitTestCase
         $product = $result->first();
         $this->assertEquals($prodId, $product->platformId);
         $this->assertEquals($prodSku, $product->sku);
-        $this->assertEquals(Channel::klaviyo->value, $product->channel);
+        $this->assertEquals('klaviyo', $product->channel);
         $this->assertEquals($input[0], $product->data);
         $this->assertNull($product->vendor);
         $this->assertInstanceOf(ArrayCollection::class, $product->variants);
@@ -103,7 +101,7 @@ class KlaviyoConvertTest extends BaseUnitTestCase
         $variant = $result->first();
         $this->assertEquals($id, $variant->platformId);
         $this->assertEquals($sku, $variant->sku);
-        $this->assertEquals(Channel::klaviyo->value, $variant->channel);
+        $this->assertEquals('klaviyo', $variant->channel);
         $this->assertEquals($input[0], $variant->data);
     }
 
@@ -127,7 +125,7 @@ class KlaviyoConvertTest extends BaseUnitTestCase
         $this->assertCount(1, $result);
         $category = $result->first();
         $this->assertEquals($id, $category->platformId);
-        $this->assertEquals(Channel::klaviyo->value, $category->channel);
+        $this->assertEquals('klaviyo', $category->channel);
         $this->assertEquals($input[0], $category->data);
     }
 

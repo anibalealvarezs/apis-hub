@@ -1,360 +1,377 @@
 <?php
 
-namespace Tests\Unit\Repositories;
+    namespace Tests\Unit\Repositories;
 
-use Doctrine\ORM\AbstractQuery;
-use Doctrine\ORM\EntityManager;
-use Doctrine\ORM\Mapping\ClassMetadata;
-use Doctrine\ORM\NonUniqueResultException;
-use Doctrine\ORM\NoResultException;
-use Doctrine\ORM\QueryBuilder;
-use Enums\QueryBuilderType;
-use Faker\Factory;
-use Faker\Generator;
-use PHPUnit\Framework\MockObject\MockObject;
-use PHPUnit\Framework\TestCase;
-use ReflectionClass;
-use ReflectionException;
-use ReflectionMethod;
-use Repositories\OrderRepository;
+    use Doctrine\ORM\AbstractQuery;
+    use Doctrine\ORM\EntityManager;
+    use Doctrine\ORM\EntityRepository;
+    use Doctrine\ORM\Mapping\ClassMetadata;
+    use Doctrine\ORM\NonUniqueResultException;
+    use Doctrine\ORM\NoResultException;
+    use Doctrine\ORM\Query;
+    use Doctrine\ORM\QueryBuilder;
+    use Enums\QueryBuilderType;
+    use Faker\Factory;
+    use Faker\Generator;
+    use Helpers\Helpers;
+    use MockChannelRepository;
+    use PHPUnit\Framework\MockObject\MockObject;
+    use PHPUnit\Framework\TestCase;
+    use ReflectionClass;
+    use ReflectionException;
+    use ReflectionMethod;
+    use Repositories\OrderRepository;
 
-class OrderRepositoryTest extends TestCase
-{
-    private Generator $faker;
-    private MockObject|QueryBuilder $queryBuilder;
-    private MockObject|AbstractQuery $query;
-    private OrderRepository $repository;
-    private string $entityName = 'Entities\Entity';
-
-    protected function setUp(): void
+    class OrderRepositoryTest extends TestCase
     {
-        $this->faker = Factory::create();
+        protected Generator $faker;
+        private MockObject|EntityManager $entityManager;
+        private MockObject|QueryBuilder $queryBuilder;
+        private MockObject|Query $query;
+        private OrderRepository $repository;
+        private string $entityName = 'Entities\Entity';
 
-        $entityManager = $this->createMock(EntityManager::class);
-        $this->queryBuilder = $this->createMock(QueryBuilder::class);
-        $this->query = $this->createMock(AbstractQuery::class);
+        protected function setUp(): void
+        {
+            $this->faker = Factory::create();
 
-        $entityManager->method('createQueryBuilder')
-            ->willReturn($this->queryBuilder);
+            $this->entityManager = $this->createMock(EntityManager::class);
+            $this->queryBuilder = $this->createMock(QueryBuilder::class);
+            $this->query = $this->createMock(Query::class);
 
-        $this->queryBuilder->method('select')->willReturnSelf();
-        $this->queryBuilder->method('addSelect')->willReturnSelf();
-        $this->queryBuilder->method('from')->willReturnSelf();
-        $this->queryBuilder->method('leftJoin')->willReturnSelf();
-        $this->queryBuilder->method('where')->willReturnSelf();
-        $this->queryBuilder->method('setParameter')->willReturnSelf();
-        $this->queryBuilder->method('setMaxResults')->willReturnSelf();
-        $this->queryBuilder->method('getQuery')->willReturn($this->query);
+            $this->entityManager->method('createQueryBuilder')
+                ->willReturn($this->queryBuilder);
 
-        $classMetadata = $this->createMock(ClassMetadata::class);
-        $classMetadata->fieldMappings = [];
-        $classMetadata->name = $this->entityName;
-        $entityManager->method('getClassMetadata')
-            ->with($this->entityName)
-            ->willReturn($classMetadata);
+            $this->queryBuilder->method('select')->willReturnSelf();
+            $this->queryBuilder->method('addSelect')->willReturnSelf();
+            $this->queryBuilder->method('from')->willReturnSelf();
+            $this->queryBuilder->method('leftJoin')->willReturnSelf();
+            $this->queryBuilder->method('where')->willReturnSelf();
+            $this->queryBuilder->method('setParameter')->willReturnSelf();
+            $this->queryBuilder->method('setMaxResults')->willReturnSelf();
+            $this->queryBuilder->method('getQuery')->willReturn($this->query);
 
-        $this->repository = new OrderRepository($entityManager, $classMetadata);
-        $reflection = new ReflectionClass($this->repository);
-        $entityNameProperty = $reflection->getProperty('_entityName');
-        $entityNameProperty->setValue($this->repository, $this->entityName);
-        $emProperty = $reflection->getProperty('_em');
-        $emProperty->setValue($this->repository, $entityManager);
-    }
+            $classMetadata = $this->createMock(ClassMetadata::class);
+            $classMetadata->fieldMappings = [];
+            $classMetadata->name = $this->entityName;
+            $this->entityManager->method('getClassMetadata')
+                ->with($this->entityName)
+                ->willReturn($classMetadata);
 
-    /**
-     * @throws ReflectionException
-     */
-    public function testCreateBaseQueryBuilderSelect(): void
-    {
-        $addSelectCallCount = 0;
-        $leftJoinCallCount = 0;
+            $this->entityManager->method('getRepository')
+                ->willReturnCallback(function ($className) {
+                    if (str_contains($className, 'Channel') && !str_contains($className, 'Channeled')) {
+                        return new MockChannelRepository();
+                    }
 
-        $this->queryBuilder->expects($this->once())
-            ->method('select')
-            ->with('e')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->exactly(4))
-            ->method('addSelect')
-            ->with($this->callback(function ($arg) use (&$addSelectCallCount) {
-                $addSelectExpected = ['o', 'c', 'p', 'd'];
-                $this->assertEquals($addSelectExpected[$addSelectCallCount], $arg, "addSelect does not match for call #$addSelectCallCount");
-                $addSelectCallCount++;
-                return true;
-            }))
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('from')
-            ->with($this->entityName, 'e')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->exactly(4))
-            ->method('leftJoin')
-            ->willReturnCallback(function (...$args) use (&$leftJoinCallCount) {
-                $leftJoinCallCount++;
-                return $this->queryBuilder;
-            });
+                    return $this->createMock(EntityRepository::class);
+                });
+            Helpers::setEntityManager($this->entityManager);
 
-        $reflection = new ReflectionMethod($this->repository, 'createBaseQueryBuilder');
-        $result = $reflection->invoke($this->repository, QueryBuilderType::SELECT);
+            $this->repository = new OrderRepository($this->entityManager, $classMetadata);
+            $reflection = new ReflectionClass($this->repository);
+            $emProperty = $reflection->getProperty('_em');
+            $emProperty->setValue($this->repository, $this->entityManager);
+        }
 
-        $this->assertInstanceOf(QueryBuilder::class, $result);
-        $this->assertEquals(4, $addSelectCallCount, "Expected four addSelect calls");
-        $this->assertEquals(4, $leftJoinCallCount, "Expected four leftJoin calls");
-    }
+        /**
+         * @throws ReflectionException
+         */
+        public function testCreateBaseQueryBuilderSelect(): void
+        {
+            $addSelectCallCount = 0;
+            $leftJoinCallCount = 0;
 
-    /**
-     * @throws ReflectionException
-     */
-    public function testCreateBaseQueryBuilderCount(): void
-    {
-        $addSelectCallCount = 0;
-        $leftJoinCallCount = 0;
+            $this->queryBuilder->expects($this->once())
+                ->method('select')
+                ->with('e')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->exactly(4))
+                ->method('addSelect')
+                ->with($this->callback(function ($arg) use (&$addSelectCallCount) {
+                    $addSelectExpected = ['o', 'c', 'p', 'd'];
+                    $this->assertEquals($addSelectExpected[$addSelectCallCount], $arg, "addSelect does not match for call #$addSelectCallCount");
+                    $addSelectCallCount++;
 
-        $this->queryBuilder->expects($this->once())
-            ->method('select')
-            ->with('count(e.id)')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->exactly(4))
-            ->method('addSelect')
-            ->with($this->callback(function ($arg) use (&$addSelectCallCount) {
-                $addSelectExpected = ['o', 'c', 'p', 'd'];
-                $this->assertEquals($addSelectExpected[$addSelectCallCount], $arg, "addSelect does not match for call #$addSelectCallCount");
-                $addSelectCallCount++;
-                return true;
-            }))
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('from')
-            ->with($this->entityName, 'e')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->exactly(4))
-            ->method('leftJoin')
-            ->willReturnCallback(function (...$args) use (&$leftJoinCallCount) {
-                $leftJoinCallCount++;
-                return $this->queryBuilder;
-            });
+                    return true;
+                }))
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('from')
+                ->with($this->entityName, 'e')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->exactly(4))
+                ->method('leftJoin')
+                ->willReturnCallback(function (...$args) use (&$leftJoinCallCount) {
+                    $leftJoinCallCount++;
 
-        $reflection = new ReflectionMethod($this->repository, 'createBaseQueryBuilder');
-        $result = $reflection->invoke($this->repository, QueryBuilderType::COUNT);
+                    return $this->queryBuilder;
+                });
 
-        $this->assertInstanceOf(QueryBuilder::class, $result);
-        $this->assertEquals(4, $addSelectCallCount, "Expected four addSelect calls");
-        $this->assertEquals(4, $leftJoinCallCount, "Expected four leftJoin calls");
-    }
+            $reflection = new ReflectionMethod($this->repository, 'createBaseQueryBuilder');
+            $result = $reflection->invoke($this->repository, QueryBuilderType::SELECT);
 
-    /**
-     * @throws NonUniqueResultException
-     */
-    public function testGetByOrderId(): void
-    {
-        $orderId = $this->faker->uuid;
-        $entity = $this->createMock($this->entityName);
+            $this->assertInstanceOf(QueryBuilder::class, $result);
+            $this->assertEquals(4, $addSelectCallCount, "Expected four addSelect calls");
+            $this->assertEquals(4, $leftJoinCallCount, "Expected four leftJoin calls");
+        }
 
-        $this->queryBuilder->expects($this->once())
-            ->method('select')
-            ->with('e')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->exactly(4))
-            ->method('addSelect')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('from')
-            ->with($this->entityName, 'e')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->exactly(4))
-            ->method('leftJoin')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('where')
-            ->with('e.orderId = :orderId')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('setParameter')
-            ->with('orderId', $this->isType('string'))
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('getQuery')
-            ->willReturn($this->query);
-        $this->query->expects($this->once())
-            ->method('getOneOrNullResult')
-            ->with(AbstractQuery::HYDRATE_OBJECT)
-            ->willReturn($entity);
+        /**
+         * @throws ReflectionException
+         */
+        public function testCreateBaseQueryBuilderCount(): void
+        {
+            $addSelectCallCount = 0;
+            $leftJoinCallCount = 0;
 
-        $result = $this->repository->getByOrderId($orderId);
+            $this->queryBuilder->expects($this->once())
+                ->method('select')
+                ->with('count(e.id)')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->exactly(4))
+                ->method('addSelect')
+                ->with($this->callback(function ($arg) use (&$addSelectCallCount) {
+                    $addSelectExpected = ['o', 'c', 'p', 'd'];
+                    $this->assertEquals($addSelectExpected[$addSelectCallCount], $arg, "addSelect does not match for call #$addSelectCallCount");
+                    $addSelectCallCount++;
 
-        $this->assertSame($entity, $result);
-    }
+                    return true;
+                }))
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('from')
+                ->with($this->entityName, 'e')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->exactly(4))
+                ->method('leftJoin')
+                ->willReturnCallback(function (...$args) use (&$leftJoinCallCount) {
+                    $leftJoinCallCount++;
 
-    /**
-     * @throws NonUniqueResultException
-     */
-    public function testGetByOrderIdNotFound(): void
-    {
-        $orderId = $this->faker->uuid;
+                    return $this->queryBuilder;
+                });
 
-        $this->queryBuilder->expects($this->once())
-            ->method('select')
-            ->with('e')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->exactly(4))
-            ->method('addSelect')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('from')
-            ->with($this->entityName, 'e')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->exactly(4))
-            ->method('leftJoin')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('where')
-            ->with('e.orderId = :orderId')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('setParameter')
-            ->with('orderId', $this->isType('string'))
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('getQuery')
-            ->willReturn($this->query);
-        $this->query->expects($this->once())
-            ->method('getOneOrNullResult')
-            ->with(AbstractQuery::HYDRATE_OBJECT)
-            ->willReturn(null);
+            $reflection = new ReflectionMethod($this->repository, 'createBaseQueryBuilder');
+            $result = $reflection->invoke($this->repository, QueryBuilderType::COUNT);
 
-        $result = $this->repository->getByOrderId($orderId);
+            $this->assertInstanceOf(QueryBuilder::class, $result);
+            $this->assertEquals(4, $addSelectCallCount, "Expected four addSelect calls");
+            $this->assertEquals(4, $leftJoinCallCount, "Expected four leftJoin calls");
+        }
 
-        $this->assertNull($result);
-    }
+        /**
+         * @throws NonUniqueResultException
+         */
+        public function testGetByOrderId(): void
+        {
+            $orderId = $this->faker->uuid;
+            $entity = $this->createMock($this->entityName);
 
-    /**
-     * @throws NonUniqueResultException
-     * @throws NoResultException
-     */
-    public function testExistsByOrderIdTrue(): void
-    {
-        $orderId = $this->faker->uuid;
+            $this->queryBuilder->expects($this->once())
+                ->method('select')
+                ->with('e')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->exactly(4))
+                ->method('addSelect')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('from')
+                ->with($this->entityName, 'e')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->exactly(4))
+                ->method('leftJoin')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('where')
+                ->with('e.orderId = :orderId')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('setParameter')
+                ->with('orderId', $this->isType('string'))
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('getQuery')
+                ->willReturn($this->query);
+            $this->query->expects($this->once())
+                ->method('getOneOrNullResult')
+                ->with(AbstractQuery::HYDRATE_OBJECT)
+                ->willReturn($entity);
 
-        $this->queryBuilder->expects($this->once())
-            ->method('select')
-            ->with('count(e.id)')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('from')
-            ->with($this->entityName, 'e')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->never())
-            ->method('leftJoin');
-        $this->queryBuilder->expects($this->once())
-            ->method('where')
-            ->with('e.orderId = :orderId')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('setParameter')
-            ->with('orderId', $this->isType('string'))
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('getQuery')
-            ->willReturn($this->query);
-        $this->query->expects($this->once())
-            ->method('getSingleScalarResult')
-            ->willReturn(1);
+            $result = $this->repository->getByOrderId($orderId);
 
-        $result = $this->repository->existsByOrderId($orderId);
+            $this->assertSame($entity, $result);
+        }
 
-        $this->assertTrue($result);
-    }
+        /**
+         * @throws NonUniqueResultException
+         */
+        public function testGetByOrderIdNotFound(): void
+        {
+            $orderId = $this->faker->uuid;
 
-    /**
-     * @throws NonUniqueResultException
-     * @throws NoResultException
-     */
-    public function testExistsByOrderIdFalse(): void
-    {
-        $orderId = $this->faker->uuid;
+            $this->queryBuilder->expects($this->once())
+                ->method('select')
+                ->with('e')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->exactly(4))
+                ->method('addSelect')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('from')
+                ->with($this->entityName, 'e')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->exactly(4))
+                ->method('leftJoin')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('where')
+                ->with('e.orderId = :orderId')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('setParameter')
+                ->with('orderId', $this->isType('string'))
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('getQuery')
+                ->willReturn($this->query);
+            $this->query->expects($this->once())
+                ->method('getOneOrNullResult')
+                ->with(AbstractQuery::HYDRATE_OBJECT)
+                ->willReturn(null);
 
-        $this->queryBuilder->expects($this->once())
-            ->method('select')
-            ->with('count(e.id)')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('from')
-            ->with($this->entityName, 'e')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->never())
-            ->method('leftJoin');
-        $this->queryBuilder->expects($this->once())
-            ->method('where')
-            ->with('e.orderId = :orderId')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('setParameter')
-            ->with('orderId', $this->isType('string'))
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('getQuery')
-            ->willReturn($this->query);
-        $this->query->expects($this->once())
-            ->method('getSingleScalarResult')
-            ->willReturn(0);
+            $result = $this->repository->getByOrderId($orderId);
 
-        $result = $this->repository->existsByOrderId($orderId);
+            $this->assertNull($result);
+        }
 
-        $this->assertFalse($result);
-    }
+        /**
+         * @throws NonUniqueResultException
+         * @throws NoResultException
+         */
+        public function testExistsByOrderIdTrue(): void
+        {
+            $orderId = $this->faker->uuid;
 
-    /**
-     * @throws ReflectionException
-     */
-    public function testProcessResultWithChanneledOrders(): void
-    {
-        $channelId = 1;
-        $channelName = 'shopify';
-        $data = [
-            'id' => $this->faker->randomNumber(),
-            'channeledOrders' => [
-                [
-                    'channel' => $channelId,
-                    'channeledCustomer' => ['channel' => 'some_channel'],
-                    'channeledProducts' => [['channel' => 'some_channel']],
-                    'channeledDiscounts' => [['channel' => 'some_channel']],
+            $this->queryBuilder->expects($this->once())
+                ->method('select')
+                ->with('count(e.id)')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('from')
+                ->with($this->entityName, 'e')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->never())
+                ->method('leftJoin');
+            $this->queryBuilder->expects($this->once())
+                ->method('where')
+                ->with('e.orderId = :orderId')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('setParameter')
+                ->with('orderId', $this->isType('string'))
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('getQuery')
+                ->willReturn($this->query);
+            $this->query->expects($this->once())
+                ->method('getSingleScalarResult')
+                ->willReturn(1);
+
+            $result = $this->repository->existsByOrderId($orderId);
+
+            $this->assertTrue($result);
+        }
+
+        /**
+         * @throws NonUniqueResultException
+         * @throws NoResultException
+         */
+        public function testExistsByOrderIdFalse(): void
+        {
+            $orderId = $this->faker->uuid;
+
+            $this->queryBuilder->expects($this->once())
+                ->method('select')
+                ->with('count(e.id)')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('from')
+                ->with($this->entityName, 'e')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->never())
+                ->method('leftJoin');
+            $this->queryBuilder->expects($this->once())
+                ->method('where')
+                ->with('e.orderId = :orderId')
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('setParameter')
+                ->with('orderId', $this->isType('string'))
+                ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('getQuery')
+                ->willReturn($this->query);
+            $this->query->expects($this->once())
+                ->method('getSingleScalarResult')
+                ->willReturn(0);
+
+            $result = $this->repository->existsByOrderId($orderId);
+
+            $this->assertFalse($result);
+        }
+
+        /**
+         * @throws ReflectionException
+         */
+        public function testProcessResultWithChanneledOrders(): void
+        {
+            $channelId = 1;
+            $channelName = 'shopify';
+            $data = [
+                'id'              => $this->faker->randomNumber(),
+                'channeledOrders' => [
+                    [
+                        'channel'            => $channelId,
+                        'channeledCustomer'  => ['channel' => 'some_channel'],
+                        'channeledProducts'  => [['channel' => 'some_channel']],
+                        'channeledDiscounts' => [['channel' => 'some_channel']],
+                    ],
                 ],
-            ],
-        ];
-        $expected = [
-            'id' => $data['id'],
-            'channeledOrders' => [
-                [
-                    'channel' => $channelName,
-                    'channeledCustomer' => [],
-                    'channeledProducts' => [[]],
-                    'channeledDiscounts' => [[]],
+            ];
+            $expected = [
+                'id'              => $data['id'],
+                'channeledOrders' => [
+                    [
+                        'channel'            => $channelName,
+                        'channeledCustomer'  => [],
+                        'channeledProducts'  => [[]],
+                        'channeledDiscounts' => [[]],
+                    ],
                 ],
-            ],
-        ];
+            ];
 
-        $reflection = new ReflectionMethod($this->repository, 'processResult');
-        $result = $reflection->invoke($this->repository, $data);
+            $reflection = new ReflectionMethod($this->repository, 'processResult');
+            $result = $reflection->invoke($this->repository, $data);
 
-        $this->assertEquals($expected, $result);
+            $this->assertEquals($expected, $result);
+        }
+
+        /**
+         * @throws ReflectionException
+         */
+        public function testProcessResultWithoutChanneledOrders(): void
+        {
+            $data = [
+                'id'              => $this->faker->randomNumber(),
+                'channeledOrders' => [],
+            ];
+            $expected = [
+                'id'              => $data['id'],
+                'channeledOrders' => [],
+            ];
+
+            $reflection = new ReflectionMethod($this->repository, 'processResult');
+            $result = $reflection->invoke($this->repository, $data);
+
+            $this->assertEquals($expected, $result);
+        }
     }
-
-    /**
-     * @throws ReflectionException
-     */
-    public function testProcessResultWithoutChanneledOrders(): void
-    {
-        $data = [
-            'id' => $this->faker->randomNumber(),
-            'channeledOrders' => [],
-        ];
-        $expected = [
-            'id' => $data['id'],
-            'channeledOrders' => [],
-        ];
-
-        $reflection = new ReflectionMethod($this->repository, 'processResult');
-        $result = $reflection->invoke($this->repository, $data);
-
-        $this->assertEquals($expected, $result);
-    }
-}

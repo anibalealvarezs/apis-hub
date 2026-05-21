@@ -386,16 +386,20 @@ class GenerateEntitiesConfigCommandTest extends TestCase
             'repository_class' => 'Repositories\ProductRepository',
             'repository_methods' => [
                 'find' => [
-                    'parameters' => ['id', 'lockMode', 'lockVersion']
+                    'parameters' => ['id', 'lockMode', 'lockVersion'],
+                    'return_type' => 'object'
                 ],
                 'findAll' => [
-                    'parameters' => []
+                    'parameters' => [],
+                    'return_type' => 'array'
                 ],
                 'findBy' => [
-                    'parameters' => ['criteria', 'orderBy', 'limit', 'offset']
+                    'parameters' => ['criteria', 'orderBy', 'limit', 'offset'],
+                    'return_type' => 'array'
                 ],
                 'findOneBy' => [
-                    'parameters' => ['criteria', 'orderBy']
+                    'parameters' => ['criteria', 'orderBy'],
+                    'return_type' => 'object'
                 ],
                 'getByProductId' => [
                     'parameters' => ['productId'],
@@ -446,31 +450,28 @@ class GenerateEntitiesConfigCommandTest extends TestCase
                     'return_type' => 'array'
                 ],
                 'createQueryBuilder' => [
-                    'parameters' => ['alias', 'indexBy']
+                    'parameters' => ['alias', 'indexBy'],
+                    'return_type' => 'Doctrine\ORM\QueryBuilder'
                 ],
                 'createResultSetMappingBuilder' => [
-                    'parameters' => ['alias']
-                ],
-                'createNamedQuery' => [
-                    'parameters' => ['queryName']
-                ],
-                'createNativeNamedQuery' => [
-                    'parameters' => ['queryName']
-                ],
-                'clear' => [
-                    'parameters' => []
+                    'parameters' => ['alias'],
+                    'return_type' => 'Doctrine\ORM\Query\ResultSetMappingBuilder'
                 ],
                 'count' => [
-                    'parameters' => ['criteria']
+                    'parameters' => ['criteria'],
+                    'return_type' => 'int'
                 ],
                 '__call' => [
-                    'parameters' => ['method', 'arguments']
+                    'parameters' => ['method', 'arguments'],
+                    'return_type' => 'mixed'
                 ],
                 'getClassName' => [
-                    'parameters' => []
+                    'parameters' => [],
+                    'return_type' => 'string'
                 ],
                 'matching' => [
-                    'parameters' => ['criteria']
+                    'parameters' => ['criteria'],
+                    'return_type' => 'mixed'
                 ],
                 'setHideFields' => [
                     'parameters' => ['fields'],
@@ -483,6 +484,26 @@ class GenerateEntitiesConfigCommandTest extends TestCase
                 'getMaxDate' => [
                     'parameters' => ['filters'],
                     'return_type' => 'string'
+                ],
+                'getEntityManager' => [
+                    'parameters' => [],
+                    'return_type' => 'Doctrine\ORM\EntityManagerInterface'
+                ],
+                'appendOptimizedStrategyMeta' => [
+                    'parameters' => ['meta'],
+                    'return_type' => 'array'
+                ],
+                'executeOptimizedAggregationPlan' => [
+                    'parameters' => ['plan', 'meta'],
+                    'return_type' => 'array'
+                ],
+                'executeLegacyAggregationPlan' => [
+                    'parameters' => ['plan', 'meta'],
+                    'return_type' => 'array'
+                ],
+                'getLastAggregateMeta' => [
+                    'parameters' => [],
+                    'return_type' => 'array'
                 ]
             ]
         ];

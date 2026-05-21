@@ -4,7 +4,7 @@
 
     namespace Tests\Unit\Services\Aggregation;
 
-    use Traits\TemporalDatePartSqlResolver;
+    use Services\Aggregation\TemporalDatePartSqlResolver;
     use Tests\Unit\BaseUnitTestCase;
 
     final class TemporalDatePartSqlResolverTest extends BaseUnitTestCase

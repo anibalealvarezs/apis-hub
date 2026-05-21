@@ -4,7 +4,7 @@
 
     namespace Tests\Unit\Services\Aggregation;
 
-    use Traits\FilterConditionResolver;
+    use Services\Aggregation\FilterConditionResolver;
     use Tests\Unit\BaseUnitTestCase;
 
     final class FilterConditionResolverTest extends BaseUnitTestCase

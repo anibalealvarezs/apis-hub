@@ -119,8 +119,8 @@
                 endDate: '2026-04-30',
             );
 
-            $this->assertSame(['facebook_organic_page_summary'], $plan->getCandidateOptimizedStrategies());
-            $this->assertSame(['facebook_organic_page_summary'], $plan->getStages()['optimized']['candidate_strategies']);
+            $this->assertSame(['social_organic_page_summary'], $plan->getCandidateOptimizedStrategies());
+            $this->assertSame(['social_organic_page_summary'], $plan->getStages()['optimized']['candidate_strategies']);
         }
 
         public function testNarrowsCandidatesToFacebookOrganicPostSnapshotStrategy(): void
@@ -144,7 +144,7 @@
                 endDate: '2026-04-30',
             );
 
-            $this->assertSame(['facebook_organic_post_snapshot'], $plan->getCandidateOptimizedStrategies());
+            $this->assertSame(['social_organic_post_snapshot'], $plan->getCandidateOptimizedStrategies());
         }
 
         public function testNarrowsCandidatesToWeightedMetricStrategy(): void

@@ -6,10 +6,10 @@
 
     use Doctrine\DBAL\Connection;
     use Doctrine\DBAL\Query\QueryBuilder;
-    use Traits\AggregationPlan;
-    use Traits\LegacyAggregateExecutionContext;
-    use Traits\Stages\LegacyAggregateFilterStage;
-    use Traits\Stages\LegacyAggregateGroupingStage;
+    use Services\Aggregation\AggregationPlan;
+    use Services\Aggregation\LegacyAggregateExecutionContext;
+    use Services\Aggregation\Stages\LegacyAggregateFilterStage;
+    use Services\Aggregation\Stages\LegacyAggregateGroupingStage;
     use Tests\Unit\BaseUnitTestCase;
 
     final class LegacyAggregateStagesSmokeTest extends BaseUnitTestCase

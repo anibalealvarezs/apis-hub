@@ -6,9 +6,9 @@
 
     use Doctrine\DBAL\Connection;
     use Doctrine\DBAL\Query\QueryBuilder;
-    use Traits\AggregationPlan;
-    use Traits\LegacyAggregateExecutionContext;
-    use Traits\Stages\LegacyAggregateRelationContextStage;
+    use Services\Aggregation\AggregationPlan;
+    use Services\Aggregation\LegacyAggregateExecutionContext;
+    use Services\Aggregation\Stages\LegacyAggregateRelationContextStage;
     use Tests\Unit\BaseUnitTestCase;
 
     final class LegacyAggregateRelationContextStageSmokeTest extends BaseUnitTestCase

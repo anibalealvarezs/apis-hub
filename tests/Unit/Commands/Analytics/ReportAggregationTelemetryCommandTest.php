@@ -6,7 +6,7 @@
 
     use Commands\Analytics\ReportAggregationTelemetryCommand;
     use PHPUnit\Framework\TestCase;
-    use Traits\AggregationFallbackTelemetryReporter;
+    use Services\Aggregation\AggregationFallbackTelemetryReporter;
     use Symfony\Component\Console\Command\Command;
     use Symfony\Component\Console\Tester\CommandTester;
 

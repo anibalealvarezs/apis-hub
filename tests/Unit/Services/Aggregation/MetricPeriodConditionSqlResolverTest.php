@@ -4,7 +4,7 @@
 
     namespace Tests\Unit\Services\Aggregation;
 
-    use Traits\MetricPeriodConditionSqlResolver;
+    use Services\Aggregation\MetricPeriodConditionSqlResolver;
     use Tests\Unit\BaseUnitTestCase;
 
     final class MetricPeriodConditionSqlResolverTest extends BaseUnitTestCase

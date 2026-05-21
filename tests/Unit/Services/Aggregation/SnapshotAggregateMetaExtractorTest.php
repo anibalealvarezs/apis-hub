@@ -4,7 +4,7 @@
 
     namespace Tests\Unit\Services\Aggregation;
 
-    use Traits\SnapshotAggregateMetaExtractor;
+    use Services\Aggregation\SnapshotAggregateMetaExtractor;
     use Tests\Unit\BaseUnitTestCase;
 
     final class SnapshotAggregateMetaExtractorTest extends BaseUnitTestCase
