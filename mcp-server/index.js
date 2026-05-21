@@ -30,9 +30,10 @@ const APIS_HUB_ROOT = path.resolve(__dirname, "..");
  */
 async function runCliCommand(command) {
   // Prefix with docker compose if we are on the host machine
-  const dockerPrefix = "docker compose exec -T facebook-marketing-entities-sync";
+  const dockerPrefix =
+    "docker compose exec -T facebook-marketing-entities-sync";
   const fullCommand = `${dockerPrefix} ${command}`;
-  
+
   try {
     const { stdout } = await execAsync(fullCommand, {
       cwd: APIS_HUB_ROOT,
@@ -65,7 +66,7 @@ function createMcpServer() {
         resources: {},
         tools: {},
       },
-    }
+    },
   );
 
   /**
@@ -96,7 +97,9 @@ function createMcpServer() {
     if (uri === "apis-hub://config/instances") {
       const filePath = path.join(APIS_HUB_ROOT, "config", "instances.yaml");
       if (!fs.existsSync(filePath)) {
-        return { contents: [{ uri, mimeType: "text/yaml", text: "File not found." }] };
+        return {
+          contents: [{ uri, mimeType: "text/yaml", text: "File not found." }],
+        };
       }
       const content = fs.readFileSync(filePath, "utf-8");
       return {
@@ -114,7 +117,9 @@ function createMcpServer() {
       const logPath = path.join(APIS_HUB_ROOT, "logs", "jobs.log");
       if (!fs.existsSync(logPath)) {
         return {
-          contents: [{ uri, mimeType: "text/plain", text: "Log file not found." }],
+          contents: [
+            { uri, mimeType: "text/plain", text: "Log file not found." },
+          ],
         };
       }
       const content = fs.readFileSync(logPath, "utf-8");
@@ -141,7 +146,8 @@ function createMcpServer() {
       tools: [
         {
           name: "get_system_health",
-          description: "Get a comprehensive health check of the APIs Hub infrastructure",
+          description:
+            "Get a comprehensive health check of the APIs Hub infrastructure",
           inputSchema: {
             type: "object",
             properties: {},
@@ -153,19 +159,32 @@ function createMcpServer() {
           inputSchema: {
             type: "object",
             properties: {
-              instance_name: { type: "string", description: "The name of the instance to trigger (e.g. facebook-marketing-recent)" },
+              instance_name: {
+                type: "string",
+                description:
+                  "The name of the instance to trigger (e.g. facebook-marketing-recent)",
+              },
             },
             required: ["instance_name"],
           },
         },
         {
           name: "check_coverage",
-          description: "Analyze data gaps for a specific channel (e.g. facebook_marketing, gsc)",
+          description:
+            "Analyze data gaps for a specific channel (e.g. facebook_marketing, gsc)",
           inputSchema: {
             type: "object",
             properties: {
-              channel: { type: "string", description: "The channel identifier" },
-              days: { type: "number", description: "Optional: Number of days to look back (default 30)", default: 30 }
+              channel: {
+                type: "string",
+                description: "The channel identifier",
+              },
+              days: {
+                type: "number",
+                description:
+                  "Optional: Number of days to look back (default 30)",
+                default: 30,
+              },
             },
             required: ["channel"],
           },
@@ -180,7 +199,8 @@ function createMcpServer() {
         },
         {
           name: "inspect_job_queue",
-          description: "Get detailed statistics about current jobs (scheduled, failed, completed)",
+          description:
+            "Get detailed statistics about current jobs (scheduled, failed, completed)",
           inputSchema: {
             type: "object",
             properties: {},
@@ -188,46 +208,71 @@ function createMcpServer() {
         },
         {
           name: "log_analyzer",
-          description: "Scan system logs for recent errors or critical failures",
+          description:
+            "Scan system logs for recent errors or critical failures",
           inputSchema: {
             type: "object",
             properties: {
-              limit: { type: "number", description: "Max errors to show per log file", default: 5 },
-              hours: { type: "number", description: "Look back timeframe in hours", default: 24 }
+              limit: {
+                type: "number",
+                description: "Max errors to show per log file",
+                default: 5,
+              },
+              hours: {
+                type: "number",
+                description: "Look back timeframe in hours",
+                default: 24,
+              },
             },
           },
         },
         {
           name: "summarize_performance",
-          description: "Get aggregated performance data using Channeled Metrics and intelligent formulas (spend, clicks, ctr, etc).",
+          description:
+            "Get aggregated performance data using Channeled Metrics and intelligent formulas (spend, clicks, ctr, etc).",
           inputSchema: {
             type: "object",
             properties: {
-              entity: { type: "string", description: "The entity name (use 'channeled_metric' for performance data)" },
-              channel: { type: "string", description: "The channel identifier (e.g. 'google_search_console', 'facebook')" },
-              aggregations: { 
-                type: "object", 
-                description: "Object mapping alias to formula. Formulas: 'spend', 'clicks', 'impressions', 'reach', 'results', 'ctr', 'cpc', 'cpm', 'roas', 'cost_per_result', 'result_rate', 'position'. e.g. {\"total_spend\":\"spend\"}" 
+              entity: {
+                type: "string",
+                description:
+                  "The entity name (use 'channeled_metric' for performance data)",
+              },
+              channel: {
+                type: "string",
+                description:
+                  "The channel identifier (e.g. 'google_search_console', 'facebook')",
+              },
+              aggregations: {
+                type: "object",
+                description:
+                  "Object mapping alias to formula. Formulas: 'spend', 'clicks', 'impressions', 'reach', 'results', 'ctr', 'cpc', 'cpm', 'roas', 'cost_per_result', 'result_rate', 'position'. e.g. {\"total_spend\":\"spend\"}",
               },
               filters: {
                 type: "object",
-                description: "Optional: Object containing filters. e.g. {\"dimensions.gender\":\"male\"}"
+                description:
+                  'Optional: Object containing filters. e.g. {"dimensions.gender":"male"}',
               },
-              groupBy: { type: "string", description: "Comma separated fields to group by (e.g. 'daily', 'weekly', 'dimensions.gender')" },
+              groupBy: {
+                type: "string",
+                description:
+                  "Comma separated fields to group by (e.g. 'daily', 'weekly', 'dimensions.gender')",
+              },
               startDate: { type: "string", description: "Start date (Y-m-d)" },
-              endDate: { type: "string", description: "End date (Y-m-d)" }
+              endDate: { type: "string", description: "End date (Y-m-d)" },
             },
             required: ["entity", "aggregations"],
           },
         },
         {
           name: "get_available_instances",
-          description: "List all configured worker instances from instances.yaml",
+          description:
+            "List all configured worker instances from instances.yaml",
           inputSchema: {
             type: "object",
             properties: {},
           },
-        }
+        },
       ],
     };
   });
@@ -240,17 +285,29 @@ function createMcpServer() {
         const stdout = await runCliCommand("php bin/cli.php app:health-check");
         return { content: [{ type: "text", text: stdout }] };
       } catch (error) {
-        return { content: [{ type: "text", text: `Health check failed: ${error.message}` }], isError: true };
+        return {
+          content: [
+            { type: "text", text: `Health check failed: ${error.message}` },
+          ],
+          isError: true,
+        };
       }
     }
 
     if (name === "trigger_instance_sync") {
       const instance = args.instance_name;
       try {
-        const stdout = await runCliCommand(`php bin/cli.php app:schedule-initial-jobs --instance="${instance}"`);
+        const stdout = await runCliCommand(
+          `php bin/cli.php app:schedule-initial-jobs --instance="${instance}"`,
+        );
         return { content: [{ type: "text", text: stdout }] };
       } catch (error) {
-        return { content: [{ type: "text", text: `Sync trigger failed: ${error.message}` }], isError: true };
+        return {
+          content: [
+            { type: "text", text: `Sync trigger failed: ${error.message}` },
+          ],
+          isError: true,
+        };
       }
     }
 
@@ -259,17 +316,29 @@ function createMcpServer() {
         const stdout = await runCliCommand("php bin/cli.php app:process-jobs");
         return { content: [{ type: "text", text: stdout }] };
       } catch (error) {
-        return { content: [{ type: "text", text: `Job processing failed: ${error.message}` }], isError: true };
+        return {
+          content: [
+            { type: "text", text: `Job processing failed: ${error.message}` },
+          ],
+          isError: true,
+        };
       }
     }
 
     if (name === "check_coverage") {
       const { channel, days = 30 } = args;
       try {
-        const stdout = await runCliCommand(`php bin/cli.php app:check-coverage --channel="${channel}" --days=${days}`);
+        const stdout = await runCliCommand(
+          `php bin/cli.php app:check-coverage --channel="${channel}" --days=${days}`,
+        );
         return { content: [{ type: "text", text: stdout }] };
       } catch (error) {
-        return { content: [{ type: "text", text: `Coverage check failed: ${error.message}` }], isError: true };
+        return {
+          content: [
+            { type: "text", text: `Coverage check failed: ${error.message}` },
+          ],
+          isError: true,
+        };
       }
     }
 
@@ -278,27 +347,53 @@ function createMcpServer() {
         const stdout = await runCliCommand("php bin/cli.php app:jobs-stats");
         return { content: [{ type: "text", text: stdout }] };
       } catch (error) {
-        return { content: [{ type: "text", text: `Job inspection failed: ${error.message}` }], isError: true };
+        return {
+          content: [
+            { type: "text", text: `Job inspection failed: ${error.message}` },
+          ],
+          isError: true,
+        };
       }
     }
 
     if (name === "log_analyzer") {
       const { limit = 5, hours = 24 } = args;
       try {
-        const stdout = await runCliCommand(`php bin/cli.php app:analyze-errors --limit=${limit} --hours=${hours}`);
+        const stdout = await runCliCommand(
+          `php bin/cli.php app:analyze-errors --limit=${limit} --hours=${hours}`,
+        );
         return { content: [{ type: "text", text: stdout }] };
       } catch (error) {
-        return { content: [{ type: "text", text: `Log analysis failed: ${error.message}` }], isError: true };
+        return {
+          content: [
+            { type: "text", text: `Log analysis failed: ${error.message}` },
+          ],
+          isError: true,
+        };
       }
     }
 
     if (name === "summarize_performance") {
-      const { entity, channel, aggregations, groupBy, startDate, endDate, filters } = args;
-      
+      const {
+        entity,
+        channel,
+        aggregations,
+        groupBy,
+        startDate,
+        endDate,
+        filters,
+      } = args;
+
       // Ensure aggregations and filters are stringified for the CLI
-      const aggregationsStr = typeof aggregations === 'object' ? JSON.stringify(aggregations) : aggregations;
-      const filtersStr = filters && typeof filters === 'object' ? JSON.stringify(filters) : filters;
-      
+      const aggregationsStr =
+        typeof aggregations === "object"
+          ? JSON.stringify(aggregations)
+          : aggregations;
+      const filtersStr =
+        filters && typeof filters === "object"
+          ? JSON.stringify(filters)
+          : filters;
+
       let cmd = `php bin/cli.php app:aggregate --entity="${entity}" --aggregations='${aggregationsStr}' --pretty`;
       if (channel) cmd += ` --channel="${channel}"`;
       if (groupBy) cmd += ` --group-by="${groupBy}"`;
@@ -310,13 +405,20 @@ function createMcpServer() {
         const stdout = await runCliCommand(cmd);
         return { content: [{ type: "text", text: stdout }] };
       } catch (error) {
-        return { content: [{ type: "text", text: `Aggregation failed: ${error.message}` }], isError: true };
+        return {
+          content: [
+            { type: "text", text: `Aggregation failed: ${error.message}` },
+          ],
+          isError: true,
+        };
       }
     }
 
     if (name === "get_available_instances") {
       try {
-        const stdout = await runCliCommand("php bin/cli.php app:refresh-instances --list");
+        const stdout = await runCliCommand(
+          "php bin/cli.php app:refresh-instances --list",
+        );
         return { content: [{ type: "text", text: stdout }] };
       } catch (error) {
         // Fallback if --list is not available or fails
@@ -324,11 +426,29 @@ function createMcpServer() {
           const filePath = path.join(APIS_HUB_ROOT, "config", "instances.yaml");
           if (fs.existsSync(filePath)) {
             const content = fs.readFileSync(filePath, "utf-8");
-            return { content: [{ type: "text", text: `Instances from file:\n${content.substring(0, 5000)}...` }] };
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: `Instances from file:\n${content.substring(0, 5000)}...`,
+                },
+              ],
+            };
           }
-          return { content: [{ type: "text", text: "No instances found." }], isError: true };
+          return {
+            content: [{ type: "text", text: "No instances found." }],
+            isError: true,
+          };
         } catch (innerError) {
-          return { content: [{ type: "text", text: `Failed to get instances: ${innerError.message}` }], isError: true };
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Failed to get instances: ${innerError.message}`,
+              },
+            ],
+            isError: true,
+          };
         }
       }
     }
@@ -347,17 +467,23 @@ const MODE = process.env.MCP_MODE || "stdio";
 if (MODE === "sse") {
   const app = express();
   app.use(cors());
-  app.set('trust proxy', true); // Permitir detección correcta tras proxies/docker
+  app.set("trust proxy", true); // Permitir detección correcta tras proxies/docker
   const PORT = process.env.MCP_PORT || 3000;
 
   // Track active sessions and their transports
   const sessions = new Map();
 
-  app.use(express.json()); // Parser para leer sessionId del cuerpo de la petición y pasar req.body al SDK
+  app.get("/", (req, res) => {
+    res.send("APIs Hub MCP Server (SSE Mode) is running. Connect to /mcp/sse");
+  });
+
+  app.use(express.json());
 
   // Middleware de logging total para debuggear peticiones de Antigravity
   app.use((req, res, next) => {
-    console.error(`[MSG-IN] ${req.method} ${req.url} | Session: ${req.query.sessionId || 'N/A'} | Body keys: ${Object.keys(req.body || {})}`);
+    console.error(
+      `[MSG-IN] ${req.method} ${req.url} | Session: ${req.query.sessionId || "N/A"} | Body keys: ${Object.keys(req.body || {})}`,
+    );
     next();
   });
 
@@ -366,46 +492,57 @@ if (MODE === "sse") {
   app.get(/.*/, async (req, res) => {
     // Si es un GET al SSE o cualquier ruta de descubrimiento, iniciar stream
     console.error(`[DISC] Discovery GET detectado en ${req.url}`);
-    
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache, no-transform');
-    res.setHeader('Connection', 'keep-alive');
-    res.setHeader('X-Accel-Buffering', 'no');
-    
-    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
-    const host = req.get('host');
+
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache, no-transform");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+
+    const protocol = req.headers["x-forwarded-proto"] || req.protocol;
+    const host = req.get("host");
     const endpoint = `${protocol}://${host}/mcp/messages`;
-    
+
     const transport = new SSEServerTransport(endpoint, res);
     sessions.set(transport.sessionId, transport);
-    console.error(`[DISC] Sesión iniciada desde descubrimiento: ${transport.sessionId}`);
+    console.error(
+      `[DISC] Sesión iniciada desde descubrimiento: ${transport.sessionId}`,
+    );
 
     const server = createMcpServer();
     await server.connect(transport);
-    
+
     res.on("close", () => {
-        console.error(`[DISC] Conexión cerrada. Persistiendo ${transport.sessionId} 2min.`);
-        setTimeout(() => sessions.delete(transport.sessionId), 120000); 
+      console.error(
+        `[DISC] Conexión cerrada. Persistiendo ${transport.sessionId} 2min.`,
+      );
+      setTimeout(() => sessions.delete(transport.sessionId), 120000);
     });
   });
 
   async function handleIncomingMessage(req, res) {
-    let sessionId = req.query.sessionId || 
-                    req.headers['x-session-id'] || 
-                    req.headers['sse-session-id'] ||
-                    (req.body && req.body.sessionId);
+    let sessionId =
+      req.query.sessionId ||
+      req.headers["x-session-id"] ||
+      req.headers["sse-session-id"] ||
+      (req.body && req.body.sessionId);
 
     if (Array.isArray(sessionId)) sessionId = sessionId[0];
 
     // FALLBACK INTELIGENTE: Si no hay ID pero hay una sesión activa reciente, usarla.
     if (!sessionId && sessions.size > 0) {
-        sessionId = Array.from(sessions.keys())[sessions.size - 1];
-        console.error(`[MSG] Usando sesión de descubrimiento más reciente: ${sessionId}`);
+      sessionId = Array.from(sessions.keys())[sessions.size - 1];
+      console.error(
+        `[MSG] Usando sesión de descubrimiento más reciente: ${sessionId}`,
+      );
     }
 
     if (!sessionId) {
-        console.error(`[MSG] Error: Sin sesiones activas para responder al POST.`);
-        return res.status(401).send("No active session. Please initiate a GET request first.");
+      console.error(
+        `[MSG] Error: Sin sesiones activas para responder al POST.`,
+      );
+      return res
+        .status(401)
+        .send("No active session. Please initiate a GET request first.");
     }
 
     const transport = sessions.get(sessionId);
@@ -427,19 +564,21 @@ if (MODE === "sse") {
 
   // Wait for PHP server to be ready before starting MCP (useful in Docker)
   const waitForPhp = async () => {
-    if (process.env.INSTANCE_NAME) { // Simpler check for "inside docker"
-        const phpHost = process.env.PHP_HOST || "master";
-        console.error(`Waiting for PHP server on ${phpHost}:8080...`);
-        await waitPort({ host: phpHost, port: 8080, timeout: 60000 });
+    if (process.env.INSTANCE_NAME) {
+      // Simpler check for "inside docker"
+      const phpHost = process.env.PHP_HOST || "master";
+      console.error(`Waiting for PHP server on ${phpHost}:8080...`);
+      await waitPort({ host: phpHost, port: 8080, timeout: 60000 });
     }
   };
 
   waitForPhp().then(() => {
     app.listen(PORT, "0.0.0.0", () => {
-        console.error(`APIs Hub MCP Server running on SSE at http://0.0.0.0:${PORT}/mcp/sse`);
+      console.error(
+        `APIs Hub MCP Server running on SSE at http://0.0.0.0:${PORT}/mcp/sse`,
+      );
     });
   });
-
 } else {
   const server = createMcpServer();
   const transport = new StdioServerTransport();
