@@ -185,10 +185,8 @@
         }
     }
 
-    // Default to at least one basic worker pool if nothing is found
-    if (empty($requiredTiers)) {
-        $requiredTiers[InstanceTier::BASIC->value] = 3;
-    }
+    // We no longer deploy default workers if no channels are found.
+    // This prevents generic workers from eagerly grabbing jobs on a fresh installation.
 
     // 2. Generate a worker pool service for each required tier
     foreach ($requiredTiers as $tierValue => $totalChannelConcurrency) {
