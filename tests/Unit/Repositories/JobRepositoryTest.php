@@ -584,4 +584,204 @@
 
             $this->assertTrue($result);
         }
+
+        public function testResetAllOrphanedJobs(): void
+        {
+            $timeoutMinutes = 30;
+            $count = 5;
+
+            $this->queryBuilder->expects($this->once())
+                ->method('update')
+                ->with($this->entityName, 'e')
+                ->willReturnSelf();
+
+            $this->queryBuilder->expects($this->exactly(4))
+                ->method('set')
+                ->willReturnSelf();
+
+            $this->queryBuilder->expects($this->once())
+                ->method('where')
+                ->with('e.status = :processing')
+                ->willReturnSelf();
+
+            $this->queryBuilder->expects($this->once())
+                ->method('andWhere')
+                ->with('e.updatedAt < :threshold')
+                ->willReturnSelf();
+
+            $this->queryBuilder->expects($this->exactly(5))
+                ->method('setParameter')
+                ->willReturnSelf();
+
+            $this->queryBuilder->expects($this->once())
+                ->method('getQuery')
+                ->willReturn($this->query);
+
+            $this->query->expects($this->once())
+                ->method('execute')
+                ->willReturn($count);
+
+            $result = $this->repository->resetAllOrphanedJobs($timeoutMinutes);
+
+            $this->assertEquals($count, $result);
+        }
+
+        public function testResetStuckJobsByWorker(): void
+        {
+            $workerId = 'worker-123';
+            $count = 3;
+
+            $this->queryBuilder->expects($this->once())
+                ->method('update')
+                ->with($this->entityName, 'e')
+                ->willReturnSelf();
+
+            $this->queryBuilder->expects($this->exactly(2))
+                ->method('set')
+                ->willReturnSelf();
+
+            $this->queryBuilder->expects($this->once())
+                ->method('where')
+                ->with('e.status = :processing')
+                ->willReturnSelf();
+
+            $this->queryBuilder->expects($this->once())
+                ->method('andWhere')
+                ->with('e.workerId = :workerId')
+                ->willReturnSelf();
+
+            $this->queryBuilder->expects($this->exactly(4))
+                ->method('setParameter')
+                ->willReturnSelf();
+
+            $this->queryBuilder->expects($this->once())
+                ->method('getQuery')
+                ->willReturn($this->query);
+
+            $this->query->expects($this->once())
+                ->method('execute')
+                ->willReturn($count);
+
+            $result = $this->repository->resetStuckJobsByWorker($workerId);
+
+            $this->assertEquals($count, $result);
+        }
+
+        public function testResetJobsByDeadWorkers(): void
+        {
+            $activeWorkers = ['worker-1', 'worker-2'];
+            $count = 7;
+
+            $this->queryBuilder->expects($this->once())
+                ->method('update')
+                ->with($this->entityName, 'e')
+                ->willReturnSelf();
+
+            $this->queryBuilder->expects($this->exactly(2))
+                ->method('set')
+                ->willReturnSelf();
+
+            $this->queryBuilder->expects($this->once())
+                ->method('where')
+                ->with('e.status = :processing')
+                ->willReturnSelf();
+
+            $this->queryBuilder->expects($this->exactly(2))
+                ->method('andWhere')
+                ->willReturnSelf();
+
+            $this->queryBuilder->expects($this->exactly(4))
+                ->method('setParameter')
+                ->willReturnSelf();
+
+            $this->queryBuilder->expects($this->once())
+                ->method('getQuery')
+                ->willReturn($this->query);
+
+            $this->query->expects($this->once())
+                ->method('execute')
+                ->willReturn($count);
+
+            $result = $this->repository->resetJobsByDeadWorkers($activeWorkers);
+
+            $this->assertEquals($count, $result);
+        }
+        
+        public function testResetJobsByDeadWorkersReturnsZeroIfEmpty(): void
+        {
+            $result = $this->repository->resetJobsByDeadWorkers([]);
+            $this->assertEquals(0, $result);
+        }
+
+        public function testResetJob(): void
+        {
+            $id = 123;
+
+            $this->queryBuilder->expects($this->once())
+                ->method('update')
+                ->with($this->entityName, 'e')
+                ->willReturnSelf();
+
+            $this->queryBuilder->expects($this->exactly(2))
+                ->method('set')
+                ->willReturnSelf();
+
+            $this->queryBuilder->expects($this->once())
+                ->method('where')
+                ->with('e.id = :id')
+                ->willReturnSelf();
+
+            $this->queryBuilder->expects($this->exactly(3))
+                ->method('setParameter')
+                ->willReturnSelf();
+
+            $this->queryBuilder->expects($this->once())
+                ->method('getQuery')
+                ->willReturn($this->query);
+
+            $this->query->expects($this->once())
+                ->method('execute')
+                ->willReturn(1); // 1 row updated
+
+            $result = $this->repository->resetJob($id);
+
+            $this->assertTrue($result);
+        }
+
+        public function testMarkAsDelayed(): void
+        {
+            $id = 123;
+            $message = 'Rate limit hit';
+
+            $this->queryBuilder->expects($this->once())
+                ->method('update')
+                ->with($this->entityName, 'e')
+                ->willReturnSelf();
+
+            // 2 sets for status and updateAt, plus 1 for message
+            $this->queryBuilder->expects($this->exactly(3))
+                ->method('set')
+                ->willReturnSelf();
+
+            $this->queryBuilder->expects($this->once())
+                ->method('where')
+                ->with('e.id = :id')
+                ->willReturnSelf();
+
+            $this->queryBuilder->expects($this->exactly(4))
+                ->method('setParameter')
+                ->willReturnSelf();
+
+            $this->queryBuilder->expects($this->once())
+                ->method('getQuery')
+                ->willReturn($this->query);
+
+            $this->query->expects($this->once())
+                ->method('execute')
+                ->willReturn(1);
+
+            $result = $this->repository->markAsDelayed($id, $message);
+
+            $this->assertTrue($result);
+        }
     }
