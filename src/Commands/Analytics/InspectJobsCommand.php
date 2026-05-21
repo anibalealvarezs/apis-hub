@@ -17,13 +17,19 @@ use Throwable;
 )]
 class InspectJobsCommand extends Command
 {
+    private \Doctrine\ORM\EntityManager $em;
+
+    public function __construct(?\Doctrine\ORM\EntityManager $em = null)
+    {
+        $this->em = $em ?? Helpers::getManager();
+        parent::__construct();
+    }
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $output->writeln("📋 <info>Job Queue Statistics</info>\n");
 
         try {
-            $em = Helpers::getManager();
-            $conn = $em->getConnection();
+            $conn = $this->em->getConnection();
 
             // Total by Status
             $sqlStatus = "SELECT status, COUNT(*) as count FROM jobs GROUP BY status";

@@ -18,6 +18,13 @@ use Throwable;
 )]
 class RetryFailedJobsCommand extends Command
 {
+    private \Doctrine\ORM\EntityManager $em;
+
+    public function __construct(?\Doctrine\ORM\EntityManager $em = null)
+    {
+        $this->em = $em ?? Helpers::getManager();
+        parent::__construct();
+    }
     protected function configure(): void
     {
         $this->addOption('channel', 'c', InputOption::VALUE_OPTIONAL, 'Retry only for this channel');
@@ -28,8 +35,7 @@ class RetryFailedJobsCommand extends Command
         $channel = $input->getOption('channel');
         
         try {
-            $em = Helpers::getManager();
-            $jobRepo = $em->getRepository(Job::class);
+            $jobRepo = $this->em->getRepository(Job::class);
 
             $criteria = ['status' => JobStatus::failed->value];
             if ($channel) {
@@ -52,10 +58,10 @@ class RetryFailedJobsCommand extends Command
                 $job->setStatus(JobStatus::scheduled->value);
                 $job->setUpdatedAt(new \DateTime());
                 $job->setMessage('Manually rescheduled for retry.');
-                $em->persist($job);
+                $this->em->persist($job);
             }
 
-            $em->flush();
+            $this->em->flush();
 
             $output->writeln("<info>Successfully rescheduled $count jobs.</info>");
             
