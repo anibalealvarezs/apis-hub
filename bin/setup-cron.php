@@ -115,6 +115,11 @@ foreach ($instances as $instance) {
 // Add the worker scaling engine (runs every minute to adapt to demand)
 $cronLines[] = "* * * * * cd /app && /usr/local/bin/php bin/cli.php app:scale-workers > /dev/null 2>&1";
 
+// Watchdog and fallback processing for master
+if ($isMaster) {
+    $cronLines[] = "*/5 * * * * cd /app && /usr/local/bin/php bin/cli.php app:process-jobs > /dev/null 2>&1";
+}
+
 
 $cronFile = '/tmp/apis-hub-cron';
 file_put_contents($cronFile, implode("\n", $cronLines) . "\n");
