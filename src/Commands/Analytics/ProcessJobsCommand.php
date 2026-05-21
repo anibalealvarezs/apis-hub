@@ -35,6 +35,7 @@
         protected static string $defaultName = 'jobs:process';
         private EntityManager $em;
         private LoggerInterface $logger;
+        private bool $shouldShutdown = false;
 
         /**
          * @throws ConfigurationException
@@ -45,6 +46,20 @@
             $this->em = $em ?? Helpers::getManager();
             $this->logger = Helpers::setLogger('jobs.log');
             parent::__construct();
+
+        }
+
+        public function getSubscribedSignals(): array
+        {
+            return [SIGTERM, SIGINT];
+        }
+
+        public function handleSignal(int $signal, int|false $previousExitCode = 0): int|false
+        {
+            $this->logger->info("Received termination signal ($signal). Graceful shutdown initiated.");
+            $this->shouldShutdown = true;
+
+            return false; // Return false to continue normal execution and let the loop exit gracefully
         }
 
         protected function configure(): void
@@ -91,9 +106,9 @@
                 $this->logger->info("Querying scheduled and delayed jobs...");
             }
 
-            // 0. Cleanup stuck jobs (e.g. processing for > 6 hours)
-            $timeoutHours = Helpers::getProjectConfig()['jobs']['timeout_hours'] ?? 6;
-            $cleaned = $jobRepo->cleanupStuckJobs($timeoutHours);
+            // 0. Cleanup stuck jobs
+            $timeoutMinutes = Helpers::getProjectConfig()['jobs']['timeout_minutes'] ?? 60;
+            $cleaned = $jobRepo->cleanupStuckJobs($timeoutMinutes);
             if ($cleaned > 0 && (Helpers::isDebug() || $forceAll)) {
                 $output->writeln("<comment>Cleanup: Marked {$cleaned} stuck processing jobs as failed.</comment>");
                 $this->logger->warning("Cleanup: Marked {$cleaned} stuck processing jobs as failed.");
@@ -157,6 +172,12 @@
                             }
                         }
                     }
+                    
+                    $this->logger->info("Master watchdog routine complete. Master instance will not process jobs.");
+                    if (Helpers::isDebug()) {
+                        $output->writeln("<info>Watchdog complete. Exiting to prevent master from processing jobs.</info>");
+                    }
+                    return Command::SUCCESS;
                 }
             }
 
@@ -171,6 +192,15 @@
             $controller = new CacheController();
 
             do {
+                if ($this->shouldShutdown) {
+                    if (Helpers::isDebug()) {
+                        $output->writeln("<comment>Graceful shutdown requested. Exiting loop.</comment>");
+                    }
+                    $this->logger->info("Graceful shutdown requested. Exiting loop.");
+
+                    break;
+                }
+
                 $progressMade = false;
                 Helpers::reconnectIfNeeded($this->em);
                 $jobRepo = $this->em->getRepository(Job::class);
@@ -204,6 +234,7 @@
                     foreach ($requiredInstances as $requiredInstance) {
                         if (!$jobRepo->hasSuccessfulRecentJob($requiredInstance)) {
                             $allMet = false;
+
                             break;
                         }
                     }
@@ -213,6 +244,7 @@
                         }
                         $jobRepo->update($job->getId(), (object)['status' => JobStatus::delayed->value]);
                         $stats['skipped']++;
+
                         continue;
                     }
                 }
@@ -239,6 +271,7 @@
 
                     // Normalize channel key (handle common config keys)
                     $chanKey = $channelName;
+
                     try {
                         $driver = DriverFactory::get($chanKey);
                         $commonKey = $driver::getCommonConfigKey();
@@ -262,6 +295,7 @@
                             'message' => "Channel is disabled in configuration",
                         ]);
                         $stats['failed']++;
+
                         continue;
                     }
 
@@ -301,6 +335,7 @@
 
                     if ($result instanceof Response && $result->getStatusCode() >= 400) {
                         $content = json_decode($result->getContent(), true);
+
                         throw new Exception($content['error'] ?? 'Unknown error from fetchData');
                     }
 
