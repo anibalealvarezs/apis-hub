@@ -353,6 +353,8 @@ if (MODE === "sse") {
   // Track active sessions and their transports
   const sessions = new Map();
 
+  app.use(express.json()); // Parser para leer sessionId del cuerpo de la petición y pasar req.body al SDK
+
   // Middleware de logging total para debuggear peticiones de Antigravity
   app.use((req, res, next) => {
     console.error(`[MSG-IN] ${req.method} ${req.url} | Session: ${req.query.sessionId || 'N/A'} | Body keys: ${Object.keys(req.body || {})}`);
@@ -409,7 +411,7 @@ if (MODE === "sse") {
     const transport = sessions.get(sessionId);
     if (transport) {
       try {
-        await transport.handlePostMessage(req, res);
+        await transport.handlePostMessage(req, res, req.body);
       } catch (err) {
         console.error(`[MSG] Error SDK: ${err.message}`);
         res.status(500).send(err.message);
