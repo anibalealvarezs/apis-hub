@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "2853e6361a4359c4c44f54805529efd1",
+    "content-hash": "d248f8cb9a63bf7f638253ab362bb409",
     "packages": [
         {
             "name": "anibalealvarezs/amazon-api",
@@ -401,13 +401,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/google-hub-driver.git",
-                "reference": "be9a9fd52f304ebed6db49d9ee91a79a19020280"
+                "reference": "8f52ed591a218d07d86ee258ada6fdbae7d0882c"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/google-hub-driver/anibalealvarezs-google-hub-driver-be9a9fd52f304ebed6db49d9ee91a79a19020280-zip-4eaff5.zip",
-                "reference": "be9a9fd52f304ebed6db49d9ee91a79a19020280",
-                "shasum": "b413327dd16ef7f4c7ef72b1269112a5dd6dfffb"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/google-hub-driver/anibalealvarezs-google-hub-driver-8f52ed591a218d07d86ee258ada6fdbae7d0882c-zip-982d18.zip",
+                "reference": "8f52ed591a218d07d86ee258ada6fdbae7d0882c",
+                "shasum": "ee77d3e94d04b0cdef4ba57d63a1219df0c75f83"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "^1.0.0",
@@ -440,7 +440,7 @@
                 }
             ],
             "description": "APIs-Hub driver for Google (Search Console & Analytics) integration.",
-            "time": "2026-05-21T01:31:48+00:00"
+            "time": "2026-05-21T20:24:59+00:00"
         },
         {
             "name": "anibalealvarezs/klaviyo-api",
@@ -1767,16 +1767,16 @@
         },
         {
             "name": "doctrine/orm",
-            "version": "3.6.5",
+            "version": "3.6.6",
             "source": {
                 "type": "git",
                 "url": "https://github.com/doctrine/orm.git",
-                "reference": "7e88b416153dceeb563352ca2b12465f09eea173"
+                "reference": "471b12949ff9bc23ecdc809ce838613c1aa9a0b9"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/doctrine/orm/zipball/7e88b416153dceeb563352ca2b12465f09eea173",
-                "reference": "7e88b416153dceeb563352ca2b12465f09eea173",
+                "url": "https://api.github.com/repos/doctrine/orm/zipball/471b12949ff9bc23ecdc809ce838613c1aa9a0b9",
+                "reference": "471b12949ff9bc23ecdc809ce838613c1aa9a0b9",
                 "shasum": ""
             },
             "require": {
@@ -1849,9 +1849,9 @@
             ],
             "support": {
                 "issues": "https://github.com/doctrine/orm/issues",
-                "source": "https://github.com/doctrine/orm/tree/3.6.5"
+                "source": "https://github.com/doctrine/orm/tree/3.6.6"
             },
-            "time": "2026-05-11T06:47:19+00:00"
+            "time": "2026-05-21T06:05:47+00:00"
         },
         {
             "name": "doctrine/persistence",
