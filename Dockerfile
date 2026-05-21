@@ -19,7 +19,7 @@ RUN apt-get update && apt-get install -y \
 COPY --from=mlocati/php-extension-installer /usr/bin/install-php-extensions /usr/local/bin/
 
 # Instalar extensiones PHP (maneja automáticamente dependencias complejas como IMAP)
-RUN install-php-extensions pdo_mysql pdo_pgsql zip imap redis xdebug swoole
+RUN install-php-extensions pdo_mysql pdo_pgsql zip imap redis xdebug swoole pcntl
 
 # Instalar Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
