@@ -177,11 +177,29 @@ if [[ "$INSTANCE_NAME" == *"master"* ]]; then
 else
     echo "Worker Instance ($INSTANCE_NAME): Running as persistent job processor."
     # We disable the cron service for workers to prevent process accumulation.
+    
+    # Graceful shutdown handler
+    cleanup() {
+        echo "Worker Instance ($INSTANCE_NAME): Received SIGTERM/SIGINT. Initiating graceful shutdown..."
+        if [ -n "$CHILD_PID" ]; then
+            kill -TERM "$CHILD_PID" 2>/dev/null || true
+            wait "$CHILD_PID" 2>/dev/null || true
+        fi
+        exit 0
+    }
+    
+    trap cleanup SIGTERM SIGINT
+
     # We use a while loop to keep the process alive even if jobs:process exits 
     # when the queue is empty, avoiding continuous container restarts.
     while true; do
-        php bin/cli.php jobs:process
+        php bin/cli.php jobs:process &
+        CHILD_PID=$!
+        wait "$CHILD_PID"
+        
         echo "Worker Instance ($INSTANCE_NAME): Queue empty or process finished. Sleeping 5s..."
-        sleep 5
+        sleep 5 &
+        CHILD_PID=$!
+        wait "$CHILD_PID"
     done
 fi
