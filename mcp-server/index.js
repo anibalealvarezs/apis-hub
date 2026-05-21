@@ -353,10 +353,6 @@ if (MODE === "sse") {
   // Track active sessions and their transports
   const sessions = new Map();
 
-  app.get("/", (req, res) => {
-    res.send("APIs Hub MCP Server (SSE Mode) is running. Connect to /mcp/sse");
-  });
-
   // Middleware de logging total para debuggear peticiones de Antigravity
   app.use((req, res, next) => {
     console.error(`[MSG-IN] ${req.method} ${req.url} | Session: ${req.query.sessionId || 'N/A'} | Body keys: ${Object.keys(req.body || {})}`);
