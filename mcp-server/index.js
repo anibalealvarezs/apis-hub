@@ -481,9 +481,9 @@ if (MODE === "sse") {
 
   // Middleware de logging total para debuggear peticiones de Antigravity
   app.use((req, res, next) => {
-    console.error(
-      `[MSG-IN] ${req.method} ${req.url} | Session: ${req.query.sessionId || "N/A"} | Body keys: ${Object.keys(req.body || {})}`,
-    );
+    req.debugLogStr = `Content-Type: ${req.headers['content-type']} | bodyType: ${typeof req.body} | isUndef: ${req.body === undefined}`;
+    const logStr = `[${new Date().toISOString()}] ${req.method} ${req.url} | ${req.debugLogStr}\n`;
+    fs.appendFileSync(path.join(APIS_HUB_ROOT, "mcp-debug.log"), logStr);
     next();
   });
 
@@ -550,8 +550,9 @@ if (MODE === "sse") {
       try {
         await transport.handlePostMessage(req, res, req.body);
       } catch (err) {
-        console.error(`[MSG] Error SDK: ${err.message}\n${err.stack}`);
-        res.status(500).send(`APIHUB-ERROR: ${err.message}\nStack: ${err.stack}`);
+        const errorLog = `[${new Date().toISOString()}] ERROR in handlePostMessage: ${err.message}\n${err.stack}\n`;
+        fs.appendFileSync(path.join(APIS_HUB_ROOT, "mcp-debug.log"), errorLog);
+        res.status(500).send(`APIHUB-ERROR: ${err.message}. DEBUG: ${req.debugLogStr}`);
       }
     } else {
       res.status(404).send("Session expired. Please reconnect.");
