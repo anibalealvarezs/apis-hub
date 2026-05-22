@@ -477,7 +477,7 @@ if (MODE === "sse") {
     res.send("APIs Hub MCP Server (SSE Mode) is running. Connect to /mcp/sse");
   });
 
-  app.use(express.json());
+  app.use(express.json({ type: '*/*' }));
 
   // Middleware de logging total para debuggear peticiones de Antigravity
   app.use((req, res, next) => {
