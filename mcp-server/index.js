@@ -540,6 +540,11 @@ if (MODE === "sse") {
     const transport = sessions.get(sessionId);
     if (transport) {
       try {
+        // PATCH: Si el SDK limpió el _sseResponse debido a un evento 'close' erróneo de Express,
+        // lo restauramos forzosamente para que no tire el error 500 y procese el mensaje.
+        if (!transport._sseResponse) {
+           transport._sseResponse = transport.res;
+        }
         await transport.handlePostMessage(req, res, req.body);
       } catch (err) {
         const errorLog = `[${new Date().toISOString()}] ERROR in handlePostMessage: ${err.message}\n${err.stack}\n`;
