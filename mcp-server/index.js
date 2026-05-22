@@ -529,9 +529,9 @@ if (MODE === "sse") {
 
     // Fallback logic removed to prevent picking up dead sessions.
 
-    // Safe fallback for clients that don't pass sessionId in the URL
-    if (!sessionId && sessions.size === 1) {
-      sessionId = Array.from(sessions.keys())[0];
+    // Safe fallback for clients that don't pass sessionId in the URL (like Antigravity)
+    if (!sessionId && sessions.size > 0) {
+      sessionId = Array.from(sessions.keys())[sessions.size - 1];
     }
 
     if (!sessionId) {
@@ -563,28 +563,20 @@ if (MODE === "sse") {
   }
 
   app.post(/.*/, async (req, res) => {
-    // Manually read the stream safely to avoid hangs in Express 5
-    const bodyStr = await new Promise((resolve) => {
-      if (req.complete) return resolve('');
-      let data = '';
-      req.on('data', chunk => { data += chunk; });
-      req.on('end', () => resolve(data));
-      req.on('error', err => {
-        console.error("Stream read error:", err);
-        resolve('');
-      });
-    });
-
+    // Parse body safely using standard get-raw-body to trap the exact failure reason
     let parsedBody = {};
-    if (bodyStr) {
-      try {
+    try {
+      const getRawBody = (await import('raw-body')).default;
+      const bodyStr = await getRawBody(req, { limit: '1mb', encoding: 'utf-8' });
+      if (bodyStr) {
         parsedBody = JSON.parse(bodyStr);
-      } catch (e) {
-        console.error("Manual JSON parse failed:", e);
       }
+    } catch (e) {
+      console.error("Stream read error:", e);
+      return res.status(500).send(`APIHUB-ERROR: Stream Read Failed: ${e.message}`);
     }
-    
-    // Asignamos al req para que handleIncomingMessage lo encuentre
+
+
     req.body = parsedBody;
 
     await handleIncomingMessage(req, res);
