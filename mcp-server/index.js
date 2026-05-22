@@ -512,10 +512,8 @@ if (MODE === "sse") {
     await server.connect(transport);
 
     res.on("close", () => {
-      console.error(
-        `[DISC] Conexión cerrada. Persistiendo ${transport.sessionId} 2min.`,
-      );
-      setTimeout(() => sessions.delete(transport.sessionId), 120000);
+      console.error(`[DISC] Conexión cerrada. Eliminando sesión ${transport.sessionId}`);
+      sessions.delete(transport.sessionId);
     });
   });
 
@@ -528,13 +526,7 @@ if (MODE === "sse") {
 
     if (Array.isArray(sessionId)) sessionId = sessionId[0];
 
-    // FALLBACK INTELIGENTE: Si no hay ID pero hay una sesión activa reciente, usarla.
-    if (!sessionId && sessions.size > 0) {
-      sessionId = Array.from(sessions.keys())[sessions.size - 1];
-      console.error(
-        `[MSG] Usando sesión de descubrimiento más reciente: ${sessionId}`,
-      );
-    }
+    // Fallback logic removed to prevent picking up dead sessions.
 
     if (!sessionId) {
       console.error(
