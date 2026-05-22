@@ -500,7 +500,18 @@ if (MODE === "sse") {
 
     const protocol = req.headers["x-forwarded-proto"] || req.protocol;
     const host = req.get("host");
-    const endpoint = `${protocol}://${host}/mcp/messages`;
+    const baseUrl = `${protocol}://${host}`;
+    const endpoint = `${baseUrl}/mcp/messages`;
+
+    // HACK: Intercept res.write to force an absolute URL for the Go SDK,
+    // since the standard SSEServerTransport always emits a relative URL.
+    const originalWrite = res.write.bind(res);
+    res.write = (chunk, encoding, callback) => {
+      if (typeof chunk === 'string' && chunk.startsWith('event: endpoint\ndata: /')) {
+        chunk = chunk.replace('data: /', `data: ${baseUrl}/`);
+      }
+      return originalWrite(chunk, encoding, callback);
+    };
 
     const transport = new SSEServerTransport(endpoint, res);
     sessions.set(transport.sessionId, transport);
@@ -561,7 +572,13 @@ if (MODE === "sse") {
     }
   }
 
-  app.post("/mcp/messages", express.text({ type: '*/*' }), async (req, res) => {
+  app.post("/mcp/messages", (req, res, next) => {
+    // Reject StreamableHttp probes (chunked POST streams) to prevent express.text from hanging indefinitely.
+    if (req.headers['transfer-encoding'] === 'chunked') {
+      return res.status(400).send("APIHUB-ERROR: StreamableHttp transport is not supported on this server. Please use SSE transport.");
+    }
+    next();
+  }, express.text({ type: '*/*' }), async (req, res) => {
     // Usamos express.text para leer el body como string y evitar fallos de raw-body no nativo
     let parsedBody = {};
     if (req.body && typeof req.body === 'string') {
