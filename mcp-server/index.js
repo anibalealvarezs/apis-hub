@@ -479,10 +479,10 @@ if (MODE === "sse") {
 
   // Removed express.json to parse manually using pure streams
 
-  // Middleware de logging total para debuggear peticiones de Antigravity
+  // Middleware de logging total para debuggear peticiones
   app.use((req, res, next) => {
-    req.debugLogStr = `Content-Type: ${req.headers['content-type']} | bodyType: ${typeof req.body} | isUndef: ${req.body === undefined}`;
-    const logStr = `[${new Date().toISOString()}] ${req.method} ${req.url} | ${req.debugLogStr}\n`;
+    const headersJson = JSON.stringify(req.headers);
+    const logStr = `[${new Date().toISOString()}] ${req.method} ${req.url} | HEADERS: ${headersJson}\n`;
     fs.appendFileSync(path.join(APIS_HUB_ROOT, "mcp-debug.log"), logStr);
     next();
   });
