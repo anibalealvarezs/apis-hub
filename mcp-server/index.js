@@ -497,6 +497,7 @@ if (MODE === "sse") {
     res.setHeader("Cache-Control", "no-cache, no-transform");
     res.setHeader("Connection", "keep-alive");
     res.setHeader("X-Accel-Buffering", "no");
+    res.flushHeaders();
 
     const protocol = req.headers["x-forwarded-proto"] || req.protocol;
     const host = req.get("host");
