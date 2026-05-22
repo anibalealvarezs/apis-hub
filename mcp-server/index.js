@@ -477,7 +477,7 @@ if (MODE === "sse") {
     res.send("APIs Hub MCP Server (SSE Mode) is running. Connect to /mcp/sse");
   });
 
-  app.use(express.json({ type: '*/*' }));
+  // Removed express.json to parse manually using pure streams
 
   // Middleware de logging total para debuggear peticiones de Antigravity
   app.use((req, res, next) => {
@@ -558,6 +558,26 @@ if (MODE === "sse") {
   }
 
   app.post(/.*/, async (req, res) => {
+    // Manually read the stream to bypass `raw-body` issues in Express 5
+    const bodyStr = await new Promise((resolve, reject) => {
+      let data = '';
+      req.on('data', chunk => { data += chunk; });
+      req.on('end', () => resolve(data));
+      req.on('error', err => reject(err));
+    });
+
+    let parsedBody = {};
+    if (bodyStr) {
+      try {
+        parsedBody = JSON.parse(bodyStr);
+      } catch (e) {
+        console.error("Manual JSON parse failed:", e);
+      }
+    }
+    
+    // Asignamos al req para que handleIncomingMessage lo encuentre
+    req.body = parsedBody;
+
     await handleIncomingMessage(req, res);
   });
 
