@@ -487,10 +487,9 @@ if (MODE === "sse") {
     next();
   });
 
-  // MANEJO DE DISCOVERY: Si Antigravity explora cualquier GET en la raíz o .well-known,
-  // iniciamos el flujo SSE para que tenga una sesión activa.
-  app.get(/.*/, async (req, res) => {
-    // Si es un GET al SSE o cualquier ruta de descubrimiento, iniciar stream
+  // MANEJO DE DISCOVERY: Iniciar flujo SSE solo en la ruta específica
+  app.get("/mcp/sse", async (req, res) => {
+    // Si es un GET al SSE, iniciar stream
     console.error(`[DISC] Discovery GET detectado en ${req.url}`);
 
     res.setHeader("Content-Type", "text/event-stream");
@@ -562,21 +561,19 @@ if (MODE === "sse") {
     }
   }
 
-  app.post(/.*/, async (req, res) => {
-    // Parse body safely using standard get-raw-body to trap the exact failure reason
+  app.post("/mcp/messages", express.text({ type: '*/*' }), async (req, res) => {
+    // Usamos express.text para leer el body como string y evitar fallos de raw-body no nativo
     let parsedBody = {};
-    try {
-      const getRawBody = (await import('raw-body')).default;
-      const bodyStr = await getRawBody(req, { limit: '1mb', encoding: 'utf-8' });
-      if (bodyStr) {
-        parsedBody = JSON.parse(bodyStr);
+    if (req.body && typeof req.body === 'string') {
+      try {
+        parsedBody = JSON.parse(req.body);
+      } catch (e) {
+        console.error("Express text JSON parse failed:", e);
       }
-    } catch (e) {
-      console.error("Stream read error:", e);
-      return res.status(500).send(`APIHUB-ERROR: Stream Read Failed: ${e.message}`);
+    } else if (req.body && typeof req.body === 'object') {
+      parsedBody = req.body;
     }
-
-
+    
     req.body = parsedBody;
 
     await handleIncomingMessage(req, res);
