@@ -529,6 +529,11 @@ if (MODE === "sse") {
 
     // Fallback logic removed to prevent picking up dead sessions.
 
+    // Safe fallback for clients that don't pass sessionId in the URL
+    if (!sessionId && sessions.size === 1) {
+      sessionId = Array.from(sessions.keys())[0];
+    }
+
     if (!sessionId) {
       console.error(
         `[MSG] Error: Sin sesiones activas para responder al POST.`,
@@ -558,12 +563,16 @@ if (MODE === "sse") {
   }
 
   app.post(/.*/, async (req, res) => {
-    // Manually read the stream to bypass `raw-body` issues in Express 5
-    const bodyStr = await new Promise((resolve, reject) => {
+    // Manually read the stream safely to avoid hangs in Express 5
+    const bodyStr = await new Promise((resolve) => {
+      if (req.complete) return resolve('');
       let data = '';
       req.on('data', chunk => { data += chunk; });
       req.on('end', () => resolve(data));
-      req.on('error', err => reject(err));
+      req.on('error', err => {
+        console.error("Stream read error:", err);
+        resolve('');
+      });
     });
 
     let parsedBody = {};
