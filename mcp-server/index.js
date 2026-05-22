@@ -550,8 +550,8 @@ if (MODE === "sse") {
       try {
         await transport.handlePostMessage(req, res, req.body);
       } catch (err) {
-        console.error(`[MSG] Error SDK: ${err.message}`);
-        res.status(500).send(err.message);
+        console.error(`[MSG] Error SDK: ${err.message}\n${err.stack}`);
+        res.status(500).send(`APIHUB-ERROR: ${err.message}\nStack: ${err.stack}`);
       }
     } else {
       res.status(404).send("Session expired. Please reconnect.");
