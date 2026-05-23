@@ -319,7 +319,7 @@
                             'name' => "{$deploymentName}_internal",
                     ],
                     'gateway' => [
-                            'name'     => "{$deploymentName}_default",
+                            'name'     => "apis-hub_default",
                             'external' => true
                     ]
             ],
