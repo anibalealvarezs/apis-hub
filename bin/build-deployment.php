@@ -319,7 +319,7 @@
                             'name' => "{$deploymentName}_internal",
                     ],
                     'gateway' => [
-                            'name'     => "apis-hub_default",
+                            'name'     => getenv('SHARED_GATEWAY_NETWORK') ?: "{$deploymentName}_default",
                             'external' => true
                     ]
             ],
