@@ -268,6 +268,8 @@
 
                 $logger->info("Update config request received for type: ".$type, ['payload' => $data]);
 
+                $results = [];
+
                 if ($type === 'global') {
                     $appConfigPath = __DIR__.'/../../config/app.yaml';
                     $appConf = file_exists($appConfigPath) ? (Yaml::parseFile($appConfigPath) ?: []) : [];
@@ -298,6 +300,7 @@
                     unset($appConf['db_host'], $appConf['db_name'], $appConf['app_mode']);
                     file_put_contents($appConfigPath, Yaml::dump($appConf, 10, 2));
                     $logger->info("Global config updated successfully");
+                    $results['global'] = $appConf;
                 } else {
                     // GENERIC CHANNEL UPDATE (MODULAR)
                     $availableChannels = DriverFactory::getAvailableChannels();
@@ -329,6 +332,12 @@
                             $currentConfig = file_exists($attrs['path']) ? (Yaml::parseFile($attrs['path']) ?: []) : [];
                             $updatedConfig = $driver->updateConfiguration($data, $currentConfig);
                             file_put_contents($attrs['path'], Yaml::dump($updatedConfig, 10, 2));
+                            
+                            if (isset($updatedConfig['channels'][$chan])) {
+                                $results[$chan] = $updatedConfig['channels'][$chan];
+                            } else {
+                                $results[$chan] = $updatedConfig;
+                            }
 
                             // 2b. Auto-enable infrastructure rule if channel is enabled
                             // (Now handled implicitly by the enabled flag in the same file)
@@ -351,7 +360,7 @@
                 // Reset cached configs within the current process (critical for Swoole/Long-lived environments)
                 Helpers::resetConfigs();
 
-                return new Response(json_encode(['success' => true]), 200, ['Content-Type' => 'application/json']);
+                return new Response(json_encode(['success' => true, 'config' => $results]), 200, ['Content-Type' => 'application/json']);
             } catch (Throwable $e) {
                 $logger->error("Error updating config: ".$e->getMessage());
 
