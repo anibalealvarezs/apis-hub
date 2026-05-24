@@ -110,13 +110,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/api-client-skeleton.git",
-                "reference": "3cf946c4a8bc744d4b189e6743b958d1147aa92a"
+                "reference": "66c11250f11740288ad53a2dc757ddb9e8915761"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/api-client-skeleton/anibalealvarezs-api-client-skeleton-3cf946c4a8bc744d4b189e6743b958d1147aa92a-zip-3c18c0.zip",
-                "reference": "3cf946c4a8bc744d4b189e6743b958d1147aa92a",
-                "shasum": "82cfbcc8b586f0d22905337c77bae615470f5839"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/api-client-skeleton/anibalealvarezs-api-client-skeleton-66c11250f11740288ad53a2dc757ddb9e8915761-zip-5a2bf2.zip",
+                "reference": "66c11250f11740288ad53a2dc757ddb9e8915761",
+                "shasum": "114b326522a3c35b4b7bd6b8e2d24af4ba7ada33"
             },
             "require": {
                 "anibalealvarezs/oauth-v1": "^1.0.0",
@@ -165,7 +165,7 @@
             "support": {
                 "issues": "https://github.com/anibalealvarezs/api-client-skeleton/issues"
             },
-            "time": "2026-05-19T13:48:15+00:00"
+            "time": "2026-05-24T19:05:41+00:00"
         },
         {
             "name": "anibalealvarezs/api-driver-core",
@@ -265,13 +265,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/facebook-graph-api.git",
-                "reference": "10e49082f6d310cd476ddf792141819ee3b34310"
+                "reference": "af55e52c6b4a50aac0e494f18ea29ffc9a4866c7"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/facebook-graph-api/anibalealvarezs-facebook-graph-api-10e49082f6d310cd476ddf792141819ee3b34310-zip-6cd33a.zip",
-                "reference": "10e49082f6d310cd476ddf792141819ee3b34310",
-                "shasum": "e8b6c6448c87a2557c28958006c09810350d8791"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/facebook-graph-api/anibalealvarezs-facebook-graph-api-af55e52c6b4a50aac0e494f18ea29ffc9a4866c7-zip-ff2734.zip",
+                "reference": "af55e52c6b4a50aac0e494f18ea29ffc9a4866c7",
+                "shasum": "d457021ec2aa49ee9e1be6181f529bb7e224da07"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "^1.0.0",
@@ -322,7 +322,7 @@
             "support": {
                 "issues": "https://github.com/anibalealvarezs/facebook-graph-api/issues"
             },
-            "time": "2026-05-19T13:48:26+00:00"
+            "time": "2026-05-24T20:23:00+00:00"
         },
         {
             "name": "anibalealvarezs/google-api",
@@ -330,13 +330,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/google-api.git",
-                "reference": "89c3fdea9ad0f2c9408dfb860ce86737d8146cd4"
+                "reference": "f5a298f1dcf80dede7bae458fb6ac8097a57ff9c"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/google-api/anibalealvarezs-google-api-89c3fdea9ad0f2c9408dfb860ce86737d8146cd4-zip-f36e65.zip",
-                "reference": "89c3fdea9ad0f2c9408dfb860ce86737d8146cd4",
-                "shasum": "d19991eea9eed24abbce02e30943c550e467dcec"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/google-api/anibalealvarezs-google-api-f5a298f1dcf80dede7bae458fb6ac8097a57ff9c-zip-cd8fc9.zip",
+                "reference": "f5a298f1dcf80dede7bae458fb6ac8097a57ff9c",
+                "shasum": "0a9d9f26a158824703359ec78a87d123ec2b953a"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "^1.0.0",
@@ -393,7 +393,7 @@
             "support": {
                 "issues": "https://github.com/anibalealvarezs/google-api/issues"
             },
-            "time": "2026-05-19T13:48:23+00:00"
+            "time": "2026-05-24T19:07:30+00:00"
         },
         {
             "name": "anibalealvarezs/google-hub-driver",
@@ -401,13 +401,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/google-hub-driver.git",
-                "reference": "8f52ed591a218d07d86ee258ada6fdbae7d0882c"
+                "reference": "71d4f3ab2268d831c4c7f40d95a105ae8489cdb7"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/google-hub-driver/anibalealvarezs-google-hub-driver-8f52ed591a218d07d86ee258ada6fdbae7d0882c-zip-982d18.zip",
-                "reference": "8f52ed591a218d07d86ee258ada6fdbae7d0882c",
-                "shasum": "ee77d3e94d04b0cdef4ba57d63a1219df0c75f83"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/google-hub-driver/anibalealvarezs-google-hub-driver-71d4f3ab2268d831c4c7f40d95a105ae8489cdb7-zip-d33edf.zip",
+                "reference": "71d4f3ab2268d831c4c7f40d95a105ae8489cdb7",
+                "shasum": "53ef52086a6fe32a0b2bba135144b274a2c4b97b"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "^1.0.0",
@@ -440,7 +440,7 @@
                 }
             ],
             "description": "APIs-Hub driver for Google (Search Console & Analytics) integration.",
-            "time": "2026-05-21T20:24:59+00:00"
+            "time": "2026-05-24T20:35:37+00:00"
         },
         {
             "name": "anibalealvarezs/klaviyo-api",
@@ -589,13 +589,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/meta-hub-driver.git",
-                "reference": "91cde5f189d9509b56757f0ba3770ed8b932d731"
+                "reference": "c668e58c15d2d7cfbbacbae77e8aa4043304013e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/meta-hub-driver/anibalealvarezs-meta-hub-driver-91cde5f189d9509b56757f0ba3770ed8b932d731-zip-7d59c5.zip",
-                "reference": "91cde5f189d9509b56757f0ba3770ed8b932d731",
-                "shasum": "81814bc868823758c924c003700e40a5045a899e"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/meta-hub-driver/anibalealvarezs-meta-hub-driver-c668e58c15d2d7cfbbacbae77e8aa4043304013e-zip-9fc288.zip",
+                "reference": "c668e58c15d2d7cfbbacbae77e8aa4043304013e",
+                "shasum": "7a89f051aeaa5f4097b9b5b3065b9b98e28e594d"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "^1.0.0",
@@ -628,7 +628,7 @@
                 }
             ],
             "description": "APIs-Hub driver for Meta (Facebook & Instagram) integration.",
-            "time": "2026-05-20T14:22:39+00:00"
+            "time": "2026-05-24T20:25:47+00:00"
         },
         {
             "name": "anibalealvarezs/netsuite-api",
@@ -2014,16 +2014,16 @@
         },
         {
             "name": "guzzlehttp/guzzle",
-            "version": "7.10.3",
+            "version": "7.10.4",
             "source": {
                 "type": "git",
                 "url": "https://github.com/guzzle/guzzle.git",
-                "reference": "47ba23c7a55247e2e1b7407aca90e9bbed0d9d86"
+                "reference": "aec528da477062d3af11f51e6b33402be233b21f"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/guzzle/guzzle/zipball/47ba23c7a55247e2e1b7407aca90e9bbed0d9d86",
-                "reference": "47ba23c7a55247e2e1b7407aca90e9bbed0d9d86",
+                "url": "https://api.github.com/repos/guzzle/guzzle/zipball/aec528da477062d3af11f51e6b33402be233b21f",
+                "reference": "aec528da477062d3af11f51e6b33402be233b21f",
                 "shasum": ""
             },
             "require": {
@@ -2121,7 +2121,7 @@
             ],
             "support": {
                 "issues": "https://github.com/guzzle/guzzle/issues",
-                "source": "https://github.com/guzzle/guzzle/tree/7.10.3"
+                "source": "https://github.com/guzzle/guzzle/tree/7.10.4"
             },
             "funding": [
                 {
@@ -2137,7 +2137,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-05-20T22:59:19+00:00"
+            "time": "2026-05-22T19:00:53+00:00"
         },
         {
             "name": "guzzlehttp/promises",
