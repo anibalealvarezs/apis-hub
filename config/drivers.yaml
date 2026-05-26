@@ -10,13 +10,6 @@ google_analytics:
   driver: 'Anibalealvarezs\GoogleHubDriver\Drivers\GoogleAnalyticsDriver'
   auth: 'Anibalealvarezs\GoogleHubDriver\Auth\GoogleAuthProvider'
   entities: ["metrics", "customers"]
-google_ads:
-  parent: google
-  resource_key: ad_accounts
-  driver: 'Anibalealvarezs\GoogleHubDriver\Drivers\GoogleAdsDriver'
-  auth: 'Anibalealvarezs\GoogleHubDriver\Auth\GoogleAuthProvider'
-  processor: ['Classes\Requests\MetricRequests', "persist"]
-  entities: ["metrics", "campaigns", "ad_groups", "ads", "entities"]
 facebook_marketing:
   parent: facebook
   resource_key: ad_accounts
