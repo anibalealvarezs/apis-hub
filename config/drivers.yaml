@@ -132,3 +132,8 @@ facebook_leads:
   driver: 'Anibalealvarezs\MetaHubDriver\Drivers\FacebookLeadsDriver'
   auth: 'Anibalealvarezs\MetaHubDriver\Auth\FacebookAuthProvider'
   entities: ["customers", "entities"]
+google_business_profile:
+  parent: google
+  driver: 'Anibalealvarezs\GoogleHubDriver\Drivers\GoogleBusinessProfileDriver'
+  auth: 'Anibalealvarezs\GoogleHubDriver\Auth\GoogleAuthProvider'
+  entities: ["metrics", "entities"]
