@@ -247,6 +247,17 @@
             'html'       => false,
             'admin'      => true
         ],
+        '/api/management/start-sync'          => [
+            'httpMethod' => 'POST',
+            'callable'   => function (...$args) {
+                $request = $args['request'] ?? Request::createFromGlobals();
+
+                return (new ManagementController())->startSync($request);
+            },
+            'public'     => false,
+            'html'       => false,
+            'admin'      => true
+        ],
         '/api/management/reset-channel'       => [
             'httpMethod' => 'POST',
             'callable'   => function (...$args) {

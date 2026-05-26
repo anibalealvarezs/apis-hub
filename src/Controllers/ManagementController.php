@@ -104,6 +104,32 @@ class ManagementController extends BaseController
     }
 
     /**
+     * Triggers a lightweight synchronization start (No downtime).
+     */
+    public function startSync(Request $request): Response
+    {
+        try {
+            $logger = Helpers::setLogger('management.log');
+            $logger->info("Sync start trigger received from Facade");
+
+            $deployScript = realpath(__DIR__ . "/../../bin/start-sync.sh");
+
+            if (!$deployScript) {
+                return new Response(json_encode(['error' => "Start sync script (start-sync.sh) not found"]), 500, ['Content-Type' => 'application/json']);
+            }
+
+            // Using bash explicitly to ensure compatibility
+            $command = "nohup bash \"$deployScript\" > /dev/null 2>&1 &";
+            exec($command);
+
+            return new Response(json_encode(['success' => true, 'message' => 'Synchronization started in background']), 200, ['Content-Type' => 'application/json']);
+        } catch (Exception $e) {
+            return new Response(json_encode(['error' => $e->getMessage()]), 500, ['Content-Type' => 'application/json']);
+        }
+    }
+
+
+    /**
      * Reports server/instance status back to Facade (Infrastructure focused).
      */
     public function getStatus(): Response
