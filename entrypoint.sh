@@ -46,7 +46,7 @@ if [[ "$INSTANCE_NAME" == *"master"* ]]; then
         echo "Master Instance ($INSTANCE_NAME): Acquired lock. Initializing database and entities..."
         if php bin/cli.php app:setup-db; then
             echo "Database setup successful. Scheduling initial jobs..."
-            php bin/cli.php app:schedule-initial-jobs --instance="global" || echo "Initial scheduling failed"
+            php bin/cli.php app:schedule-initial-jobs || echo "Initial scheduling failed"
         else
             echo "Database setup failed. Removing lock to allow retries."
             rmdir "$LOCK_DIR"
