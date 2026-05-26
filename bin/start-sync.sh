@@ -6,7 +6,9 @@ set -e
 echo -e "\033[1;34m⚡ Starting Lightweight Sync Orchestrator\033[0m"
 
 ENV_FILE=${ENV_FILE:-.env}
-export PROJECT_PATH_HOST=$(pwd)
+if [ -z "$PROJECT_PATH_HOST" ]; then
+    export PROJECT_PATH_HOST=$(pwd)
+fi
 
 # ── Step 1: Refresh Instances ──────────────────────────────────────────
 echo -e "\033[1;33m🔄 [1/4] Refreshing instances from config...\033[0m"
