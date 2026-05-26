@@ -44,6 +44,6 @@ fi
 
 # ── Step 4: Apply Containers ───────────────────────────────────────────
 echo -e "\033[1;33m🚀 [4/4] Scaling and starting containers (No Downtime)...\033[0m"
-docker compose --env-file "$ENV_FILE" up -d --remove-orphans --build
+docker compose --env-file "$ENV_FILE" up -d --remove-orphans
 
 echo -e "\033[0;32m✅ Sync deployment successfully applied!\033[0m"
