@@ -98,7 +98,7 @@
     // ─── Phase 1: Create Standardized Master ────────────────────────────────────────
     $masterName = "$deploymentName-master";
     $startingHostPort = (int)(getenv('STARTING_HOST_PORT') ?: 10000);
-    $externalPort = getenv('EXTERNAL_PORT') ?: ($instances[0]['port'] ?? $startingHostPort);
+    $externalPort = getenv('EXTERNAL_PORT') ?: $startingHostPort;
     $mcpPort = getenv('MCP_PORT') ?: 3000;
     $projectPathHost = "\${PROJECT_PATH_HOST:-./}";
     $isLocal = !in_array($env, ['production', 'testing', 'remote']);
