@@ -59,6 +59,7 @@ class CustomerProcessor
                     'platform_id' => $channeledCustomer->platformId,
                     'platform_created_at' => $channeledCustomer->platformCreatedAt,
                     'data' => $channeledCustomer->data,
+                    'lead_data' => $channeledCustomer->leadData ?? $channeledCustomer->lead_data ?? null,
                 ];
             } else {
                 // Merge addresses in memory if duplicates exist in the same payload
@@ -72,6 +73,18 @@ class CustomerProcessor
                     );
                 }
                 $uniqueChanneledCustomers[$channeledKey]['data'] = $existingData;
+
+                $newLeadData = $channeledCustomer->leadData ?? $channeledCustomer->lead_data ?? null;
+                if ($newLeadData) {
+                    $existingLeadData = $uniqueChanneledCustomers[$channeledKey]['lead_data'] ?? [];
+                    if (!is_array($existingLeadData)) {
+                        $existingLeadData = is_string($existingLeadData) ? json_decode($existingLeadData, true) : [];
+                    }
+                    if (!is_array($newLeadData)) {
+                        $newLeadData = is_string($newLeadData) ? json_decode($newLeadData, true) : [];
+                    }
+                    $uniqueChanneledCustomers[$channeledKey]['lead_data'] = array_merge($existingLeadData ?: [], $newLeadData ?: []);
+                }
             }
         }
 
@@ -146,14 +159,14 @@ class CustomerProcessor
                 $params[] = $cc['channel'];
                 $params[] = $cc['platform_id'];
             }
-            $sql = "SELECT id, channel, platform_id, data FROM channeled_customers WHERE " . implode(' OR ', $conditions);
+            $sql = "SELECT id, channel, platform_id, data, lead_data FROM channeled_customers WHERE " . implode(' OR ', $conditions);
 
             $map = MapGenerator::getChanneledCustomerMap($manager, $sql, $params);
             $channeledCustomerMap = array_merge($channeledCustomerMap, $map);
         }
 
-        $inCols = ['customer_id', 'email', 'platform_id', 'channel', 'platform_created_at', 'data'];
-        $upCols = ['id', 'customer_id', 'email', 'platform_id', 'channel', 'platform_created_at', 'data'];
+        $inCols = ['customer_id', 'email', 'platform_id', 'channel', 'platform_created_at', 'data', 'lead_data'];
+        $upCols = ['id', 'customer_id', 'email', 'platform_id', 'channel', 'platform_created_at', 'data', 'lead_data'];
         
         $inBuffer = [];
         $upBuffer = [];
@@ -178,6 +191,18 @@ class CustomerProcessor
                     $cc['data'] = $mergedData;
                 }
 
+                $existingLeadData = $channeledCustomerMap[$key]['lead_data'] ?? null;
+                if (is_string($existingLeadData)) {
+                    $existingLeadData = json_decode($existingLeadData, true);
+                }
+                $newLeadData = $cc['lead_data'] ?? null;
+                if (is_string($newLeadData)) {
+                    $newLeadData = json_decode($newLeadData, true);
+                }
+                if ($existingLeadData || $newLeadData) {
+                    $cc['lead_data'] = array_merge($existingLeadData ?: [], $newLeadData ?: []);
+                }
+
                 $upBuffer[] = $channeledCustomerMap[$key]['id'];
                 $upBuffer[] = $customerId;
                 $upBuffer[] = $cc['customer_email'];
@@ -185,10 +210,11 @@ class CustomerProcessor
                 $upBuffer[] = $cc['channel'];
                 $upBuffer[] = $cc['platform_created_at'] instanceof DateTime ? $cc['platform_created_at']->format('Y-m-d H:i:s') : $cc['platform_created_at'];
                 $upBuffer[] = json_encode($cc['data']);
+                $upBuffer[] = isset($cc['lead_data']) ? json_encode($cc['lead_data']) : null;
                 $upCount++;
 
                 if ($upCount >= 500) {
-                    $sql = Helpers::buildUpsertSql('channeled_customers', $upCols, ['customer_id', 'email', 'platform_id', 'channel', 'platform_created_at', 'data', 'updated_at'], 'id', $upCount);
+                    $sql = Helpers::buildUpsertSql('channeled_customers', $upCols, ['customer_id', 'email', 'platform_id', 'channel', 'platform_created_at', 'data', 'lead_data', 'updated_at'], 'id', $upCount);
                     $manager->getConnection()->executeStatement($sql, $upBuffer);
                     $upBuffer = [];
                     $upCount = 0;
@@ -200,10 +226,11 @@ class CustomerProcessor
                 $inBuffer[] = $cc['channel'];
                 $inBuffer[] = $cc['platform_created_at'] instanceof DateTime ? $cc['platform_created_at']->format('Y-m-d H:i:s') : $cc['platform_created_at'];
                 $inBuffer[] = json_encode($cc['data']);
+                $inBuffer[] = isset($cc['lead_data']) ? json_encode($cc['lead_data']) : null;
                 $inCount++;
 
                 if ($inCount >= 500) {
-                    $sql = "INSERT INTO channeled_customers (" . implode(',', $inCols) . ") VALUES " . implode(',', array_fill(0, $inCount, '(?, ?, ?, ?, ?, ?)'));
+                    $sql = "INSERT INTO channeled_customers (" . implode(',', $inCols) . ") VALUES " . implode(',', array_fill(0, $inCount, '(?, ?, ?, ?, ?, ?, ?)'));
                     $manager->getConnection()->executeStatement($sql, $inBuffer);
                     $inBuffer = [];
                     $inCount = 0;
@@ -212,12 +239,12 @@ class CustomerProcessor
         }
 
         if ($inCount > 0) {
-            $sql = "INSERT INTO channeled_customers (" . implode(',', $inCols) . ") VALUES " . implode(',', array_fill(0, $inCount, '(?, ?, ?, ?, ?, ?)'));
+            $sql = "INSERT INTO channeled_customers (" . implode(',', $inCols) . ") VALUES " . implode(',', array_fill(0, $inCount, '(?, ?, ?, ?, ?, ?, ?)'));
             $manager->getConnection()->executeStatement($sql, $inBuffer);
         }
 
         if ($upCount > 0) {
-            $sql = Helpers::buildUpsertSql('channeled_customers', $upCols, ['customer_id', 'email', 'platform_id', 'channel', 'platform_created_at', 'data', 'updated_at'], 'id', $upCount);
+            $sql = Helpers::buildUpsertSql('channeled_customers', $upCols, ['customer_id', 'email', 'platform_id', 'channel', 'platform_created_at', 'data', 'lead_data', 'updated_at'], 'id', $upCount);
             $manager->getConnection()->executeStatement($sql, $upBuffer);
         }
 
