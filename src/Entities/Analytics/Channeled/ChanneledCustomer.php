@@ -23,6 +23,9 @@
         #[ORM\Column(type: 'string')]
         protected string $email;
 
+        #[ORM\Column(name: 'lead_data', type: 'json', nullable: true)]
+        protected ?array $leadData = null;
+
         // Relationships with channeled entities
 
         #[ORM\OneToMany(targetEntity: ChanneledOrder::class, mappedBy: 'channeledCustomer', orphanRemoval: true)]
@@ -144,6 +147,25 @@
         public function addCustomer(?Customer $customer): static
         {
             $this->customer = $customer;
+
+            return $this;
+        }
+
+        /**
+         * @return array|null
+         */
+        public function getLeadData(): ?array
+        {
+            return $this->leadData;
+        }
+
+        /**
+         * @param array|null $leadData
+         * @return static
+         */
+        public function addLeadData(?array $leadData): static
+        {
+            $this->leadData = $leadData;
 
             return $this;
         }

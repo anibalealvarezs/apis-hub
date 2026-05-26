@@ -119,3 +119,9 @@ triplewhale:
   driver: 'Anibalealvarezs\TripleWhaleHubDriver\Drivers\TripleWhaleDriver'
   auth: 'Anibalealvarezs\TripleWhaleHubDriver\Auth\TripleWhaleAuthProvider'
   entities: ["metrics"]
+facebook_leads:
+  parent: facebook
+  resource_key: pages
+  driver: 'Anibalealvarezs\MetaHubDriver\Drivers\FacebookLeadsDriver'
+  auth: 'Anibalealvarezs\MetaHubDriver\Auth\FacebookAuthProvider'
+  entities: ["customers", "entities"]
