@@ -336,6 +336,7 @@ class MapGenerator
             $channeledCustomerMap[$key] = [
                 'id' => (int)$channeledCustomer['id'],
                 'data' => $channeledCustomer['data'],
+                'lead_data' => $channeledCustomer['lead_data'] ?? null,
             ];
         }
 

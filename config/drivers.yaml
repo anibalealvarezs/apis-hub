@@ -10,6 +10,13 @@ google_analytics:
   driver: 'Anibalealvarezs\GoogleHubDriver\Drivers\GoogleAnalyticsDriver'
   auth: 'Anibalealvarezs\GoogleHubDriver\Auth\GoogleAuthProvider'
   entities: ["metrics", "customers"]
+google_ads:
+  parent: google
+  resource_key: ad_accounts
+  driver: 'Anibalealvarezs\GoogleHubDriver\Drivers\GoogleAdsDriver'
+  auth: 'Anibalealvarezs\GoogleHubDriver\Auth\GoogleAuthProvider'
+  processor: ['Classes\Requests\MetricRequests', "persist"]
+  entities: ["metrics", "campaigns", "ad_groups", "ads", "entities"]
 facebook_marketing:
   parent: facebook
   resource_key: ad_accounts
@@ -119,3 +126,14 @@ triplewhale:
   driver: 'Anibalealvarezs\TripleWhaleHubDriver\Drivers\TripleWhaleDriver'
   auth: 'Anibalealvarezs\TripleWhaleHubDriver\Auth\TripleWhaleAuthProvider'
   entities: ["metrics"]
+facebook_leads:
+  parent: facebook
+  resource_key: pages
+  driver: 'Anibalealvarezs\MetaHubDriver\Drivers\FacebookLeadsDriver'
+  auth: 'Anibalealvarezs\MetaHubDriver\Auth\FacebookAuthProvider'
+  entities: ["customers", "entities"]
+google_business_profile:
+  parent: google
+  driver: 'Anibalealvarezs\GoogleHubDriver\Drivers\GoogleBusinessProfileDriver'
+  auth: 'Anibalealvarezs\GoogleHubDriver\Auth\GoogleAuthProvider'
+  entities: ["metrics", "entities"]

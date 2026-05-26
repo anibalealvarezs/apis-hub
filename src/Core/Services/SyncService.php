@@ -405,6 +405,11 @@
                 case 'ig_media':
                     SocialProcessor::processPosts($collection, $manager);
                     break;
+                case 'customer':
+                case 'customers':
+                case 'channeled_customer':
+                    \Classes\CustomerProcessor::processCustomers($collection, $manager);
+                    break;
             }
         }
     }
