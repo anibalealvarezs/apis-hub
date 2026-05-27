@@ -93,6 +93,9 @@ REDIS_CONTAINER_NAME="${DEPLOYMENT_NAME}-redis-build"
 # Create a temporary network
 docker network create "$BUILD_NETWORK" >/dev/null 2>&1 || echo "  ℹ️  Build network already exists."
 
+# Clean up any previously stuck container
+docker rm -f "$REDIS_CONTAINER_NAME" >/dev/null 2>&1 || true
+
 # Start a temporary redis container on that network
 docker run -d --rm --name "$REDIS_CONTAINER_NAME" --network "$BUILD_NETWORK" --network-alias redis redis:alpine >/dev/null
 echo -e "${GREEN}✔ Temporary Redis is running.${NC}"
