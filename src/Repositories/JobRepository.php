@@ -861,11 +861,16 @@ class JobRepository extends BaseRepository
                         3
                     ))")."
                 ),
+                ProcessingAccounts AS (
+                    SELECT DISTINCT channel, entity, 
+                           COALESCE(payload->>'account_id', payload->'params'->>'account_id') as account_id,
+                           COALESCE(payload->>'instance_name', '') as instance_name
+                    FROM jobs
+                    WHERE status = {$processingStatus}
+                ),
                 ChannelSlots AS (
                     -- Acquire a channel-level advisory lock to prevent concurrent workers from
                     -- racing past BusyChannels before any of them has updated updated_at.
-                    -- pg_try_advisory_xact_lock returns false if another transaction holds the lock,
-                    -- meaning only one worker per channel can enter this CTE at a time.
                     SELECT DISTINCT j.channel,
                            pg_try_advisory_xact_lock(hashtext('channel_slot|' || j.channel)) as slot_acquired
                     FROM jobs j
@@ -891,29 +896,22 @@ class JobRepository extends BaseRepository
                     ".($workerTier !== null ? " AND COALESCE(c.tier, 2) = :worker_tier" : "")."
                     -- Mutual Exclusion
                     AND NOT EXISTS (
-                        SELECT 1 FROM jobs p 
-                        WHERE p.status = $processingStatus 
-                        AND p.id != j.id
+                        SELECT 1 FROM ProcessingAccounts p 
+                        WHERE p.channel = j.channel AND p.entity = j.entity
                         AND (
-                            (COALESCE(p.payload->>'account_id', p.payload->'params'->>'account_id') = COALESCE(j.payload->>'account_id', j.payload->'params'->>'account_id')
-                             AND p.channel = j.channel 
-                             AND p.entity = j.entity
-                             AND COALESCE(j.payload->>'account_id', j.payload->'params'->>'account_id') IS NOT NULL)
+                            (p.account_id = COALESCE(j.payload->>'account_id', j.payload->'params'->>'account_id') AND COALESCE(j.payload->>'account_id', j.payload->'params'->>'account_id') IS NOT NULL)
                             OR 
-                            (COALESCE(p.payload->>'instance_name', '') = COALESCE(j.payload->>'instance_name', '') 
-                             AND p.channel = j.channel 
-                             AND p.entity = j.entity
-                             AND COALESCE(j.payload->>'account_id', j.payload->'params'->>'account_id') IS NULL)
+                            (p.instance_name = COALESCE(j.payload->>'instance_name', '') AND COALESCE(j.payload->>'account_id', j.payload->'params'->>'account_id') IS NULL)
                         )
                     )
-                    -- Job-level advisory lock (prevents two workers claiming the exact same job)
-                    AND pg_try_advisory_xact_lock(hashtext(j.channel || '|' || j.entity || '|' || COALESCE(j.payload->>'account_id', j.payload->'params'->>'account_id', j.payload->>'instance_name', 'global')))
                     ORDER BY j.priority DESC, j.id ASC
                     LIMIT 1
                     FOR UPDATE OF j SKIP LOCKED
                 )
                 UPDATE jobs SET status = {$processingStatus}, worker_id = :worker_id, updated_at = NOW()
                 WHERE id = (SELECT id FROM RankedJobs)
+                -- Job-level advisory lock (prevents two workers claiming the exact same job)
+                AND pg_try_advisory_xact_lock(hashtext(channel || '|' || entity || '|' || COALESCE(payload->>'account_id', payload->'params'->>'account_id', payload->>'instance_name', 'global')))
                 RETURNING id";
 
             $params = [
