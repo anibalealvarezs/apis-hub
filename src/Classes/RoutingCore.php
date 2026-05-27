@@ -190,6 +190,12 @@
                 }
             }
 
+            // 2. Admin API Key Bypass
+            // Internal communication between Facade and Nodes usually uses the Admin API Key.
+            if ($this->isAuthorized($request, true)) {
+                return false;
+            }
+
             $whiteList = [
                 '/monitoring',
                 '/api/monitoring',
