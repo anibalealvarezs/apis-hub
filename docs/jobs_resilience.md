@@ -48,7 +48,7 @@ The designated `master` instance runs a watchdog routine:
 
 ### Graceful Shutdowns
 
-Workers listening for `SIGTERM` or `SIGINT` signals (e.g., during a deployment or container restart) will immediately flag themselves to shut down, cleanly abandon the queue loop after their active job finishes, and exit cleanly. Docker is configured with a 60-minute grace period (`stop_grace_period`) to accommodate long-running synchronizations.
+Workers listening for `SIGTERM` or `SIGINT` signals (e.g., during a deployment or container restart) will immediately flag themselves to shut down, cleanly abandon the queue loop after their active job finishes, and exit cleanly. Docker is configured with a 30-minute grace period (`stop_grace_period`) to accommodate long-running synchronizations.
 
 ## Manual Intervention (CLI Commands)
 

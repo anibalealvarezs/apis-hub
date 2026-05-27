@@ -118,7 +118,7 @@
             'command'        => null,
             'environment'    => $buildEnv($masterName),
             'networks'       => ['default', 'gateway'],
-            'stop_grace_period' => '60m',
+            'stop_grace_period' => '30m',
             'ports'          => [
                     "$externalPort:8080"
             ],
@@ -220,7 +220,7 @@
                 'command'     => null,
                 'environment' => $buildEnv(null, 'none', 'none', $tierValue),
                 'networks'    => ['default'],
-                'stop_grace_period' => '60m',
+                'stop_grace_period' => '30m',
                 'volumes'     => $workerVolumes,
                 'depends_on'  => [
                         'master' => ['condition' => 'service_started'],
