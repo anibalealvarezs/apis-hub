@@ -205,6 +205,7 @@
                 '/api/monitoring/logs',
                 '/docs',
                 '/api/spec',
+                '/assets',
             ];
 
             // Dynamically load whitelists from drivers
