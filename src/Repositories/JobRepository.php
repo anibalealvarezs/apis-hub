@@ -1005,13 +1005,15 @@ class JobRepository extends BaseRepository
         $qb = $this->_em->createQueryBuilder();
 
         return $qb->update($this->getEntityName(), 'e')
-            ->set('e.status', ':failed')
+            ->set('e.status', ':scheduled')
             ->set('e.message', ':message')
+            ->set('e.workerId', ':null')
             ->set('e.updatedAt', ':now')
             ->where('e.status = :processing')
             ->andWhere('e.updatedAt <= :since')
-            ->setParameter('failed', JobStatus::failed->value)
-            ->setParameter('message', "Job timed out after ".$minutes." minutes")
+            ->setParameter('scheduled', JobStatus::scheduled->value)
+            ->setParameter('message', "Job timed out after ".$minutes." minutes, rescheduled automatically")
+            ->setParameter('null', null)
             ->setParameter('now', new DateTime())
             ->setParameter('processing', JobStatus::processing->value)
             ->setParameter('since', $since)
