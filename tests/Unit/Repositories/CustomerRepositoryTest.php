@@ -71,6 +71,13 @@
 
                     return $this->createMock(EntityRepository::class);
                 });
+            $this->entityManager->method('find')
+                ->willReturnCallback(function ($entityClass, $id) use ($channelRepo) {
+                    if ($entityClass === \Entities\Analytics\Channel::class) {
+                        return $channelRepo->find($id);
+                    }
+                    return null;
+                });
             Helpers::setEntityManager($this->entityManager);
 
             $this->repository = new CustomerRepository($this->entityManager, $classMetadata);

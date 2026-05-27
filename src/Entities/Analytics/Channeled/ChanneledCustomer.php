@@ -20,8 +20,11 @@
     #[ORM\HasLifecycleCallbacks]
     class ChanneledCustomer extends ChanneledEntity
     {
-        #[ORM\Column(type: 'string')]
-        protected string $email;
+        #[ORM\Column(type: 'string', nullable: true)]
+        protected ?string $email = null;
+
+        #[ORM\Column(name: 'lead_data', type: 'json', nullable: true)]
+        protected ?array $leadData = null;
 
         // Relationships with channeled entities
 
@@ -40,18 +43,18 @@
         }
 
         /**
-         * @return string
+         * @return string|null
          */
-        public function getEmail(): string
+        public function getEmail(): ?string
         {
             return $this->email;
         }
 
         /**
-         * @param string $email
+         * @param string|null $email
          * @return static
          */
-        public function addEmail(string $email): static
+        public function addEmail(?string $email): static
         {
             $this->email = $email;
 
@@ -144,6 +147,25 @@
         public function addCustomer(?Customer $customer): static
         {
             $this->customer = $customer;
+
+            return $this;
+        }
+
+        /**
+         * @return array|null
+         */
+        public function getLeadData(): ?array
+        {
+            return $this->leadData;
+        }
+
+        /**
+         * @param array|null $leadData
+         * @return static
+         */
+        public function addLeadData(?array $leadData): static
+        {
+            $this->leadData = $leadData;
 
             return $this;
         }
