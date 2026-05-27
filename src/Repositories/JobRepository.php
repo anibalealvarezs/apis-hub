@@ -838,26 +838,28 @@ class JobRepository extends BaseRepository
         $statusSql = is_array($status) ? "IN (".implode(',', array_map('intval', $status)).")" : "= ".(int)$status;
         $processingStatus = JobStatus::processing->value;
 
+        $isFreeTier = (getenv('BILLING_TIER') === 'free');
+
         $this->_em->beginTransaction();
 
         try {
             $sql = "
                 WITH BusyChannels AS (
                     SELECT j.channel as channel_name, COUNT(*) as active_count,
-                           MAX(COALESCE(
+                           ".($isFreeTier ? "1" : "MAX(COALESCE(
                                NULLIF(to_jsonb(c)->>'max_workers', '')::int,
                                NULLIF(to_jsonb(c)->>'maxworkers', '')::int,
                                3
-                           )) as max_workers
+                           ))")." as max_workers
                     FROM jobs j
                     JOIN channels c ON j.channel = c.name
                     WHERE j.status = {$processingStatus}
                     GROUP BY j.channel
-                    HAVING COUNT(*) >= MAX(COALESCE(
+                    HAVING COUNT(*) >= ".($isFreeTier ? "1" : "MAX(COALESCE(
                         NULLIF(to_jsonb(c)->>'max_workers', '')::int,
                         NULLIF(to_jsonb(c)->>'maxworkers', '')::int,
                         3
-                    ))
+                    ))")."
                 ),
                 ChannelSlots AS (
                     -- Acquire a channel-level advisory lock to prevent concurrent workers from
@@ -972,6 +974,10 @@ class JobRepository extends BaseRepository
 
     private function resolveChannelMaxWorkers(string $channel): int
     {
+        if (getenv('BILLING_TIER') === 'free') {
+            return 1;
+        }
+        
         try {
             $maxWorkers = $this->_em->createQueryBuilder()
                 ->select('c.maxWorkers')
