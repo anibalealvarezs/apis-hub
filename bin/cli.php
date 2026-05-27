@@ -18,6 +18,8 @@
     use Commands\Analytics\ResetMetricsCommand;
     use Commands\Analytics\ResetEntitiesCommand;
     use Commands\Analytics\ResetChannelCommand;
+    use Commands\Analytics\RetryFailedJobCommand;
+    use Commands\Analytics\RetryFailedJobsCommand;
     use Commands\Analytics\SwooleWorkerCommand;
     use Commands\HealthCheckCommand;
     use Commands\Crud\AggregateEntityCommand;
@@ -105,6 +107,8 @@
             new MigratePagesCanonicalCommand(Helpers::getManager()),
             new InstallDriversCommand(),
             new ScaleWorkersCommand($entityManager),
+            new RetryFailedJobCommand($entityManager),
+            new RetryFailedJobsCommand($entityManager),
         ];
 
         foreach ($commands as $command) {
