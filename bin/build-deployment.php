@@ -167,7 +167,9 @@
                 }
                 
                 $maxWorkers = 3;
-                if (array_key_exists('max_workers', $chanConfig)) {
+                if (getenv('BILLING_TIER') === 'free') {
+                    $maxWorkers = 1;
+                } elseif (array_key_exists('max_workers', $chanConfig)) {
                     $maxWorkers = max(0, (int)$chanConfig['max_workers']);
                 } elseif (method_exists($driver, 'getDefaultMaxWorkers')) {
                     $maxWorkers = max(0, (int)$driver::getDefaultMaxWorkers());
@@ -198,6 +200,9 @@
             $maxPerTier = (int)$infraConfig['worker_pool_size'];
         }
         $poolSize = min($totalChannelConcurrency, $maxPerTier);
+        if (getenv('BILLING_TIER') === 'free') {
+            $poolSize = 1;
+        }
         
         $tierName = "worker-tier-$tierValue";
         
