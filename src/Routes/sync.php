@@ -24,4 +24,13 @@ return [
         'public' => true,
         'admin' => false
     ],
+    '/api/sync/reschedule-auth-failed' => [
+        'httpMethod' => 'POST',
+        'callable' => function (...$args) {
+            $request = $args['request'] ?? Request::createFromGlobals();
+            return (new SyncStatusController())->rescheduleAuthFailedJobs($request);
+        },
+        'public' => false,
+        'admin' => true
+    ],
 ];

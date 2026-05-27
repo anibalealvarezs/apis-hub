@@ -84,6 +84,43 @@ class SyncStatusController extends BaseController
     }
 
     /**
+     * POST /api/sync/reschedule-auth-failed
+     *
+     * @param Request $request
+     * @return JsonResponse
+     */
+    public function rescheduleAuthFailedJobs(Request $request): JsonResponse
+    {
+        if (!$this->isAuthorized($request)) {
+            return new JsonResponse(['error' => 'Unauthorized'], 401);
+        }
+
+        $payload = json_decode($request->getContent(), true) ?: [];
+        $channel = $payload['channel'] ?? null;
+
+        if (!$channel) {
+            return new JsonResponse(['error' => 'Missing channel parameter'], 400);
+        }
+
+        try {
+            $em = Helpers::getEntityManager();
+            $jobRepo = $em->getRepository(\Entities\Analytics\Job::class);
+            $rescheduledCount = $jobRepo->resetAuthFailedJobs($channel);
+
+            return new JsonResponse([
+                'status' => 'success',
+                'message' => "Successfully rescheduled {$rescheduledCount} auth-failed jobs for channel {$channel}.",
+                'rescheduled_count' => $rescheduledCount
+            ]);
+        } catch (\Throwable $e) {
+            return new JsonResponse([
+                'error' => 'Failed to reschedule auth-failed jobs',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Basic API Key authorization check
      *
      * @param Request $request

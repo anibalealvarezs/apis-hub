@@ -258,7 +258,7 @@
                     $completion = $stats['total_for_percentage'] > 0 ? round(($stats['completed'] / $stats['total_for_percentage']) * 100, 2) : 0;
                     if ($completion >= 100) $fullySyncedCount++;
 
-                    $assetObj = array_merge(['id' => $id, 'completion' => $completion], $stats);
+                    $assetObj = array_merge(['id' => $id, 'completion' => $completion, 'enabled' => true], $stats);
                     $formattedAssets[$id] = $assetObj;
                     $platformIds[] = $id;
 
@@ -282,6 +282,7 @@
                             $pId = $ca->getPlatformId();
                             if (isset($formattedAssets[$pId])) {
                                 $formattedAssets[$pId]['name'] = $ca->getName();
+                                $formattedAssets[$pId]['enabled'] = $ca->isEnabled();
                             }
                         }
                     } catch (Throwable $e) {

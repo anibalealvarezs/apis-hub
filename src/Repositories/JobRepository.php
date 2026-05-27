@@ -660,6 +660,32 @@ class JobRepository extends BaseRepository
     }
 
     /**
+     * Resets failed jobs for a specific channel caused by permanent authentication errors.
+     *
+     * @param string $channel
+     * @return int Number of jobs rescheduled
+     */
+    public function resetAuthFailedJobs(string $channel): int
+    {
+        $qb = $this->_em->createQueryBuilder();
+        $updatedRows = $qb->update($this->getEntityName(), 'e')
+            ->set('e.status', ':scheduled')
+            ->set('e.updatedAt', ':now')
+            ->where('e.channel = :channel')
+            ->andWhere('e.status = :failed')
+            ->andWhere('e.message LIKE :message')
+            ->setParameter('scheduled', JobStatus::scheduled->value)
+            ->setParameter('now', new DateTime())
+            ->setParameter('channel', $channel)
+            ->setParameter('failed', JobStatus::failed->value)
+            ->setParameter('message', '%Permanent Auth Error%')
+            ->getQuery()
+            ->execute();
+
+        return (int)$updatedRows;
+    }
+
+    /**
      * Marks a job as delayed (e.g. for rate limiting).
      *
      * @param int $id
