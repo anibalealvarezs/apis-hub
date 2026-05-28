@@ -233,7 +233,9 @@ use Enums\JobStatus;
                     $requiredInstances = array_map('trim', explode(',', $requires));
                     $allMet = true;
                     foreach ($requiredInstances as $requiredInstance) {
-                        if (!$jobRepo->hasSuccessfulRecentJob($requiredInstance)) {
+                        // Historical chunks (e.g. 2026-1) might have completed more than 24 hours ago.
+                        // We pass 87600 hours (10 years) to ensure they are recognized regardless of completion date.
+                        if (!$jobRepo->hasSuccessfulRecentJob($requiredInstance, 87600)) {
                             $allMet = false;
 
                             break;
