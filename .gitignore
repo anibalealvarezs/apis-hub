@@ -93,10 +93,10 @@ config/channels/facebook_organic.yaml_old
 
 patch.php
 
-scratch_claim.php
-
 scratch_jobs.php
 
 scratch_payload.php
+
+scratch_claim.php
 
 scratch_tier_claim.php

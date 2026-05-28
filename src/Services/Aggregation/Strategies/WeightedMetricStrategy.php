@@ -346,7 +346,6 @@
         JOIN configs mc ON m.metric_config_id = mc.id
         WHERE m.metric_date >= :startDate
         AND m.metric_date <= :endDate
-        AND mc.dimension_set_id IN (SELECT DISTINCT dimension_set_id FROM configs)
         GROUP BY m.metric_date, mc.dimension_set_id, mc.page_id, mc.query_id, mc.country_id, mc.device_id $baseGroupByFields
     ),
     paired AS (
