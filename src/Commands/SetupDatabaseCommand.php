@@ -66,14 +66,14 @@
                     throw new Exception("Failed to install/register drivers.");
                 }
 
-                // 4. Initialize Entities
-                $output->writeln("<info>🌱 Seeding initial entities...</info>");
-                $initEntitiesCommand = $this->getApplication()->find('app:initialize-entities');
+                // 4. Initialize Core Default Entities (Without triggering remote asset syncing)
+                $output->writeln("<info>🌱 Seeding initial default entities...</info>");
+                $initEntitiesCommand = $this->getApplication()->find('app:initialize-default-entities');
                 $initExitCode = $initEntitiesCommand->run(new ArrayInput([]), $output);
                 if ($initExitCode !== Command::SUCCESS) {
-                    error_log("CRITICAL: app:initialize-entities failed with exit code: ".$initExitCode);
-                    $output->writeln("<error>CRITICAL: app:initialize-entities failed with exit code: $initExitCode</error>");
-                    throw new Exception("Failed to initialize core/channel entities.");
+                    error_log("CRITICAL: app:initialize-default-entities failed with exit code: ".$initExitCode);
+                    $output->writeln("<error>CRITICAL: app:initialize-default-entities failed with exit code: $initExitCode</error>");
+                    throw new Exception("Failed to initialize core default entities.");
                 }
 
                 // 5. Auto-Seed for Demo (Smart Zero-Touch)
