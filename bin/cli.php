@@ -29,6 +29,7 @@
     use Commands\Crud\UpdateEntityCommand;
     use Commands\GenerateEntitiesConfigCommand;
     use Commands\Infrastructure\ScaleWorkersCommand;
+    use Commands\InitializeDefaultEntitiesCommand;
     use Commands\InitializeEntitiesCommand;
     use Commands\RefreshInstancesCommand;
     use Commands\SetupDatabaseCommand;
@@ -84,6 +85,7 @@
             new ReadEntityCommand(),
             new UpdateEntityCommand(),
             new GenerateEntitiesConfigCommand(),
+            new InitializeDefaultEntitiesCommand(Helpers::getManager()),
             new InitializeEntitiesCommand(Helpers::getManager()),
             new ScheduleInitialJobsCommand($entityManager),
             new CacheEntityCommand(),
