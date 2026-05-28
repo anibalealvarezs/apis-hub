@@ -19,6 +19,8 @@
                     'neq', 'not_equal', '!=', 'ne' => ['operator' => 'neq', 'value' => $value],
                     'is_null', 'null' => ['operator' => 'is_null', 'value' => null],
                     'is_not_null', 'not_null' => ['operator' => 'is_not_null', 'value' => null],
+                    'in' => ['operator' => 'in', 'value' => is_array($value) ? array_values($value) : [$value]],
+                    'like' => ['operator' => 'like', 'value' => $value],
                     default => ['operator' => 'eq', 'value' => $value],
                 };
             }

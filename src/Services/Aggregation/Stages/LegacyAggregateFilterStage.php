@@ -63,6 +63,12 @@
                     } elseif ($condition['operator'] === 'neq') {
                         $qb->andWhere("dv_$dimAlias.value <> :val_$dimAlias")
                             ->setParameter("val_$dimAlias", $condition['value']);
+                    } elseif ($condition['operator'] === 'in') {
+                        $qb->andWhere("dv_$dimAlias.value IN (:val_$dimAlias)")
+                            ->setParameter("val_$dimAlias", $condition['value'], \Doctrine\DBAL\Connection::PARAM_STR_ARRAY);
+                    } elseif ($condition['operator'] === 'like') {
+                        $qb->andWhere("dv_$dimAlias.value LIKE :val_$dimAlias")
+                            ->setParameter("val_$dimAlias", $condition['value']);
                     } elseif ($condition['operator'] === 'is_null') {
                         $qb->andWhere("dv_$dimAlias.value IS NULL");
                     } elseif ($condition['operator'] === 'is_not_null') {
@@ -104,6 +110,12 @@
                         } elseif ($condition['operator'] === 'neq') {
                             $qb->andWhere("$sqlKeyComparable <> :$paramName")
                                 ->setParameter($paramName, (string)$condition['value']);
+                        } elseif ($condition['operator'] === 'in') {
+                            $qb->andWhere("$sqlKeyComparable IN (:$paramName)")
+                                ->setParameter($paramName, $condition['value'], \Doctrine\DBAL\Connection::PARAM_STR_ARRAY);
+                        } elseif ($condition['operator'] === 'like') {
+                            $qb->andWhere("$sqlKeyComparable LIKE :$paramName")
+                                ->setParameter($paramName, (string)$condition['value']);
                         } else {
                             $qb->andWhere("$sqlKeyComparable = :$paramName")
                                 ->setParameter($paramName, (string)$condition['value']);
@@ -131,6 +143,12 @@
                     $qb->andWhere("$sqlKey IS NOT NULL");
                 } elseif ($condition['operator'] === 'neq') {
                     $qb->andWhere("$sqlKey <> :$paramName")
+                        ->setParameter($paramName, $condition['value']);
+                } elseif ($condition['operator'] === 'in') {
+                    $qb->andWhere("$sqlKey IN (:$paramName)")
+                        ->setParameter($paramName, $condition['value'], \Doctrine\DBAL\Connection::PARAM_STR_ARRAY);
+                } elseif ($condition['operator'] === 'like') {
+                    $qb->andWhere("$sqlKey LIKE :$paramName")
                         ->setParameter($paramName, $condition['value']);
                 } else {
                     $qb->andWhere("$sqlKey = :$paramName")
