@@ -203,8 +203,7 @@
                         SUM(CASE WHEN status = :failed THEN 1 ELSE 0 END) as failed,
                         SUM(CASE WHEN status = :processing THEN 1 ELSE 0 END) as processing,
                         SUM(CASE WHEN status = :scheduled THEN 1 ELSE 0 END) as scheduled,
-                        SUM(CASE WHEN NOT $isRecentJob AND status = :completed THEN 1 ELSE 0 END) as completed_for_percentage,
-                        SUM(CASE WHEN NOT $isRecentJob THEN 1 ELSE 0 END) as total_for_percentage
+                        SUM(CASE WHEN $isRecentJob AND status IN (:scheduled, :delayed, :cancelled) THEN 0 ELSE 1 END) as total_for_percentage
                     FROM jobs
                     WHERE channel = :channel
                 ";
@@ -215,6 +214,8 @@
                     'failed' => JobStatus::failed->value,
                     'processing' => JobStatus::processing->value,
                     'scheduled' => JobStatus::scheduled->value,
+                    'delayed' => JobStatus::delayed->value,
+                    'cancelled' => JobStatus::cancelled->value,
                 ];
 
                 if ($targetAccountId) {
@@ -235,7 +236,6 @@
                     $assets[$accId] = [
                         'total'      => (int)$row['total'],
                         'total_for_percentage' => (int)$row['total_for_percentage'],
-                        'completed_for_percentage' => (int)($row['completed_for_percentage'] ?? 0),
                         'completed'  => (int)$row['completed'],
                         'failed'     => (int)$row['failed'],
                         'processing' => (int)$row['processing'],
@@ -255,7 +255,7 @@
                 $fullySyncedCount = 0;
 
                 foreach ($assets as $id => $stats) {
-                    $completion = $stats['total_for_percentage'] > 0 ? round(($stats['completed_for_percentage'] / $stats['total_for_percentage']) * 100, 2) : 0;
+                    $completion = $stats['total_for_percentage'] > 0 ? round(($stats['completed'] / $stats['total_for_percentage']) * 100, 2) : 0;
                     if ($completion > 100) $completion = 100;
                     if ($completion >= 100) $fullySyncedCount++;
 
