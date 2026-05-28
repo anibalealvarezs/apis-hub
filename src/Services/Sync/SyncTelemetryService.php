@@ -192,8 +192,8 @@
                     : "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.account_id')), JSON_UNQUOTE(JSON_EXTRACT(payload, '$.params.account_id')), 'global')";
 
                 $isRecentJob = $isPostgres
-                    ? "(payload->'params'->>'type' = 'recent' OR payload->'params'->>'startDate' = '-3 days' OR payload->'params'->>'start_date' = '-3 days')"
-                    : "(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.params.type')) = 'recent' OR JSON_UNQUOTE(JSON_EXTRACT(payload, '$.params.startDate')) = '-3 days' OR JSON_UNQUOTE(JSON_EXTRACT(payload, '$.params.start_date')) = '-3 days')";
+                    ? "(payload->>'instance_name' LIKE '%-recent' OR payload->'params'->>'type' = 'recent' OR payload->'params'->>'startDate' = '-3 days' OR payload->'params'->>'start_date' = '-3 days')"
+                    : "(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.instance_name')) LIKE '%-recent' OR JSON_UNQUOTE(JSON_EXTRACT(payload, '$.params.type')) = 'recent' OR JSON_UNQUOTE(JSON_EXTRACT(payload, '$.params.startDate')) = '-3 days' OR JSON_UNQUOTE(JSON_EXTRACT(payload, '$.params.start_date')) = '-3 days')";
 
                 $query = "
                     SELECT
