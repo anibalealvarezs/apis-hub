@@ -71,6 +71,7 @@
                 'startDate' => $startDate,
                 'endDate'   => $endDate,
             ];
+            $sqlTypes = [];
 
             $metricSqlResolver = $this->metricSqlResolver ?? new CanonicalMetricSqlResolver();
             $channelKey = $this->resolveChannelKey($filtersArr);
@@ -193,6 +194,16 @@
                     case 'is_not_null':
                         $configWhere[] = "mc.$col IS NOT NULL";
                         break;
+                    case 'in':
+                        $configWhere[] = "mc.$col IN (:$alias)";
+                        $configParams[$alias] = $condition['value'];
+                        $sqlTypes[$alias] = \Doctrine\DBAL\ArrayParameterType::STRING;
+                        break;
+                    case 'not_in':
+                        $configWhere[] = "mc.$col NOT IN (:$alias)";
+                        $configParams[$alias] = $condition['value'];
+                        $sqlTypes[$alias] = \Doctrine\DBAL\ArrayParameterType::STRING;
+                        break;
                     case 'eq':
                     default:
                         $configWhere[] = "mc.$col = :$alias";
@@ -214,6 +225,8 @@
                         'is_null' => "dv_$alias.value IS NULL",
                         'is_not_null' => "dv_$alias.value IS NOT NULL",
                         'eq' => "dv_$alias.value = :{$alias}_val",
+                        'in' => "dv_$alias.value IN (:{$alias}_val)",
+                        'not_in' => "dv_$alias.value NOT IN (:{$alias}_val)",
                         default => null
                     };
 
@@ -232,6 +245,9 @@
                 )";
                     $sqlParams["{$alias}_key"] = $dk;
                     $sqlParams["{$alias}_val"] = $condition['value'];
+                    if (in_array($condition['operator'], ['in', 'not_in'], true)) {
+                        $sqlTypes["{$alias}_val"] = \Doctrine\DBAL\ArrayParameterType::STRING;
+                    }
                 }
             }
 
@@ -389,7 +405,7 @@
     $orderSql";
 
             $queryStart = $debugSqlEnabled ? microtime(true) : null;
-            $rows = $connection->fetchAllAssociative($sql, $sqlParams);
+            $rows = $connection->fetchAllAssociative($sql, $sqlParams, $sqlTypes);
 
             if ($debugSqlEnabled) {
                 $elapsedMs = $queryStart !== null ? (int)round((microtime(true) - $queryStart) * 1000) : -1;

@@ -65,7 +65,7 @@
                             ->setParameter("val_$dimAlias", $condition['value']);
                     } elseif ($condition['operator'] === 'in') {
                         $qb->andWhere("dv_$dimAlias.value IN (:val_$dimAlias)")
-                            ->setParameter("val_$dimAlias", $condition['value'], \Doctrine\DBAL\Connection::PARAM_STR_ARRAY);
+                            ->setParameter("val_$dimAlias", $condition['value'], \Doctrine\DBAL\ArrayParameterType::STRING);
                     } elseif ($condition['operator'] === 'like') {
                         $qb->andWhere("dv_$dimAlias.value LIKE :val_$dimAlias")
                             ->setParameter("val_$dimAlias", $condition['value']);
@@ -112,7 +112,10 @@
                                 ->setParameter($paramName, (string)$condition['value']);
                         } elseif ($condition['operator'] === 'in') {
                             $qb->andWhere("$sqlKeyComparable IN (:$paramName)")
-                                ->setParameter($paramName, $condition['value'], \Doctrine\DBAL\Connection::PARAM_STR_ARRAY);
+                                ->setParameter($paramName, $condition['value'], \Doctrine\DBAL\ArrayParameterType::STRING);
+                        } elseif ($condition['operator'] === 'not_in') {
+                            $qb->andWhere("$sqlKeyComparable NOT IN (:$paramName)")
+                                ->setParameter($paramName, $condition['value'], \Doctrine\DBAL\ArrayParameterType::STRING);
                         } elseif ($condition['operator'] === 'like') {
                             $qb->andWhere("$sqlKeyComparable LIKE :$paramName")
                                 ->setParameter($paramName, (string)$condition['value']);
@@ -146,7 +149,7 @@
                         ->setParameter($paramName, $condition['value']);
                 } elseif ($condition['operator'] === 'in') {
                     $qb->andWhere("$sqlKey IN (:$paramName)")
-                        ->setParameter($paramName, $condition['value'], \Doctrine\DBAL\Connection::PARAM_STR_ARRAY);
+                        ->setParameter($paramName, $condition['value'], \Doctrine\DBAL\ArrayParameterType::STRING);
                 } elseif ($condition['operator'] === 'like') {
                     $qb->andWhere("$sqlKey LIKE :$paramName")
                         ->setParameter($paramName, $condition['value']);
