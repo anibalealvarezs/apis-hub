@@ -191,6 +191,10 @@
                     ? "COALESCE(payload->>'account_id', payload->'params'->>'account_id', 'global')"
                     : "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.account_id')), JSON_UNQUOTE(JSON_EXTRACT(payload, '$.params.account_id')), 'global')";
 
+                $isRecentJob = $isPostgres
+                    ? "(payload->>'instance_name' LIKE '%-recent' OR payload->'params'->>'type' = 'recent' OR payload->'params'->>'startDate' = '-3 days' OR payload->'params'->>'start_date' = '-3 days')"
+                    : "(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.instance_name')) LIKE '%-recent' OR JSON_UNQUOTE(JSON_EXTRACT(payload, '$.params.type')) = 'recent' OR JSON_UNQUOTE(JSON_EXTRACT(payload, '$.params.startDate')) = '-3 days' OR JSON_UNQUOTE(JSON_EXTRACT(payload, '$.params.start_date')) = '-3 days')";
+
                 $query = "
                     SELECT
                         $jsonExtract as account_id,
@@ -199,7 +203,7 @@
                         SUM(CASE WHEN status = :failed THEN 1 ELSE 0 END) as failed,
                         SUM(CASE WHEN status = :processing THEN 1 ELSE 0 END) as processing,
                         SUM(CASE WHEN status = :scheduled THEN 1 ELSE 0 END) as scheduled,
-                        SUM(CASE WHEN status = :cancelled THEN 0 ELSE 1 END) as total_for_percentage
+                        SUM(CASE WHEN status = :cancelled THEN 0 WHEN $isRecentJob AND status IN (:scheduled, :delayed) THEN 0 ELSE 1 END) as total_for_percentage
                     FROM jobs
                     WHERE channel = :channel
                 ";
