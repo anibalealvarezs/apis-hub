@@ -183,6 +183,50 @@
                 $condition = $filterResolver->resolve($filtersArr[$filterKey]);
                 $alias = $filterKey."Val";
 
+                $isStringEntity = in_array($filterKey, ['country', 'device', 'query'], true);
+
+                if ($isStringEntity) {
+                    $table = match($filterKey) { 'country' => 'countries', 'device' => 'devices', 'query' => 'queries' };
+                    $matchCol = match($filterKey) { 'country' => 'code', 'device' => 'type', 'query' => 'query' };
+
+                    if (in_array($condition['operator'], ['is_null', 'is_not_null'])) {
+                        $configWhere[] = $condition['operator'] === 'is_null' ? "mc.$col IS NULL" : "mc.$col IS NOT NULL";
+                        continue;
+                    }
+
+                    $values = is_array($condition['value']) ? array_values($condition['value']) : [$condition['value']];
+                    $hasNA = false;
+                    $actualVals = [];
+                    foreach ($values as $v) {
+                        if ($v === 'N/A' || $v === 'NULL') {
+                            $hasNA = true;
+                        } else {
+                            $actualVals[] = $v;
+                        }
+                    }
+
+                    $parts = [];
+                    $isNegative = in_array($condition['operator'], ['neq', 'not_in']);
+
+                    if ($hasNA) {
+                        $parts[] = $isNegative ? "mc.$col IS NOT NULL" : "mc.$col IS NULL";
+                    }
+
+                    if (!empty($actualVals)) {
+                        $op = $isNegative ? 'NOT IN' : 'IN';
+                        $parts[] = "mc.$col $op (SELECT id FROM $table WHERE $matchCol IN (:$alias))";
+                        $configParams[$alias] = $actualVals;
+                        $sqlTypes[$alias] = \Doctrine\DBAL\ArrayParameterType::STRING;
+                    }
+
+                    if (empty($parts)) {
+                        $configWhere[] = "1 = 0";
+                    } else {
+                        $configWhere[] = "(" . implode($isNegative ? ' AND ' : ' OR ', $parts) . ")";
+                    }
+                    continue;
+                }
+
                 switch ($condition['operator']) {
                     case 'neq':
                         $configWhere[] = "mc.$col <> :$alias";
