@@ -20,6 +20,13 @@ return [
         },
         'admin' => true
     ],
+    '/cache/reset-historical' => [
+        'httpMethod' => 'POST',
+        'callable' => function (?string $body = null, ?array $params = null) {
+            return (new CacheController())->triggerHistoricalResync();
+        },
+        'admin' => true
+    ],
     '/cache/reset/{entity}' => [
         'httpMethod' => 'POST',
         'callable' => function (string $entity, ?array $ids = null, bool $includeListAndCount = true, ?string $channel = null, ?string $body = null, ?array $params = null) {

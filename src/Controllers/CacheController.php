@@ -438,4 +438,50 @@
                 );
             }
         }
+
+        public function triggerHistoricalResync(): Response
+        {
+            $redis = Helpers::getRedisClient();
+            $lockKey = 'lock:nuclear_resync';
+
+            if (!$redis->set($lockKey, 'locked', 'EX', 60, 'NX')) {
+                return $this->createResponse(
+                    data: null,
+                    status: 'error',
+                    error: 'A nuclear resync is already in progress.',
+                    httpStatus: Response::HTTP_CONFLICT
+                );
+            }
+
+            try {
+                // Delete all jobs (sync jobs).
+                // Use DBAL connection.
+                $conn = $this->em->getConnection();
+                
+                if ($this->isPostgreSQL()) {
+                    $conn->executeStatement("TRUNCATE TABLE jobs RESTART IDENTITY CASCADE");
+                } else {
+                    $conn->executeStatement("DELETE FROM jobs");
+                }
+
+                // Clear telemetry cache
+                $keys = $redis->keys('sync_telemetry:*');
+                if (!empty($keys)) {
+                    $redis->del($keys);
+                }
+
+                // Trigger sync for all channels to restart the process
+                return $this->__invoke('all', 'all');
+                
+            } catch (\Exception $e) {
+                return $this->createResponse(
+                    data: null,
+                    status: 'error',
+                    error: 'Failed to reset historical data: ' . $e->getMessage(),
+                    httpStatus: Response::HTTP_INTERNAL_SERVER_ERROR
+                );
+            } finally {
+                $redis->del($lockKey);
+            }
+        }
     }
