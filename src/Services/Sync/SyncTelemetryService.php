@@ -74,7 +74,7 @@
                         SUM(CASE WHEN status = :failed THEN 1 ELSE 0 END) as failed,
                         SUM(CASE WHEN status = :processing THEN 1 ELSE 0 END) as processing,
                         SUM(CASE WHEN status = :scheduled THEN 1 ELSE 0 END) as scheduled,
-                        SUM(CASE WHEN $isRecentJob AND status IN (:scheduled, :delayed, :cancelled) THEN 0 ELSE 1 END) as total_for_percentage
+                        SUM(CASE WHEN status IN (:cancelled, :delayed) THEN 0 WHEN $isRecentJob AND status IN (:scheduled) THEN 0 ELSE 1 END) as total_for_percentage
                     FROM jobs
                     GROUP BY channel, account_id
                 ";
@@ -203,7 +203,7 @@
                         SUM(CASE WHEN status = :failed THEN 1 ELSE 0 END) as failed,
                         SUM(CASE WHEN status = :processing THEN 1 ELSE 0 END) as processing,
                         SUM(CASE WHEN status = :scheduled THEN 1 ELSE 0 END) as scheduled,
-                        SUM(CASE WHEN status = :cancelled THEN 0 WHEN $isRecentJob AND status IN (:scheduled, :delayed) THEN 0 ELSE 1 END) as total_for_percentage
+                        SUM(CASE WHEN status IN (:cancelled, :delayed) THEN 0 WHEN $isRecentJob AND status IN (:scheduled) THEN 0 ELSE 1 END) as total_for_percentage
                     FROM jobs
                     WHERE channel = :channel
                 ";

@@ -106,3 +106,7 @@ test_field.php
 flush_redis.php
 
 test_schema.php
+
+dump_delayed_job.php
+
+flush_cache.php
