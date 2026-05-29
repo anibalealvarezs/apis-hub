@@ -470,8 +470,17 @@
                     $redis->del($keys);
                 }
 
-                // Trigger sync for all channels to restart the process
-                return $this->__invoke('all', 'all');
+                // Schedule initial jobs to instruct drivers to fetch historical data
+                $command = new \Commands\Analytics\ScheduleInitialJobsCommand($this->em);
+                $output = new \Symfony\Component\Console\Output\BufferedOutput();
+                $command->run(new \Symfony\Component\Console\Input\ArrayInput([]), $output);
+
+                return $this->createResponse(
+                    data: ['schedule_output' => $output->fetch()],
+                    status: 'success',
+                    error: null,
+                    httpStatus: Response::HTTP_OK
+                );
                 
             } catch (\Exception $e) {
                 return $this->createResponse(
