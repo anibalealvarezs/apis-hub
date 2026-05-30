@@ -77,7 +77,7 @@
                         SUM(CASE WHEN status IN (:cancelled, :delayed) THEN 0 WHEN $isRecentJob AND status IN (:scheduled) THEN 0 ELSE 1 END) as total_for_percentage
                     FROM jobs j
                     LEFT JOIN channeled_accounts ca ON ca.platform_id = $jsonExtract
-                    WHERE (ca.enabled IS NOT FALSE OR $jsonExtract = 'global')
+                    WHERE (ca.enabled = TRUE OR $jsonExtract = 'global')
                     GROUP BY j.channel, $jsonExtract
                 ";
 
@@ -208,7 +208,7 @@
                         SUM(CASE WHEN status IN (:cancelled, :delayed) THEN 0 WHEN $isRecentJob AND status IN (:scheduled) THEN 0 ELSE 1 END) as total_for_percentage
                     FROM jobs j
                     LEFT JOIN channeled_accounts ca ON ca.platform_id = $jsonExtract
-                    WHERE j.channel = :channel AND (ca.enabled IS NOT FALSE OR $jsonExtract = 'global')
+                    WHERE j.channel = :channel AND (ca.enabled = TRUE OR $jsonExtract = 'global')
                 ";
 
                 $params = [
