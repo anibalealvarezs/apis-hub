@@ -58,12 +58,12 @@
                 $isPostgres = Helpers::isPostgres($em);
 
                 $jsonExtract = $isPostgres
-                    ? "COALESCE(payload->>'account_id', payload->'params'->>'account_id', 'global')"
-                    : "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.account_id')), JSON_UNQUOTE(JSON_EXTRACT(payload, '$.params.account_id')), 'global')";
+                    ? "COALESCE(j.payload->>'account_id', j.payload->'params'->>'account_id', 'global')"
+                    : "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(j.payload, '$.account_id')), JSON_UNQUOTE(JSON_EXTRACT(j.payload, '$.params.account_id')), 'global')";
 
                 $isRecentJob = $isPostgres
-                    ? "(payload->'params'->>'type' = 'recent')"
-                    : "(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.params.type')) = 'recent')";
+                    ? "(j.payload->'params'->>'type' = 'recent')"
+                    : "(JSON_UNQUOTE(JSON_EXTRACT(j.payload, '$.params.type')) = 'recent')";
 
                 $sql = "
                     SELECT
@@ -188,12 +188,12 @@
                 $isPostgres = Helpers::isPostgres($em);
 
                 $jsonExtract = $isPostgres
-                    ? "COALESCE(payload->>'account_id', payload->'params'->>'account_id', 'global')"
-                    : "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.account_id')), JSON_UNQUOTE(JSON_EXTRACT(payload, '$.params.account_id')), 'global')";
+                    ? "COALESCE(j.payload->>'account_id', j.payload->'params'->>'account_id', 'global')"
+                    : "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(j.payload, '$.account_id')), JSON_UNQUOTE(JSON_EXTRACT(j.payload, '$.params.account_id')), 'global')";
 
                 $isRecentJob = $isPostgres
-                    ? "(payload->>'instance_name' LIKE '%-recent' OR payload->'params'->>'type' = 'recent' OR payload->'params'->>'startDate' = '-3 days' OR payload->'params'->>'start_date' = '-3 days')"
-                    : "(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.instance_name')) LIKE '%-recent' OR JSON_UNQUOTE(JSON_EXTRACT(payload, '$.params.type')) = 'recent' OR JSON_UNQUOTE(JSON_EXTRACT(payload, '$.params.startDate')) = '-3 days' OR JSON_UNQUOTE(JSON_EXTRACT(payload, '$.params.start_date')) = '-3 days')";
+                    ? "(j.payload->>'instance_name' LIKE '%-recent' OR j.payload->'params'->>'type' = 'recent' OR j.payload->'params'->>'startDate' = '-3 days' OR j.payload->'params'->>'start_date' = '-3 days')"
+                    : "(JSON_UNQUOTE(JSON_EXTRACT(j.payload, '$.instance_name')) LIKE '%-recent' OR JSON_UNQUOTE(JSON_EXTRACT(j.payload, '$.params.type')) = 'recent' OR JSON_UNQUOTE(JSON_EXTRACT(j.payload, '$.params.startDate')) = '-3 days' OR JSON_UNQUOTE(JSON_EXTRACT(j.payload, '$.params.start_date')) = '-3 days')";
 
                 $query = "
                     SELECT
@@ -328,8 +328,8 @@
                 $isPostgres = Helpers::isPostgres($em);
 
                 $jsonExtract = $isPostgres
-                    ? "COALESCE(payload->>'account_id', payload->'params'->>'account_id', 'global')"
-                    : "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.account_id')), JSON_UNQUOTE(JSON_EXTRACT(payload, '$.params.account_id')), 'global')";
+                    ? "COALESCE(j.payload->>'account_id', j.payload->'params'->>'account_id', 'global')"
+                    : "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(j.payload, '$.account_id')), JSON_UNQUOTE(JSON_EXTRACT(j.payload, '$.params.account_id')), 'global')";
 
                 $jsonStart = $isPostgres ? "payload->'params'->>'startDate'" : "JSON_UNQUOTE(JSON_EXTRACT(payload, '$.params.startDate'))";
                 $jsonEnd = $isPostgres ? "payload->'params'->>'endDate'" : "JSON_UNQUOTE(JSON_EXTRACT(payload, '$.params.endDate'))";
