@@ -67,7 +67,7 @@
 
                 $sql = "
                     SELECT
-                        channel,
+                        j.channel,
                         $jsonExtract as account_id,
                         COUNT(*) as total,
                         SUM(CASE WHEN status = :completed THEN 1 ELSE 0 END) as completed,
