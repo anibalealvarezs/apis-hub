@@ -108,6 +108,24 @@ class NuclearResyncCommand extends Command
             return Command::FAILURE;
         }
 
+        /*
+        // 4. Restart workers
+        $deploymentName = getenv('DEPLOYMENT_NAME') ?: 'apis-hub';
+        // We use 'docker compose restart $(docker compose ps -aq --filter name="worker-tier-*") to restart just the workers
+        $cmd = "docker compose -p $deploymentName restart $(docker compose ps -aq --filter name='worker-tier-*')";
+        $output->writeln("Executing: $cmd");
+        // Important: master container must have /var/run/docker.sock mapped
+        $projectPathHost = getenv('PROJECT_PATH_HOST') ?: './';
+        $cmd = "PROJECT_PATH_HOST=$projectPathHost " . $cmd;
+        exec($cmd, $execOutput, $returnVar);
+        if ($returnVar !== 0) {
+            $output->writeln("<error>Restart workers failed (exit code $returnVar): ".implode("\n", $execOutput)."</error>");
+
+            return Command::FAILURE;
+        }
+        $output->writeln("<info>Waiting 5 seconds for workers to warm up...</info>");
+        sleep(5); */
+
         $output->writeln("<info>✓ Nuclear Resync complete.</info>");
 
         return Command::SUCCESS;
