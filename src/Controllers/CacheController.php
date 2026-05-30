@@ -441,72 +441,16 @@
 
         public function triggerHistoricalResync(?string $channel = null): Response
         {
-            $logger = Helpers::setLogger('nuclear_resync.log');
-            $logger->warning("1. Started resync for channel: " . ($channel ?? 'all'));
-            $redis = Helpers::getRedisClient();
-            $lockKey = 'lock:nuclear_resync';
+            $cliPath = realpath(dirname(__DIR__, 2) . '/bin/cli.php');
+            $channelArg = ($channel && $channel !== 'all') ? '--channel=' . escapeshellarg($channel) : '';
+            $command = "nohup php \"$cliPath\" app:nuclear-resync $channelArg > /dev/null 2>&1 &";
+            exec($command);
 
-            if (!$redis->set($lockKey, 'locked', 'EX', 60, 'NX')) {
-                $logger->warning("1b. Lock failed - resync already in progress");
-                return $this->createResponse(
-                    data: ['status' => 'error', 'message' => 'A resync is already in progress.'],
-                    status: 'error',
-                    error: 'Lock acquisition failed',
-                    httpStatus: Response::HTTP_CONFLICT
-                );
-            }
-
-            try {
-                $logger->warning("2. Acquired lock, connecting to DB");
-                $conn = $this->em->getConnection();
-                
-                $logger->warning("3. Executing DB delete");
-                if ($channel && $channel !== 'all') {
-                    $conn->executeStatement("DELETE FROM jobs WHERE channel = :channel", ['channel' => $channel]);
-                } else {
-                    if ($this->isPostgreSQL()) {
-                        $conn->executeStatement("TRUNCATE TABLE jobs RESTART IDENTITY CASCADE");
-                    } else {
-                        $conn->executeStatement("DELETE FROM jobs");
-                    }
-                }
-
-                $logger->warning("4. DB delete finished. Clearing telemetry cache");
-                // Clear telemetry cache
-                if ($channel && $channel !== 'all') {
-                    $keys = $redis->keys("sync_telemetry:{$channel}:*");
-                } else {
-                    $keys = $redis->keys('sync_telemetry:*');
-                }
-                if (!empty($keys)) {
-                    $redis->del($keys);
-                }
-
-                $logger->warning("5. Cache cleared. Starting background exec");
-                // Schedule initial jobs asynchronously to prevent hanging the HTTP response
-                $args = $channel && $channel !== 'all' ? escapeshellarg("--channel={$channel}") : '';
-                $cliPath = dirname(__DIR__, 2) . '/bin/cli.php';
-                exec("php $cliPath app:schedule-initial-jobs $args > /dev/null 2>&1 < /dev/null &");
-
-                $logger->warning("6. Background exec dispatched. Returning response");
-                return $this->createResponse(
-                    data: ['status' => 'initiated', 'message' => 'Jobs are being scheduled in the background'],
-                    status: 'success',
-                    error: null,
-                    httpStatus: Response::HTTP_OK
-                );
-                
-            } catch (\Throwable $e) {
-                $logger->error("ERROR: " . $e->getMessage() . " at " . $e->getFile() . ':' . $e->getLine());
-                return $this->createResponse(
-                    data: null,
-                    status: 'error',
-                    error: 'Failed to reset historical data: ' . $e->getMessage(),
-                    httpStatus: Response::HTTP_INTERNAL_SERVER_ERROR
-                );
-            } finally {
-                $logger->warning("7. Releasing lock");
-                $redis->del($lockKey);
-            }
+            return $this->createResponse(
+                data: ['status' => 'initiated', 'message' => 'Nuclear resync is running in the background.'],
+                status: 'success',
+                error: null,
+                httpStatus: Response::HTTP_OK
+            );
         }
     }
