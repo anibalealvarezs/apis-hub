@@ -75,8 +75,8 @@
                         SUM(CASE WHEN status = :processing THEN 1 ELSE 0 END) as processing,
                         SUM(CASE WHEN status = :scheduled THEN 1 ELSE 0 END) as scheduled,
                         SUM(CASE WHEN status IN (:cancelled, :delayed) THEN 0 WHEN $isRecentJob AND status IN (:scheduled) THEN 0 ELSE 1 END) as total_for_percentage
-                    FROM jobs
-                    GROUP BY channel, account_id
+                    FROM jobs j
+                    GROUP BY j.channel, account_id
                 ";
 
                 $rows = $conn->fetchAllAssociative($sql, [
@@ -204,8 +204,8 @@
                         SUM(CASE WHEN status = :processing THEN 1 ELSE 0 END) as processing,
                         SUM(CASE WHEN status = :scheduled THEN 1 ELSE 0 END) as scheduled,
                         SUM(CASE WHEN status IN (:cancelled, :delayed) THEN 0 WHEN $isRecentJob AND status IN (:scheduled) THEN 0 ELSE 1 END) as total_for_percentage
-                    FROM jobs
-                    WHERE channel = :channel
+                    FROM jobs j
+                    WHERE j.channel = :channel
                 ";
 
                 $params = [
