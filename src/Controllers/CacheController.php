@@ -446,8 +446,8 @@
             $redis = Helpers::getRedisClient();
             $lockKey = 'lock:nuclear_resync';
 
-            if (!$redis->set($lockKey, '1', ['nx', 'ex' => 60])) {
-                $logger->warning("1b. Lock failed");
+            if (!$redis->set($lockKey, 'locked', 'EX', 60, 'NX')) {
+                $logger->warning("1b. Lock failed - resync already in progress");
                 return $this->createResponse(
                     data: ['status' => 'error', 'message' => 'A resync is already in progress.'],
                     status: 'error',
