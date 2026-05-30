@@ -78,7 +78,7 @@
                     FROM jobs j
                     LEFT JOIN channeled_accounts ca ON ca.platform_id = $jsonExtract
                     WHERE (ca.enabled IS NOT FALSE OR $jsonExtract = 'global')
-                    GROUP BY j.channel, account_id
+                    GROUP BY j.channel, $jsonExtract
                 ";
 
                 $rows = $conn->fetchAllAssociative($sql, [
@@ -226,7 +226,7 @@
                     $params['account_id'] = $targetAccountId;
                 }
 
-                $query .= " GROUP BY account_id";
+                $query .= " GROUP BY $jsonExtract";
 
                 $rows = $conn->fetchAllAssociative($query, $params);
 
