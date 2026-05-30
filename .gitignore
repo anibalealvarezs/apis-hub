@@ -110,3 +110,7 @@ test_schema.php
 dump_delayed_job.php
 
 flush_cache.php
+
+scratch/test_nuclear.php
+
+scratch/debug_delete.php

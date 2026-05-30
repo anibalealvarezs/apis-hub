@@ -441,23 +441,26 @@
 
         public function triggerHistoricalResync(?string $channel = null): Response
         {
+            $logger = Helpers::setLogger('nuclear_resync.log');
+            $logger->warning("1. Started resync for channel: " . ($channel ?? 'all'));
             $redis = Helpers::getRedisClient();
             $lockKey = 'lock:nuclear_resync';
 
-            if (!$redis->set($lockKey, 'locked', 'EX', 60, 'NX')) {
+            if (!$redis->set($lockKey, '1', ['nx', 'ex' => 60])) {
+                $logger->warning("1b. Lock failed");
                 return $this->createResponse(
-                    data: null,
+                    data: ['status' => 'error', 'message' => 'A resync is already in progress.'],
                     status: 'error',
-                    error: 'A nuclear resync is already in progress.',
+                    error: 'Lock acquisition failed',
                     httpStatus: Response::HTTP_CONFLICT
                 );
             }
 
             try {
-                // Delete jobs
-                // Use DBAL connection.
+                $logger->warning("2. Acquired lock, connecting to DB");
                 $conn = $this->em->getConnection();
                 
+                $logger->warning("3. Executing DB delete");
                 if ($channel && $channel !== 'all') {
                     $conn->executeStatement("DELETE FROM jobs WHERE channel = :channel", ['channel' => $channel]);
                 } else {
@@ -468,6 +471,7 @@
                     }
                 }
 
+                $logger->warning("4. DB delete finished. Clearing telemetry cache");
                 // Clear telemetry cache
                 if ($channel && $channel !== 'all') {
                     $keys = $redis->keys("sync_telemetry:{$channel}:*");
@@ -478,25 +482,22 @@
                     $redis->del($keys);
                 }
 
-                // Schedule initial jobs to instruct drivers to fetch historical data
-                $command = new \Commands\Analytics\ScheduleInitialJobsCommand($this->em);
-                $output = new \Symfony\Component\Console\Output\BufferedOutput();
-                
-                $inputArgs = [];
-                if ($channel && $channel !== 'all') {
-                    $inputArgs['--channel'] = $channel;
-                }
-                
-                $command->run(new \Symfony\Component\Console\Input\ArrayInput($inputArgs), $output);
+                $logger->warning("5. Cache cleared. Starting background exec");
+                // Schedule initial jobs asynchronously to prevent hanging the HTTP response
+                $args = $channel && $channel !== 'all' ? escapeshellarg("--channel={$channel}") : '';
+                $cliPath = dirname(__DIR__, 2) . '/bin/cli.php';
+                exec("php $cliPath app:schedule-initial-jobs $args > /dev/null 2>&1 < /dev/null &");
 
+                $logger->warning("6. Background exec dispatched. Returning response");
                 return $this->createResponse(
-                    data: ['schedule_output' => $output->fetch()],
+                    data: ['status' => 'initiated', 'message' => 'Jobs are being scheduled in the background'],
                     status: 'success',
                     error: null,
                     httpStatus: Response::HTTP_OK
                 );
                 
-            } catch (\Exception $e) {
+            } catch (\Throwable $e) {
+                $logger->error("ERROR: " . $e->getMessage() . " at " . $e->getFile() . ':' . $e->getLine());
                 return $this->createResponse(
                     data: null,
                     status: 'error',
@@ -504,6 +505,7 @@
                     httpStatus: Response::HTTP_INTERNAL_SERVER_ERROR
                 );
             } finally {
+                $logger->warning("7. Releasing lock");
                 $redis->del($lockKey);
             }
         }
