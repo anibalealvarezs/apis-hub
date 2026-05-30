@@ -38,6 +38,7 @@
         protected function configure(): void
         {
             $this->addOption('instance', null, InputOption::VALUE_OPTIONAL, 'Schedule only for this instance name');
+            $this->addOption('channel', null, InputOption::VALUE_OPTIONAL, 'Schedule only for this channel');
         }
 
         /**
@@ -50,6 +51,7 @@
             $config = Helpers::getProjectConfig();
             $instances = $config['instances'] ?? [];
             $targetInstance = $input->getOption('instance');
+            $targetChannel = $input->getOption('channel');
 
             if (empty($instances)) {
                 if (Helpers::isDebug()) {
@@ -72,6 +74,11 @@
 
                 $channel = $instance['channel'] ?? null;
                 $entity = $instance['entity'] ?? null;
+
+                // Filter by channel if provided
+                if ($targetChannel && $targetChannel !== 'all' && $channel !== $targetChannel) {
+                    continue;
+                }
 
                 if ($channel && ($chanEnum = Channel::tryFromName($channel))) {
                     $channel = $chanEnum->getName();

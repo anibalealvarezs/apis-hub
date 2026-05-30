@@ -23,7 +23,9 @@ return [
     '/cache/reset-historical' => [
         'httpMethod' => 'POST',
         'callable' => function (?string $body = null, ?array $params = null) {
-            return (new CacheController())->triggerHistoricalResync();
+            $input = (array) Helpers::bodyToObject(data: $body);
+            $channel = $input['channel'] ?? $params['channel'] ?? null;
+            return (new CacheController())->triggerHistoricalResync($channel);
         },
         'admin' => true
     ],

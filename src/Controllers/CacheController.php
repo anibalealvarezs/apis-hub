@@ -439,7 +439,7 @@
             }
         }
 
-        public function triggerHistoricalResync(): Response
+        public function triggerHistoricalResync(?string $channel = null): Response
         {
             $redis = Helpers::getRedisClient();
             $lockKey = 'lock:nuclear_resync';
@@ -454,18 +454,26 @@
             }
 
             try {
-                // Delete all jobs (sync jobs).
+                // Delete jobs
                 // Use DBAL connection.
                 $conn = $this->em->getConnection();
                 
-                if ($this->isPostgreSQL()) {
-                    $conn->executeStatement("TRUNCATE TABLE jobs RESTART IDENTITY CASCADE");
+                if ($channel && $channel !== 'all') {
+                    $conn->executeStatement("DELETE FROM jobs WHERE channel = :channel", ['channel' => $channel]);
                 } else {
-                    $conn->executeStatement("DELETE FROM jobs");
+                    if ($this->isPostgreSQL()) {
+                        $conn->executeStatement("TRUNCATE TABLE jobs RESTART IDENTITY CASCADE");
+                    } else {
+                        $conn->executeStatement("DELETE FROM jobs");
+                    }
                 }
 
                 // Clear telemetry cache
-                $keys = $redis->keys('sync_telemetry:*');
+                if ($channel && $channel !== 'all') {
+                    $keys = $redis->keys("sync_telemetry:{$channel}:*");
+                } else {
+                    $keys = $redis->keys('sync_telemetry:*');
+                }
                 if (!empty($keys)) {
                     $redis->del($keys);
                 }
@@ -473,7 +481,13 @@
                 // Schedule initial jobs to instruct drivers to fetch historical data
                 $command = new \Commands\Analytics\ScheduleInitialJobsCommand($this->em);
                 $output = new \Symfony\Component\Console\Output\BufferedOutput();
-                $command->run(new \Symfony\Component\Console\Input\ArrayInput([]), $output);
+                
+                $inputArgs = [];
+                if ($channel && $channel !== 'all') {
+                    $inputArgs['--channel'] = $channel;
+                }
+                
+                $command->run(new \Symfony\Component\Console\Input\ArrayInput($inputArgs), $output);
 
                 return $this->createResponse(
                     data: ['schedule_output' => $output->fetch()],
