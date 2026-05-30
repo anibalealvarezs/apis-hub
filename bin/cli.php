@@ -36,6 +36,7 @@
     use Commands\SeedDemoDataCommand;
     use Commands\MigratePagesCanonicalCommand;
     use Commands\InstallDriversCommand;
+    use Commands\NuclearResyncCommand;
     use Doctrine\ORM\Tools\Console\ConsoleRunner;
     use Doctrine\ORM\Tools\Console\EntityManagerProvider\SingleManagerProvider;
     use Exceptions\ConfigurationException;
@@ -111,6 +112,7 @@
             new ScaleWorkersCommand($entityManager),
             new RetryFailedJobCommand($entityManager),
             new RetryFailedJobsCommand($entityManager),
+            new NuclearResyncCommand($entityManager),
         ];
 
         foreach ($commands as $command) {

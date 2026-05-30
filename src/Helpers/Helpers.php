@@ -904,21 +904,14 @@
         {
             if (self::$entityManager === null || !self::$entityManager->isOpen()) {
                 try {
-                    if (self::$entityManager !== null && !self::$entityManager->isOpen()) {
-                        self::closeManager();
-                    }
-                    if (self::$connection === null || !self::$connection->isConnected()) {
-                        $config = self::getDbConfig();
-                        self::$connection = DriverManager::getConnection($config);
-                    } else {
-                        try {
-                            self::$connection->executeQuery('SELECT 1');
-                        } catch (Exception|\Doctrine\DBAL\Exception $e) {
-                            self::$connection->close();
-                            // DBAL reconnects lazily on next query execution.
-                            self::$connection->executeQuery('SELECT 1');
-                        }
-                    }
+                    // Always close and recreate both connection and EntityManager together.
+                    // Reusing an existing DBAL connection that reports isConnected()=true can
+                    // cause Swoole workers to hang indefinitely on a stale TCP connection
+                    // (e.g. after a worker restart or a Postgres container restart).
+                    self::closeManager();
+
+                    $config = self::getDbConfig();
+                    self::$connection = DriverManager::getConnection($config);
 
                     $ormConfig = ORMSetup::createAttributeMetadataConfiguration(
                         paths: array_merge([__DIR__.'/../Entities'], EntityRegistry::getAll()),
@@ -926,7 +919,6 @@
                     );
 
                     self::$entityManager = new EntityManager(self::$connection, $ormConfig);
-                    error_log("DEBUG: Helpers::getManager - CREATED NEW EntityManager. ID: ".spl_object_id(self::$entityManager));
                 } catch (Exception $e) {
                     throw new RuntimeException('Failed to initialize EntityManager: '.$e->getMessage());
                 }
