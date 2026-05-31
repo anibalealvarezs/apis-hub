@@ -65,13 +65,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/amazon-hub-driver.git",
-                "reference": "b50cdabb16817644f5825cbd49e0c255ee3e05a9"
+                "reference": "f9f906c12841b5a13c5b761fa5ac09e2abd77584"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/amazon-hub-driver/anibalealvarezs-amazon-hub-driver-b50cdabb16817644f5825cbd49e0c255ee3e05a9-zip-167df8.zip",
-                "reference": "b50cdabb16817644f5825cbd49e0c255ee3e05a9",
-                "shasum": "761d8ba0fc0ed0987d4a778ed98a40c2004cf00f"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/amazon-hub-driver/anibalealvarezs-amazon-hub-driver-f9f906c12841b5a13c5b761fa5ac09e2abd77584-zip-8aeda1.zip",
+                "reference": "f9f906c12841b5a13c5b761fa5ac09e2abd77584",
+                "shasum": "1bde8934149e56822a3792a42d134de26bb365e1"
             },
             "require": {
                 "anibalealvarezs/amazon-api": "^0.1.0",
@@ -102,7 +102,7 @@
                 }
             ],
             "description": "Amazon driver for the Hub ecosystem",
-            "time": "2026-05-25T02:04:03+00:00"
+            "time": "2026-05-27T12:11:22+00:00"
         },
         {
             "name": "anibalealvarezs/api-client-skeleton",
@@ -110,13 +110,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/api-client-skeleton.git",
-                "reference": "0d6b0fa325304714a54562b8877097e1eaaaccb4"
+                "reference": "42d510da3d3f04ac448296979c29e68ead189d08"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/api-client-skeleton/anibalealvarezs-api-client-skeleton-0d6b0fa325304714a54562b8877097e1eaaaccb4-zip-7c0cc8.zip",
-                "reference": "0d6b0fa325304714a54562b8877097e1eaaaccb4",
-                "shasum": "6ece9dfef280cfb7a03117e3a747b8824ec94086"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/api-client-skeleton/anibalealvarezs-api-client-skeleton-42d510da3d3f04ac448296979c29e68ead189d08-zip-1709bd.zip",
+                "reference": "42d510da3d3f04ac448296979c29e68ead189d08",
+                "shasum": "eef85f77b374dc2e87fbe9797361eccac056d1f7"
             },
             "require": {
                 "anibalealvarezs/oauth-v1": "^1.0.0",
@@ -165,7 +165,7 @@
             "support": {
                 "issues": "https://github.com/anibalealvarezs/api-client-skeleton/issues"
             },
-            "time": "2026-05-25T00:43:10+00:00"
+            "time": "2026-05-27T21:09:00+00:00"
         },
         {
             "name": "anibalealvarezs/api-driver-core",
@@ -221,13 +221,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/bigcommerce-hub-driver.git",
-                "reference": "fb3cc2abd615c730fd36475757f1b77be0fd0095"
+                "reference": "6c423df105e65f9f35a03b8504f694d6a62572a4"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/bigcommerce-hub-driver/anibalealvarezs-bigcommerce-hub-driver-fb3cc2abd615c730fd36475757f1b77be0fd0095-zip-0be440.zip",
-                "reference": "fb3cc2abd615c730fd36475757f1b77be0fd0095",
-                "shasum": "3f3799984a0e7f5a5bbd217aff11097ec7f2a3db"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/bigcommerce-hub-driver/anibalealvarezs-bigcommerce-hub-driver-6c423df105e65f9f35a03b8504f694d6a62572a4-zip-06d481.zip",
+                "reference": "6c423df105e65f9f35a03b8504f694d6a62572a4",
+                "shasum": "69c593cfb76b217e32817c93d0316b1f4a8ff0e3"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "^1.0.0",
@@ -257,7 +257,7 @@
                 }
             ],
             "description": "BigCommerce driver for the Hub ecosystem",
-            "time": "2026-05-25T02:04:45+00:00"
+            "time": "2026-05-27T12:14:44+00:00"
         },
         {
             "name": "anibalealvarezs/facebook-graph-api",
@@ -330,13 +330,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/google-api.git",
-                "reference": "1149de86e65614450939c65fa84e68763063d9c3"
+                "reference": "310f8c4270c7188fcd2cc3ccc667a28a930fb476"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/google-api/anibalealvarezs-google-api-1149de86e65614450939c65fa84e68763063d9c3-zip-10e1d8.zip",
-                "reference": "1149de86e65614450939c65fa84e68763063d9c3",
-                "shasum": "65269de74c677402677b55411e1fc8966a04b13a"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/google-api/anibalealvarezs-google-api-310f8c4270c7188fcd2cc3ccc667a28a930fb476-zip-8d9c40.zip",
+                "reference": "310f8c4270c7188fcd2cc3ccc667a28a930fb476",
+                "shasum": "33f8edc0b21d70b415a72a4d6334aed0b1bb058c"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "^1.0.0",
@@ -393,7 +393,7 @@
             "support": {
                 "issues": "https://github.com/anibalealvarezs/google-api/issues"
             },
-            "time": "2026-05-27T02:56:22+00:00"
+            "time": "2026-05-27T21:08:51+00:00"
         },
         {
             "name": "anibalealvarezs/google-hub-driver",
@@ -401,13 +401,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/google-hub-driver.git",
-                "reference": "dc56516ead2a8cfdbd8e1166e1380656b98910ad"
+                "reference": "c31b8b093f3b8db23e27af3ae9b3cd0e8dc342b6"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/google-hub-driver/anibalealvarezs-google-hub-driver-dc56516ead2a8cfdbd8e1166e1380656b98910ad-zip-a6fde5.zip",
-                "reference": "dc56516ead2a8cfdbd8e1166e1380656b98910ad",
-                "shasum": "9e9af6f658a464ada8dab7a44e82a7cf6949d8e1"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/google-hub-driver/anibalealvarezs-google-hub-driver-c31b8b093f3b8db23e27af3ae9b3cd0e8dc342b6-zip-f327ff.zip",
+                "reference": "c31b8b093f3b8db23e27af3ae9b3cd0e8dc342b6",
+                "shasum": "05e3fca7cd0c37bfff47079c24a5f3cfa97b011f"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "^1.0.0",
@@ -440,7 +440,7 @@
                 }
             ],
             "description": "APIs-Hub driver for Google (Search Console & Analytics) integration.",
-            "time": "2026-05-27T03:34:53+00:00"
+            "time": "2026-05-27T12:36:15+00:00"
         },
         {
             "name": "anibalealvarezs/klaviyo-api",
@@ -500,13 +500,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/klaviyo-hub-driver.git",
-                "reference": "3cc2f474035ad900862784eeb483a5f98ea1f58e"
+                "reference": "a982eed2edc416ab3da3aa6527b5501489d45714"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/klaviyo-hub-driver/anibalealvarezs-klaviyo-hub-driver-3cc2f474035ad900862784eeb483a5f98ea1f58e-zip-f53afa.zip",
-                "reference": "3cc2f474035ad900862784eeb483a5f98ea1f58e",
-                "shasum": "88a1d6b70c542f456434fa33236d9b258d4bed65"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/klaviyo-hub-driver/anibalealvarezs-klaviyo-hub-driver-a982eed2edc416ab3da3aa6527b5501489d45714-zip-05a895.zip",
+                "reference": "a982eed2edc416ab3da3aa6527b5501489d45714",
+                "shasum": "0b4eb9e825fa8ae744a575a3d225ff05602c0296"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "^1.0.0",
@@ -537,7 +537,7 @@
                 }
             ],
             "description": "Klaviyo driver for the Hub ecosystem",
-            "time": "2026-05-25T02:03:02+00:00"
+            "time": "2026-05-27T12:12:26+00:00"
         },
         {
             "name": "anibalealvarezs/linkedin-hub-driver",
@@ -545,13 +545,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/linkedin-hub-driver.git",
-                "reference": "ad0d289329c94fe5a8622fddef09ba9ccc3a0a33"
+                "reference": "2851276381766a0d50a887d5023ba3e76b350cd9"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/linkedin-hub-driver/anibalealvarezs-linkedin-hub-driver-ad0d289329c94fe5a8622fddef09ba9ccc3a0a33-zip-966ed8.zip",
-                "reference": "ad0d289329c94fe5a8622fddef09ba9ccc3a0a33",
-                "shasum": "a05ecbad0df38819aa457243d02d5e0ff9307785"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/linkedin-hub-driver/anibalealvarezs-linkedin-hub-driver-2851276381766a0d50a887d5023ba3e76b350cd9-zip-57c822.zip",
+                "reference": "2851276381766a0d50a887d5023ba3e76b350cd9",
+                "shasum": "f26e420a09e7a6a26d3d0271ca98994ecbe82953"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "^1.0.0",
@@ -581,7 +581,7 @@
                 }
             ],
             "description": "LinkedIn driver for the Hub ecosystem",
-            "time": "2026-05-25T02:04:16+00:00"
+            "time": "2026-05-27T12:18:43+00:00"
         },
         {
             "name": "anibalealvarezs/meta-hub-driver",
@@ -589,13 +589,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/meta-hub-driver.git",
-                "reference": "6bdc6a16fb2774b91415a496549c3fe043fbd7f4"
+                "reference": "ac7d8462ba970d2caf46d5bb75ac1c78e6155118"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/meta-hub-driver/anibalealvarezs-meta-hub-driver-6bdc6a16fb2774b91415a496549c3fe043fbd7f4-zip-4a50a9.zip",
-                "reference": "6bdc6a16fb2774b91415a496549c3fe043fbd7f4",
-                "shasum": "c80c14cf0055916882b0ed9971738100f75ad267"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/meta-hub-driver/anibalealvarezs-meta-hub-driver-ac7d8462ba970d2caf46d5bb75ac1c78e6155118-zip-71ba42.zip",
+                "reference": "ac7d8462ba970d2caf46d5bb75ac1c78e6155118",
+                "shasum": "4ba421e7e6334874c49cf0d76086bae871f1f9ba"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "^1.0.0",
@@ -628,7 +628,7 @@
                 }
             ],
             "description": "APIs-Hub driver for Meta (Facebook & Instagram) integration.",
-            "time": "2026-05-27T03:33:38+00:00"
+            "time": "2026-05-27T12:36:10+00:00"
         },
         {
             "name": "anibalealvarezs/netsuite-api",
@@ -690,13 +690,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/netsuite-hub-driver.git",
-                "reference": "67d7112cab20602639d1fbca9213e9fe84557234"
+                "reference": "7d2f42019129b34ae4c98eddee597af34ee616a8"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/netsuite-hub-driver/anibalealvarezs-netsuite-hub-driver-67d7112cab20602639d1fbca9213e9fe84557234-zip-7aabc4.zip",
-                "reference": "67d7112cab20602639d1fbca9213e9fe84557234",
-                "shasum": "1dcdb2437676b4275225a17384b73f0591ebea82"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/netsuite-hub-driver/anibalealvarezs-netsuite-hub-driver-7d2f42019129b34ae4c98eddee597af34ee616a8-zip-7fb74b.zip",
+                "reference": "7d2f42019129b34ae4c98eddee597af34ee616a8",
+                "shasum": "02fe81ce369ffd8e58b0034c751f2aca24872fc8"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "^1.0.0",
@@ -727,7 +727,7 @@
                 }
             ],
             "description": "NetSuite driver for the Hub ecosystem",
-            "time": "2026-05-25T02:04:59+00:00"
+            "time": "2026-05-27T12:19:42+00:00"
         },
         {
             "name": "anibalealvarezs/oauth-v1",
@@ -793,13 +793,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/pinterest-hub-driver.git",
-                "reference": "8bcf6d91da881c14b28b3b57002a8e4c4ab9a4c9"
+                "reference": "7b4adb2a81a3783314a7e2bdfa541c78acf8f583"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/pinterest-hub-driver/anibalealvarezs-pinterest-hub-driver-8bcf6d91da881c14b28b3b57002a8e4c4ab9a4c9-zip-73db88.zip",
-                "reference": "8bcf6d91da881c14b28b3b57002a8e4c4ab9a4c9",
-                "shasum": "053adfaff03df02f4e0794d3b788a07be575c930"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/pinterest-hub-driver/anibalealvarezs-pinterest-hub-driver-7b4adb2a81a3783314a7e2bdfa541c78acf8f583-zip-91d1e7.zip",
+                "reference": "7b4adb2a81a3783314a7e2bdfa541c78acf8f583",
+                "shasum": "e00abaa90c32c5fa0cc88f4c5bb55df2058d6125"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "^1.0.0",
@@ -829,7 +829,7 @@
                 }
             ],
             "description": "Pinterest driver for the Hub ecosystem",
-            "time": "2026-05-25T02:04:30+00:00"
+            "time": "2026-05-27T12:19:08+00:00"
         },
         {
             "name": "anibalealvarezs/shopify-api",
@@ -947,13 +947,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/tiktok-hub-driver.git",
-                "reference": "910defb5b0ba49dc33ae78e18df99ddf3559f86e"
+                "reference": "84b2e1557ed9bdcd084f6187acd8e03f2dd0663b"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/tiktok-hub-driver/anibalealvarezs-tiktok-hub-driver-910defb5b0ba49dc33ae78e18df99ddf3559f86e-zip-4bf9ef.zip",
-                "reference": "910defb5b0ba49dc33ae78e18df99ddf3559f86e",
-                "shasum": "64257759a1c4648ef963ae6d5d91a8143a2183a2"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/tiktok-hub-driver/anibalealvarezs-tiktok-hub-driver-84b2e1557ed9bdcd084f6187acd8e03f2dd0663b-zip-bca6f9.zip",
+                "reference": "84b2e1557ed9bdcd084f6187acd8e03f2dd0663b",
+                "shasum": "3052da24883f676ca8f39303a7b79716df153665"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "^1.0.0",
@@ -983,7 +983,7 @@
                 }
             ],
             "description": "TikTok driver for the Hub ecosystem",
-            "time": "2026-05-25T02:03:42+00:00"
+            "time": "2026-05-27T12:18:01+00:00"
         },
         {
             "name": "anibalealvarezs/triple-whale-api",
@@ -1045,13 +1045,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/triple-whale-hub-driver.git",
-                "reference": "3ff84392021b6f5fb939898209414e08f1ef8a13"
+                "reference": "f41b6698c9f709d09187977140001c83edee520f"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/triple-whale-hub-driver/anibalealvarezs-triple-whale-hub-driver-3ff84392021b6f5fb939898209414e08f1ef8a13-zip-0d829f.zip",
-                "reference": "3ff84392021b6f5fb939898209414e08f1ef8a13",
-                "shasum": "214066549d387bc4fc0f3db58ee8287e6c07d001"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/triple-whale-hub-driver/anibalealvarezs-triple-whale-hub-driver-f41b6698c9f709d09187977140001c83edee520f-zip-9bb3f2.zip",
+                "reference": "f41b6698c9f709d09187977140001c83edee520f",
+                "shasum": "c6ce915fad41787b32a2f8ff9c8800d409433bcd"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "^1.0.0",
@@ -1082,7 +1082,7 @@
                 }
             ],
             "description": "Triple Whale driver for the Hub ecosystem",
-            "time": "2026-05-25T02:01:48+00:00"
+            "time": "2026-05-27T12:15:31+00:00"
         },
         {
             "name": "anibalealvarezs/x-hub-driver",
@@ -1090,13 +1090,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/x-hub-driver.git",
-                "reference": "8464c2fda4df69a68aa2ef55c54feee838eee30e"
+                "reference": "d6df804790d0853a30719fa4eb8edfc7a6a44c9a"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/x-hub-driver/anibalealvarezs-x-hub-driver-8464c2fda4df69a68aa2ef55c54feee838eee30e-zip-c3f99b.zip",
-                "reference": "8464c2fda4df69a68aa2ef55c54feee838eee30e",
-                "shasum": "0c56188529a1399db0ce2fb329859fb0a2eeab4f"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/x-hub-driver/anibalealvarezs-x-hub-driver-d6df804790d0853a30719fa4eb8edfc7a6a44c9a-zip-21cae6.zip",
+                "reference": "d6df804790d0853a30719fa4eb8edfc7a6a44c9a",
+                "shasum": "1837672b4757a4e3aef5d578ecc7815c3f69161b"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "^1.0.0",
@@ -1126,7 +1126,7 @@
                 }
             ],
             "description": "X (Twitter) driver for the Hub ecosystem",
-            "time": "2026-05-25T02:02:06+00:00"
+            "time": "2026-05-27T12:16:15+00:00"
         },
         {
             "name": "carbonphp/carbon-doctrine-types",
@@ -2014,16 +2014,16 @@
         },
         {
             "name": "guzzlehttp/guzzle",
-            "version": "7.10.4",
+            "version": "7.10.5",
             "source": {
                 "type": "git",
                 "url": "https://github.com/guzzle/guzzle.git",
-                "reference": "aec528da477062d3af11f51e6b33402be233b21f"
+                "reference": "7c8d84b39e680315f687e8662a9d6fb0865c5148"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/guzzle/guzzle/zipball/aec528da477062d3af11f51e6b33402be233b21f",
-                "reference": "aec528da477062d3af11f51e6b33402be233b21f",
+                "url": "https://api.github.com/repos/guzzle/guzzle/zipball/7c8d84b39e680315f687e8662a9d6fb0865c5148",
+                "reference": "7c8d84b39e680315f687e8662a9d6fb0865c5148",
                 "shasum": ""
             },
             "require": {
@@ -2041,7 +2041,7 @@
                 "bamarni/composer-bin-plugin": "^1.8.2",
                 "ext-curl": "*",
                 "guzzle/client-integration-tests": "3.0.2",
-                "guzzlehttp/test-server": "^0.3.2",
+                "guzzlehttp/test-server": "^0.4",
                 "php-http/message-factory": "^1.1",
                 "phpunit/phpunit": "^8.5.52 || ^9.6.34",
                 "psr/log": "^1.1 || ^2.0 || ^3.0"
@@ -2121,7 +2121,7 @@
             ],
             "support": {
                 "issues": "https://github.com/guzzle/guzzle/issues",
-                "source": "https://github.com/guzzle/guzzle/tree/7.10.4"
+                "source": "https://github.com/guzzle/guzzle/tree/7.10.5"
             },
             "funding": [
                 {
@@ -2137,7 +2137,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-05-22T19:00:53+00:00"
+            "time": "2026-05-27T11:53:46+00:00"
         },
         {
             "name": "guzzlehttp/promises",
@@ -2224,16 +2224,16 @@
         },
         {
             "name": "guzzlehttp/psr7",
-            "version": "2.10.2",
+            "version": "2.10.4",
             "source": {
                 "type": "git",
                 "url": "https://github.com/guzzle/psr7.git",
-                "reference": "a1bbdc172f32a25fe999965b65b6e71fd87da9ed"
+                "reference": "d2a1a094e396da8957e797489fddaf860c340cfc"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/guzzle/psr7/zipball/a1bbdc172f32a25fe999965b65b6e71fd87da9ed",
-                "reference": "a1bbdc172f32a25fe999965b65b6e71fd87da9ed",
+                "url": "https://api.github.com/repos/guzzle/psr7/zipball/d2a1a094e396da8957e797489fddaf860c340cfc",
+                "reference": "d2a1a094e396da8957e797489fddaf860c340cfc",
                 "shasum": ""
             },
             "require": {
@@ -2321,7 +2321,7 @@
             ],
             "support": {
                 "issues": "https://github.com/guzzle/psr7/issues",
-                "source": "https://github.com/guzzle/psr7/tree/2.10.2"
+                "source": "https://github.com/guzzle/psr7/tree/2.10.4"
             },
             "funding": [
                 {
@@ -2337,7 +2337,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-05-25T22:58:15+00:00"
+            "time": "2026-05-29T12:59:07+00:00"
         },
         {
             "name": "monolog/monolog",
@@ -3065,16 +3065,16 @@
         },
         {
             "name": "symfony/cache",
-            "version": "v7.4.12",
+            "version": "v7.4.13",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/cache.git",
-                "reference": "902d621e0b6ef0ebeaa133770b5c339a19328589"
+                "reference": "4c09e18a92cce126cc0d1155825279fca8cd0673"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/cache/zipball/902d621e0b6ef0ebeaa133770b5c339a19328589",
-                "reference": "902d621e0b6ef0ebeaa133770b5c339a19328589",
+                "url": "https://api.github.com/repos/symfony/cache/zipball/4c09e18a92cce126cc0d1155825279fca8cd0673",
+                "reference": "4c09e18a92cce126cc0d1155825279fca8cd0673",
                 "shasum": ""
             },
             "require": {
@@ -3145,7 +3145,7 @@
                 "psr6"
             ],
             "support": {
-                "source": "https://github.com/symfony/cache/tree/v7.4.12"
+                "source": "https://github.com/symfony/cache/tree/v7.4.13"
             },
             "funding": [
                 {
@@ -3165,7 +3165,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-05-20T07:20:23+00:00"
+            "time": "2026-05-24T08:43:14+00:00"
         },
         {
             "name": "symfony/cache-contracts",
@@ -3406,16 +3406,16 @@
         },
         {
             "name": "symfony/console",
-            "version": "v7.4.11",
+            "version": "v7.4.13",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/console.git",
-                "reference": "ed0107e43ab452aa77ae99e005b95e56b556e075"
+                "reference": "85095d2573eaefaf35e40b9513a9bf09f72cd217"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/console/zipball/ed0107e43ab452aa77ae99e005b95e56b556e075",
-                "reference": "ed0107e43ab452aa77ae99e005b95e56b556e075",
+                "url": "https://api.github.com/repos/symfony/console/zipball/85095d2573eaefaf35e40b9513a9bf09f72cd217",
+                "reference": "85095d2573eaefaf35e40b9513a9bf09f72cd217",
                 "shasum": ""
             },
             "require": {
@@ -3480,7 +3480,7 @@
                 "terminal"
             ],
             "support": {
-                "source": "https://github.com/symfony/console/tree/v7.4.11"
+                "source": "https://github.com/symfony/console/tree/v7.4.13"
             },
             "funding": [
                 {
@@ -3500,7 +3500,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-05-13T12:04:42+00:00"
+            "time": "2026-05-24T08:56:14+00:00"
         },
         {
             "name": "symfony/deprecation-contracts",
@@ -3892,16 +3892,16 @@
         },
         {
             "name": "symfony/http-foundation",
-            "version": "v7.4.8",
+            "version": "v7.4.13",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/http-foundation.git",
-                "reference": "9381209597ec66c25be154cbf2289076e64d1eab"
+                "reference": "bc354f47c62301e990b7874fa662326368508e2c"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/http-foundation/zipball/9381209597ec66c25be154cbf2289076e64d1eab",
-                "reference": "9381209597ec66c25be154cbf2289076e64d1eab",
+                "url": "https://api.github.com/repos/symfony/http-foundation/zipball/bc354f47c62301e990b7874fa662326368508e2c",
+                "reference": "bc354f47c62301e990b7874fa662326368508e2c",
                 "shasum": ""
             },
             "require": {
@@ -3950,7 +3950,7 @@
             "description": "Defines an object-oriented layer for the HTTP specification",
             "homepage": "https://symfony.com",
             "support": {
-                "source": "https://github.com/symfony/http-foundation/tree/v7.4.8"
+                "source": "https://github.com/symfony/http-foundation/tree/v7.4.13"
             },
             "funding": [
                 {
@@ -3970,20 +3970,20 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-03-24T13:12:05+00:00"
+            "time": "2026-05-24T11:20:33+00:00"
         },
         {
             "name": "symfony/http-kernel",
-            "version": "v7.4.12",
+            "version": "v7.4.13",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/http-kernel.git",
-                "reference": "7922b53e70d2ba2027af8bb6a59d91eb3541ea4d"
+                "reference": "9df847980c436451f4f51d1284491bb4356dd989"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/http-kernel/zipball/7922b53e70d2ba2027af8bb6a59d91eb3541ea4d",
-                "reference": "7922b53e70d2ba2027af8bb6a59d91eb3541ea4d",
+                "url": "https://api.github.com/repos/symfony/http-kernel/zipball/9df847980c436451f4f51d1284491bb4356dd989",
+                "reference": "9df847980c436451f4f51d1284491bb4356dd989",
                 "shasum": ""
             },
             "require": {
@@ -4069,7 +4069,7 @@
             "description": "Provides a structured process for converting a Request into a Response",
             "homepage": "https://symfony.com",
             "support": {
-                "source": "https://github.com/symfony/http-kernel/tree/v7.4.12"
+                "source": "https://github.com/symfony/http-kernel/tree/v7.4.13"
             },
             "funding": [
                 {
@@ -4089,7 +4089,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-05-20T09:27:11+00:00"
+            "time": "2026-05-27T08:31:43+00:00"
         },
         {
             "name": "symfony/messenger",
@@ -4838,16 +4838,16 @@
         },
         {
             "name": "symfony/routing",
-            "version": "v7.4.12",
+            "version": "v7.4.13",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/routing.git",
-                "reference": "3b04a5ec4887a8135a12ebf0f4cbc5b8fc8ee204"
+                "reference": "3a162171bb008e5e0f15dce6581373a4c0e8390d"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/routing/zipball/3b04a5ec4887a8135a12ebf0f4cbc5b8fc8ee204",
-                "reference": "3b04a5ec4887a8135a12ebf0f4cbc5b8fc8ee204",
+                "url": "https://api.github.com/repos/symfony/routing/zipball/3a162171bb008e5e0f15dce6581373a4c0e8390d",
+                "reference": "3a162171bb008e5e0f15dce6581373a4c0e8390d",
                 "shasum": ""
             },
             "require": {
@@ -4899,7 +4899,7 @@
                 "url"
             ],
             "support": {
-                "source": "https://github.com/symfony/routing/tree/v7.4.12"
+                "source": "https://github.com/symfony/routing/tree/v7.4.13"
             },
             "funding": [
                 {
@@ -4919,7 +4919,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-05-20T07:20:23+00:00"
+            "time": "2026-05-24T11:20:33+00:00"
         },
         {
             "name": "symfony/service-contracts",
@@ -5010,16 +5010,16 @@
         },
         {
             "name": "symfony/string",
-            "version": "v7.4.11",
+            "version": "v7.4.13",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/string.git",
-                "reference": "965f7306a43383d02c6aca1e3f3bd2f0ea5dee15"
+                "reference": "961683010db3b27ec6ebcd7308e6e1ee8fa7ffde"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/string/zipball/965f7306a43383d02c6aca1e3f3bd2f0ea5dee15",
-                "reference": "965f7306a43383d02c6aca1e3f3bd2f0ea5dee15",
+                "url": "https://api.github.com/repos/symfony/string/zipball/961683010db3b27ec6ebcd7308e6e1ee8fa7ffde",
+                "reference": "961683010db3b27ec6ebcd7308e6e1ee8fa7ffde",
                 "shasum": ""
             },
             "require": {
@@ -5077,7 +5077,7 @@
                 "utf8"
             ],
             "support": {
-                "source": "https://github.com/symfony/string/tree/v7.4.11"
+                "source": "https://github.com/symfony/string/tree/v7.4.13"
             },
             "funding": [
                 {
@@ -5097,7 +5097,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-05-13T12:04:42+00:00"
+            "time": "2026-05-23T15:23:29+00:00"
         },
         {
             "name": "symfony/translation",
@@ -5451,16 +5451,16 @@
         },
         {
             "name": "symfony/yaml",
-            "version": "v7.4.12",
+            "version": "v7.4.13",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/yaml.git",
-                "reference": "8b6952b56ca6417f25f7a65758cadd0ce02edc51"
+                "reference": "a7ec3b1156faf8815db7683ec7c1e7338e6f977c"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/yaml/zipball/8b6952b56ca6417f25f7a65758cadd0ce02edc51",
-                "reference": "8b6952b56ca6417f25f7a65758cadd0ce02edc51",
+                "url": "https://api.github.com/repos/symfony/yaml/zipball/a7ec3b1156faf8815db7683ec7c1e7338e6f977c",
+                "reference": "a7ec3b1156faf8815db7683ec7c1e7338e6f977c",
                 "shasum": ""
             },
             "require": {
@@ -5503,7 +5503,7 @@
             "description": "Loads and dumps YAML files",
             "homepage": "https://symfony.com",
             "support": {
-                "source": "https://github.com/symfony/yaml/tree/v7.4.12"
+                "source": "https://github.com/symfony/yaml/tree/v7.4.13"
             },
             "funding": [
                 {
@@ -5523,7 +5523,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-05-20T07:20:23+00:00"
+            "time": "2026-05-25T06:06:12+00:00"
         }
     ],
     "packages-dev": [
@@ -6730,7 +6730,6 @@
                     "type": "github"
                 }
             ],
-            "abandoned": true,
             "time": "2020-10-26T13:08:54+00:00"
         },
         {
@@ -6786,7 +6785,6 @@
                     "type": "github"
                 }
             ],
-            "abandoned": true,
             "time": "2020-09-28T05:30:19+00:00"
         },
         {
@@ -7922,16 +7920,16 @@
         },
         {
             "name": "symfony/process",
-            "version": "v7.4.11",
+            "version": "v7.4.13",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/process.git",
-                "reference": "d9593c9efa40499eb078b81144de42cbc28a31f0"
+                "reference": "f5804be144caceb570f6747519999636b664f24c"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/process/zipball/d9593c9efa40499eb078b81144de42cbc28a31f0",
-                "reference": "d9593c9efa40499eb078b81144de42cbc28a31f0",
+                "url": "https://api.github.com/repos/symfony/process/zipball/f5804be144caceb570f6747519999636b664f24c",
+                "reference": "f5804be144caceb570f6747519999636b664f24c",
                 "shasum": ""
             },
             "require": {
@@ -7963,7 +7961,7 @@
             "description": "Executes commands in sub-processes",
             "homepage": "https://symfony.com",
             "support": {
-                "source": "https://github.com/symfony/process/tree/v7.4.11"
+                "source": "https://github.com/symfony/process/tree/v7.4.13"
             },
             "funding": [
                 {
@@ -7983,7 +7981,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-05-11T16:55:21+00:00"
+            "time": "2026-05-23T16:05:06+00:00"
         },
         {
             "name": "theseer/tokenizer",
