@@ -45,9 +45,10 @@
     use Services\Aggregation\Stages\LegacyAggregateSelectStage;
     use stdClass;
     use Traits\OptimizedAggregationHelpersTrait;
-    use Services\Aggregation\Strategies\WeightedMetricStrategy;
-    use Services\Aggregation\Strategies\SocialOrganicStrategy;
     use Services\Aggregation\Strategies\MarketingHierarchyStrategy;
+    use Services\Aggregation\Strategies\SocialOrganicStrategy;
+    use Services\Aggregation\Strategies\UniversalSqlStrategy;
+    use Services\Aggregation\Strategies\WeightedMetricStrategy;
 
     class BaseRepository extends EntityRepository
     {
@@ -405,6 +406,7 @@
                 new WeightedMetricStrategy(),
                 new SocialOrganicStrategy(),
                 new MarketingHierarchyStrategy(),
+                new UniversalSqlStrategy(),
             ];
 
             $candidateKeys = $plan->getCandidateOptimizedStrategies();
