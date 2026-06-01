@@ -65,6 +65,9 @@ if [[ "$INSTANCE_NAME" != *"master"* ]] || [[ "$INSTANCE_TYPE" == "waiting-maste
     # We use Throwable to catch fatal errors as well.
     CHECK_CMD="require 'app/bootstrap.php'; try { \Helpers\Helpers::getManager()->getConnection()->executeQuery('SELECT 1 FROM jobs LIMIT 1'); echo 'READY'; } catch (\Throwable \$e) { echo 'NOT_READY: ' . \$e->getMessage(); }"
     
+    RETRY_COUNT=0
+    MAX_RETRIES=30
+    
     while true; do
         CHECK_RESULT=$(php -r "$CHECK_CMD" 2>&1) || true
         if [[ "$CHECK_RESULT" == *"READY"* ]]; then
