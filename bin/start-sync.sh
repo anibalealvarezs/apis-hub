@@ -15,8 +15,8 @@ DEPLOYMENT_NAME=$(grep -E '^DEPLOYMENT_NAME=' "$ENV_FILE" | cut -d '=' -f 2 | tr
 
 # ── Step 0: Ensure Master and Infra are Running ──────────────────────────────
 echo -e "\033[1;33m🔄 [0/4] Ensuring infrastructure is running...\033[0m"
-# Start db, redis, and master detached. This builds images if missing and won't hang over SSH.
-MSYS_NO_PATHCONV=1 docker compose --env-file "$ENV_FILE" up -d redis db master || true
+# Start db, redis, and master detached. Redirect output to prevent SSH from hanging on background FDs.
+MSYS_NO_PATHCONV=1 docker compose --env-file "$ENV_FILE" up -d redis db master > /dev/null 2>&1 || true
 
 # ── Step 1: Refresh Instances ──────────────────────────────────────────
 echo -e "\033[1;33m🔄 [1/4] Refreshing instances from config...\033[0m"
@@ -41,10 +41,8 @@ fi
 echo -e "\033[1;33m🚀 [4/4] Scaling and starting containers (No Downtime)...\033[0m"
 WORKER_SERVICES=$(docker compose --env-file "$ENV_FILE" config --services | grep '^worker-tier-' | tr '\r\n' ' ' || true)
 if [ -n "$WORKER_SERVICES" ]; then
-    # Pass the list of worker services without quotes so it expands to multiple arguments
-    # We explicitly use --force-recreate so the containers receive SIGTERM, safely return their jobs,
-    # and reboot with a completely fresh PHP state, guaranteeing the new instances.yaml is loaded.
-    docker compose --env-file "$ENV_FILE" up -d --force-recreate --remove-orphans --no-deps $WORKER_SERVICES
+    # pass the list of worker services without quotes so it expands to multiple arguments
+    docker compose --env-file "$ENV_FILE" up -d --force-recreate --remove-orphans --no-deps $WORKER_SERVICES > /dev/null 2>&1
 else
     echo -e "\033[1;33m⚠️ No worker-tier services found in manifest. Skipping up.\033[0m"
 fi
