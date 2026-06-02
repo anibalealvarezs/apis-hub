@@ -49,7 +49,9 @@ echo -e "\033[1;33m🚀 [4/4] Scaling and starting containers (No Downtime)...\0
 WORKER_SERVICES=$(docker compose --env-file "$ENV_FILE" config --services | grep '^worker-tier-' || true)
 if [ -n "$WORKER_SERVICES" ]; then
     # Pass the list of worker services without quotes so it expands to multiple arguments
-    docker compose --env-file "$ENV_FILE" up -d --remove-orphans --no-deps $WORKER_SERVICES
+    # We explicitly use --force-recreate so the containers receive SIGTERM, safely return their jobs,
+    # and reboot with a completely fresh PHP state, guaranteeing the new instances.yaml is loaded.
+    docker compose --env-file "$ENV_FILE" up -d --force-recreate --remove-orphans --no-deps $WORKER_SERVICES
 else
     echo -e "\033[1;33m⚠️ No worker-tier services found in manifest. Skipping up.\033[0m"
 fi

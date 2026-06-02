@@ -37,6 +37,7 @@ use Enums\JobStatus;
         private EntityManager $em;
         private LoggerInterface $logger;
         private bool $shouldShutdown = false;
+        private ?int $currentJobId = null;
 
         /**
          * @throws ConfigurationException
@@ -57,10 +58,22 @@ use Enums\JobStatus;
 
         public function handleSignal(int $signal, int|false $previousExitCode = 0): int|false
         {
-            $this->logger->info("Received termination signal ($signal). Graceful shutdown initiated.");
+            $this->logger->info("Received termination signal ($signal). Instant graceful shutdown initiated.");
             $this->shouldShutdown = true;
 
-            return false; // Return false to continue normal execution and let the loop exit gracefully
+            if ($this->currentJobId) {
+                try {
+                    Helpers::reconnectIfNeeded($this->em);
+                    $jobRepo = $this->em->getRepository(Job::class);
+                    $jobRepo->update($this->currentJobId, (object)['status' => JobStatus::scheduled->value]);
+                    $this->logger->info("Job {$this->currentJobId} safely returned to scheduled state. Exiting immediately.");
+                } catch (\Exception $e) {
+                    $this->logger->error("Failed to return job to scheduled state during shutdown: " . $e->getMessage());
+                }
+                exit(0); // Instantly exit, dropping container gracefully in < 1s
+            }
+
+            return false; // Return false to continue normal execution if no job is active
         }
 
         protected function configure(): void
@@ -222,6 +235,8 @@ use Enums\JobStatus;
                 if (!$job) {
                     break;
                 }
+
+                $this->currentJobId = $job->getId();
 
                 $payload = $job->getPayload() ?? [];
                 $params = $payload['params'] ?? [];
@@ -446,6 +461,11 @@ use Enums\JobStatus;
                 }
 
                 $this->em->clear();
+                $this->currentJobId = null;
+
+                if ($this->shouldShutdown) {
+                    break;
+                }
             } while ($progressMade);
 
             if (Helpers::isDebug()) {
