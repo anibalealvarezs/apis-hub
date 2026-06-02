@@ -16,13 +16,13 @@ DEPLOYMENT_NAME=$(grep -E '^DEPLOYMENT_NAME=' "$ENV_FILE" | cut -d '=' -f 2 | tr
 # ── Step 1: Refresh Instances ──────────────────────────────────────────
 echo -e "\033[1;33m🔄 [1/4] Refreshing instances from config...\033[0m"
 docker exec "${DEPLOYMENT_NAME}-master" php bin/cli.php app:refresh-instances || \
-MSYS_NO_PATHCONV=1 docker compose --env-file "$ENV_FILE" run --rm master php bin/cli.php app:refresh-instances || \
+MSYS_NO_PATHCONV=1 docker compose --env-file "$ENV_FILE" run -T --rm master php bin/cli.php app:refresh-instances || \
 { command -v php >/dev/null 2>&1 && php bin/cli.php app:refresh-instances || { echo -e "\033[1;31m⚠️ Refresh instances failed via docker and php-cli is not available locally. Aborting.\033[0m" >&2; exit 1; }; }
 
 # ── Step 2: Rebuild Manifest ───────────────────────────────────────────
 echo -e "\033[1;33m📂 [2/4] Building Docker Compose manifest...\033[0m"
 docker exec "${DEPLOYMENT_NAME}-master" php bin/cli.php app:build-deployment || \
-MSYS_NO_PATHCONV=1 docker compose --env-file "$ENV_FILE" run --rm master php bin/cli.php app:build-deployment || \
+MSYS_NO_PATHCONV=1 docker compose --env-file "$ENV_FILE" run -T --rm master php bin/cli.php app:build-deployment || \
 { command -v php >/dev/null 2>&1 && php bin/cli.php app:build-deployment || { echo -e "\033[1;31m⚠️ Build manifest failed via docker and php-cli is not available locally. Aborting.\033[0m" >&2; exit 1; }; }
 
 # ── Step 3: Schedule Jobs ──────────────────────────────────────────────
