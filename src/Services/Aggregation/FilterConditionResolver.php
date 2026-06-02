@@ -11,17 +11,19 @@
          */
         public function resolve(mixed $rawValue): array
         {
-            if (is_object($rawValue)) {
-                $operator = strtolower(trim($rawValue->operator ?? 'eq'));
-                $value = $rawValue->value ?? null;
+            if (is_object($rawValue) || (is_array($rawValue) && isset($rawValue['operator']))) {
+                $op = is_object($rawValue) ? ($rawValue->operator ?? 'eq') : ($rawValue['operator'] ?? 'eq');
+                $val = is_object($rawValue) ? ($rawValue->value ?? null) : ($rawValue['value'] ?? null);
+
+                $operator = strtolower(trim((string)$op));
 
                 return match ($operator) {
-                    'neq', 'not_equal', '!=', 'ne' => ['operator' => 'neq', 'value' => $value],
+                    'neq', 'not_equal', '!=', 'ne' => ['operator' => 'neq', 'value' => $val],
                     'is_null', 'null' => ['operator' => 'is_null', 'value' => null],
                     'is_not_null', 'not_null' => ['operator' => 'is_not_null', 'value' => null],
-                    'in' => ['operator' => 'in', 'value' => is_array($value) ? array_values($value) : [$value]],
-                    'like' => ['operator' => 'like', 'value' => $value],
-                    default => ['operator' => 'eq', 'value' => $value],
+                    'in' => ['operator' => 'in', 'value' => is_array($val) ? array_values($val) : [$val]],
+                    'like' => ['operator' => 'like', 'value' => $val],
+                    default => ['operator' => 'eq', 'value' => $val],
                 };
             }
 
@@ -36,6 +38,10 @@
                 if (str_starts_with($trimmed, '!=')) {
                     return ['operator' => 'neq', 'value' => trim(substr($trimmed, 2))];
                 }
+            }
+
+            if (is_array($rawValue)) {
+                return ['operator' => 'in', 'value' => array_values($rawValue)];
             }
 
             return ['operator' => 'eq', 'value' => $rawValue];

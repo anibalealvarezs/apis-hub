@@ -134,10 +134,14 @@
                     if (isset($map['isJSON']) && $map['isJSON']) {
                         $jsonPath = $map['jsonPath'] ?? 'name';
                         $sqlField = $isPostgres ? "$alias.data->>'$jsonPath'" : "JSON_UNQUOTE(JSON_EXTRACT($alias.data, '$.$jsonPath'))";
+                        $quotedFieldId = $quoteChar.$field.'_id'.$quoteChar;
 
                         $selectFields[] = "COALESCE($sqlField, 'N/A') AS $quotedField";
+                        $selectFields[] = "mc.{$map['fk']} AS $quotedFieldId";
                         $groupByFields[] = $sqlField;
+                        $groupByFields[] = "mc.{$map['fk']}";
                         $orderMap[$field] = $sqlField;
+                        $orderMap[$field.'_id'] = "mc.{$map['fk']}";
                     } elseif (!empty($map['isAttribute'])) {
                         $sqlField = "$alias.{$map['field']}";
                         $selectFields[] = "COALESCE(CAST($sqlField AS $castType), 'N/A') AS $quotedField";
@@ -180,22 +184,38 @@
                 if (isset($relationMap[$key])) {
                     $whereClauses[] = $this->buildFilterClause("mc.{$relationMap[$key]['fk']}", $condition, $paramName);
                     if ($condition['value'] !== null) {
-                        $sqlParams[$paramName] = $this->formatFilterValue($condition['value']);
+                        if ($condition['operator'] === 'in' && is_array($condition['value'])) {
+                            foreach ($condition['value'] as $i => $v) {
+                                $sqlParams["{$paramName}_{$i}"] = $this->formatFilterValue($v);
+                            }
+                        } else {
+                            $sqlParams[$paramName] = $this->formatFilterValue($condition['value']);
+                        }
                     }
                     continue;
                 }
 
                 if ($key === 'channel') {
-                    $channelId = $condition['value'];
-                    if (is_scalar($channelId) && !ctype_digit((string)$channelId)) {
-                        $ch = Channel::tryFromName((string)$channelId);
-                        if ($ch) $channelId = $ch->getId();
+                    $channelIds = is_array($condition['value']) ? $condition['value'] : [$condition['value']];
+                    foreach ($channelIds as &$channelId) {
+                        if (is_scalar($channelId) && !ctype_digit((string)$channelId)) {
+                            $ch = Channel::tryFromName((string)$channelId);
+                            if ($ch) $channelId = $ch->getId();
+                        }
                     }
-                    $condition['value'] = $channelId;
+                    unset($channelId);
+
+                    $condition['value'] = is_array($condition['value']) ? $channelIds : $channelIds[0];
                     
                     $whereClauses[] = $this->buildFilterClause('mc.channel', $condition, $paramName);
                     if ($condition['value'] !== null) {
-                        $sqlParams[$paramName] = (int)$channelId;
+                        if ($condition['operator'] === 'in' && is_array($condition['value'])) {
+                            foreach ($condition['value'] as $i => $v) {
+                                $sqlParams["{$paramName}_{$i}"] = (int)$v;
+                            }
+                        } else {
+                            $sqlParams[$paramName] = (int)$condition['value'];
+                        }
                     }
                     continue;
                 }
@@ -218,7 +238,13 @@
 
                     $whereClauses[] = $this->buildFilterClause("dv_$dimAlias.value", $condition, $paramName);
                     if ($condition['value'] !== null) {
-                        $sqlParams[$paramName] = $this->formatFilterValue($condition['value']);
+                        if ($condition['operator'] === 'in' && is_array($condition['value'])) {
+                            foreach ($condition['value'] as $i => $v) {
+                                $sqlParams["{$paramName}_{$i}"] = $this->formatFilterValue($v);
+                            }
+                        } else {
+                            $sqlParams[$paramName] = $this->formatFilterValue($condition['value']);
+                        }
                     }
                     continue;
                 }
@@ -333,6 +359,14 @@
         
         private function buildFilterClause(string $col, array $condition, string $alias): string
         {
+            if ($condition['operator'] === 'in' && is_array($condition['value'])) {
+                $placeholders = [];
+                foreach (array_keys($condition['value']) as $i) {
+                    $placeholders[] = ":{$alias}_{$i}";
+                }
+                return "$col IN (" . implode(', ', $placeholders) . ")";
+            }
+
             return match ($condition['operator']) {
                 'neq'         => "$col <> :$alias",
                 'is_null'     => "$col IS NULL",
