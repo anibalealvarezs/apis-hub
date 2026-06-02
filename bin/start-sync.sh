@@ -24,9 +24,9 @@ docker exec "${DEPLOYMENT_NAME}-master" php bin/cli.php app:refresh-instances ||
 { command -v php >/dev/null 2>&1 && php bin/cli.php app:refresh-instances || { echo -e "\033[1;31m⚠️ Refresh instances failed via docker and php-cli is not available locally. Aborting.\033[0m" >&2; exit 1; }; }
 
 # ── Step 2: Rebuild Manifest ───────────────────────────────────────────
-echo -e "\033[1;33m📂 [2/4] Building Docker Compose manifest...\033[0m"
-docker exec "${DEPLOYMENT_NAME}-master" php bin/cli.php app:build-deployment || \
-{ command -v php >/dev/null 2>&1 && php bin/cli.php app:build-deployment || { echo -e "\033[1;31m⚠️ Build manifest failed via docker and php-cli is not available locally. Aborting.\033[0m" >&2; exit 1; }; }
+echo -e "\033[1;33m🔄 [2/4] Building Docker Compose manifest...\033[0m"
+docker exec "${DEPLOYMENT_NAME}-master" php bin/build-deployment.php || \
+{ command -v php >/dev/null 2>&1 && php bin/build-deployment.php || { echo -e "\033[1;31m⚠️ Build manifest failed via docker and php-cli is not available locally. Aborting.\033[0m" >&2; exit 1; }; }
 
 # ── Step 3: Schedule Jobs ──────────────────────────────────────────────
 echo -e "\033[1;33m📅 [3/4] Scheduling initial sync jobs...\033[0m"
