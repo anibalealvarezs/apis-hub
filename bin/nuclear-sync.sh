@@ -14,7 +14,7 @@ if [ "$1" ]; then
 fi
 
 # Get dynamically defined worker services from docker-compose.yml
-WORKERS=$(docker compose config --services | grep "worker-tier-" | tr '\n' ' ')
+WORKERS=$(docker compose config --services | grep "worker-tier-" | tr '\r\n' ' ' || true)
 
 if [ -z "$WORKERS" ]; then
     echo "No worker tiers found in configuration. Cannot restart workers."
