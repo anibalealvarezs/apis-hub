@@ -300,7 +300,7 @@ class ChanneledCrudController extends BaseController
             if ($hasBodyFilters) {
                 $count = $repository->countElements(filters: $params['filters']);
             } else {
-                $cacheKey = 'channeled_count_'.$entity.'_'.$channel->value.'_'.md5(serialize($params['filters']));
+                $cacheKey = 'channeled_count_'.$entity.'_'.$channel->value.'_'.md5(serialize($params));
 
                 $count = $this->cacheService->get(
                     key: $cacheKey,
@@ -366,7 +366,7 @@ class ChanneledCrudController extends BaseController
             if ($hasBodyFilters) {
                 $data = $repository->readMultiple(...$params)->toArray();
             } else {
-                $cacheKey = 'channeled_list_'.$entity.'_'.$channel->value.'_'.md5(serialize($params['filters']))
+                $cacheKey = 'channeled_list_'.$entity.'_'.$channel->value.'_'.md5(serialize($params))
                     .($rawData ? '_raw' : '')
                     .($hideFields ? '_'.implode('_', $hideFields) : '');
 
