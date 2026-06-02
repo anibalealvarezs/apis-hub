@@ -182,7 +182,15 @@
                 }
 
                 if (isset($relationMap[$key])) {
-                    $whereClauses[] = $this->buildFilterClause("mc.{$relationMap[$key]['fk']}", $condition, $paramName);
+                    $relationKey = $key;
+                } elseif (str_ends_with($key, '_id') && isset($relationMap[substr($key, 0, -3)])) {
+                    $relationKey = substr($key, 0, -3);
+                } else {
+                    $relationKey = null;
+                }
+
+                if ($relationKey !== null) {
+                    $whereClauses[] = $this->buildFilterClause("mc.{$relationMap[$relationKey]['fk']}", $condition, $paramName);
                     if ($condition['value'] !== null) {
                         if ($condition['operator'] === 'in' && is_array($condition['value'])) {
                             foreach ($condition['value'] as $i => $v) {
