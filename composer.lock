@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "d248f8cb9a63bf7f638253ab362bb409",
+    "content-hash": "2853e6361a4359c4c44f54805529efd1",
     "packages": [
         {
             "name": "anibalealvarezs/amazon-api",
@@ -265,13 +265,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/facebook-graph-api.git",
-                "reference": "264c16980628db46031983e1ef9c20ff4c3e04aa"
+                "reference": "d190941b83c86959f2a61f236c6d988e44ef0ad8"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/facebook-graph-api/anibalealvarezs-facebook-graph-api-264c16980628db46031983e1ef9c20ff4c3e04aa-zip-650c74.zip",
-                "reference": "264c16980628db46031983e1ef9c20ff4c3e04aa",
-                "shasum": "733cb9f44a691ade2351c92773372f5e64492dec"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/facebook-graph-api/anibalealvarezs-facebook-graph-api-d190941b83c86959f2a61f236c6d988e44ef0ad8-zip-f5d3d6.zip",
+                "reference": "d190941b83c86959f2a61f236c6d988e44ef0ad8",
+                "shasum": "99f9329c8a02ddf632ac2fb36f0b35f298a1aebd"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "^1.0.0",
@@ -322,7 +322,7 @@
             "support": {
                 "issues": "https://github.com/anibalealvarezs/facebook-graph-api/issues"
             },
-            "time": "2026-05-27T03:13:46+00:00"
+            "time": "2026-06-03T03:12:29+00:00"
         },
         {
             "name": "anibalealvarezs/google-api",
@@ -589,13 +589,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/meta-hub-driver.git",
-                "reference": "3e64463ab2dde7b843c30bcb4a85a69a3dd16f55"
+                "reference": "db2c5a6ef0a2d7442d220dbb8cb7f3fee75a5969"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/meta-hub-driver/anibalealvarezs-meta-hub-driver-3e64463ab2dde7b843c30bcb4a85a69a3dd16f55-zip-2b8381.zip",
-                "reference": "3e64463ab2dde7b843c30bcb4a85a69a3dd16f55",
-                "shasum": "3bd2dc9c3278c668ab2843f338968092befd0b0b"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/meta-hub-driver/anibalealvarezs-meta-hub-driver-db2c5a6ef0a2d7442d220dbb8cb7f3fee75a5969-zip-a49d97.zip",
+                "reference": "db2c5a6ef0a2d7442d220dbb8cb7f3fee75a5969",
+                "shasum": "506dfd64d296c37e1aa4199de608126fa3279636"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "^1.0.0",
@@ -628,7 +628,7 @@
                 }
             ],
             "description": "APIs-Hub driver for Meta (Facebook & Instagram) integration.",
-            "time": "2026-06-02T20:03:51+00:00"
+            "time": "2026-06-03T03:18:53+00:00"
         },
         {
             "name": "anibalealvarezs/netsuite-api",
