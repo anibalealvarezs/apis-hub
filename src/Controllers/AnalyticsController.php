@@ -23,27 +23,38 @@ class AnalyticsController extends BaseController
         $startTime = microtime(true);
         
         try {
-            $payload = json_decode($request->getContent(), true);
+            $logger->info("1. Getting request content...");
+            $content = $request->getContent();
+            $logger->info("2. JSON decoding payload...");
+            $payload = json_decode($content, true);
 
             if (!isset($payload['ast'])) {
                 $logger->error("Missing AST payload.");
                 return $this->errorResponse('Missing AST payload.', 400);
             }
 
+            $logger->info("3. Initializing AstParser...");
             $tParseStart = microtime(true);
             $parser = new AstParser();
+            
+            $logger->info("4. Parsing AST...");
             $node = $parser->parse($payload['ast']);
             $logger->info("AST parsed in " . round((microtime(true) - $tParseStart) * 1000, 2) . "ms");
             
-            // Use AstDataHydrator to automatically extract required metrics and fetch them
+            $logger->info("5. Initializing AstDataHydrator...");
             $tHydrateStart = microtime(true);
             $hydrator = new \Services\Analytics\VirtualMetricEngine\AstDataHydrator($this->em, $logger);
             $filters = $payload['filters'] ?? [];
+            
+            $logger->info("6. Starting AST Hydration...");
             $metricData = $hydrator->hydrate($node, $filters);
             $logger->info("Total Hydration completed in " . round((microtime(true) - $tHydrateStart) * 1000, 2) . "ms", ['metrics' => $metricData]);
             
+            $logger->info("7. Initializing EvaluationContext...");
             $tEvalStart = microtime(true);
             $context = new EvaluationContext($metricData);
+            
+            $logger->info("8. Evaluating Node...");
             $result = $node->evaluate($context);
             $logger->info("Mathematical evaluation completed in " . round((microtime(true) - $tEvalStart) * 1000, 2) . "ms");
 
