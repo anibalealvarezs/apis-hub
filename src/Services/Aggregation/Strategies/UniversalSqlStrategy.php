@@ -228,6 +228,21 @@
                     continue;
                 }
 
+                if ($key === 'account_type') {
+                    $safeLeftJoin('channeled_accounts', 'ca', 'ca.id = mc.channeled_account_id');
+                    $whereClauses[] = $this->buildFilterClause('LOWER(ca.type)', $condition, $paramName);
+                    if ($condition['value'] !== null) {
+                        if ($condition['operator'] === 'in' && is_array($condition['value'])) {
+                            foreach ($condition['value'] as $i => $v) {
+                                $sqlParams["{$paramName}_{$i}"] = strtolower((string)$v);
+                            }
+                        } else {
+                            $sqlParams[$paramName] = strtolower((string)$condition['value']);
+                        }
+                    }
+                    continue;
+                }
+
                 // Dynamic dimension filter
                 $isStandardRelation = in_array($key, ['account_type', 'metric_date', 'daily', 'weekly', 'monthly', 'quarterly', 'yearly', 'channel'], true)
                                       || isset($relationMap[$key])

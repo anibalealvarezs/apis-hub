@@ -218,8 +218,6 @@
                 $condition = $filterResolver->resolve($filtersArr['page']);
                 $whereClauses[] = $this->buildFilterClause('mc.page_id', $condition, 'pageId');
                 if ($condition['value'] !== null) $sqlParams['pageId'] = (int)$condition['value'];
-            } else {
-                return null;
             }
 
             // Handle Channel
