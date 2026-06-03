@@ -58,8 +58,8 @@ class AstDataHydrator
             // e.g. ['spend' => 'SUM(value) AS spend']
             $aggregations = [];
             foreach ($metricsList as $metric) {
-                // We assume SUM by default for AST hydration, or we could support more complex mappings.
-                $aggregations[$metric] = "SUM(value) AS {$metric}";
+                // We assume SUM by default for AST hydration.
+                $aggregations[$metric] = "SUM(e.value)";
             }
 
             // We default to period=lifetime if not provided, but it should be in filters
