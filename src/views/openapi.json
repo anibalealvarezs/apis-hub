@@ -22,6 +22,11 @@
                 "in": "header",
                 "name": "X-API-Key"
             },
+            "AdminApiKeyAuth": {
+                "type": "apiKey",
+                "in": "header",
+                "name": "X-Admin-API-Key"
+            },
             "BearerAuth": {
                 "type": "http",
                 "scheme": "bearer"
@@ -580,7 +585,12 @@
                     "500": {
                         "description": "Python Analytics Engine Communication Error"
                     }
-                }
+                },
+                "security": [
+                    {
+                        "AdminApiKeyAuth": []
+                    }
+                ]
             }
         },
         "/api/config-manager/assets": {
