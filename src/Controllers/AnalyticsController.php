@@ -62,7 +62,8 @@ class AnalyticsController extends BaseController
             if (isset($payload['calculate_regression']) && $payload['calculate_regression']) {
                 $tPythonStart = microtime(true);
                 $apiKey = $payload['admin_api_key'] ?? null;
-                $result = $this->forwardToPythonEngine($result, 'api/v1/stats/regression', $apiKey);
+                $engineHost = $payload['analytics_engine_host'] ?? null;
+                $result = $this->forwardToPythonEngine($result, 'api/v1/stats/regression', $engineHost, $apiKey);
                 $logger->info("Python engine request completed in " . round((microtime(true) - $tPythonStart) * 1000, 2) . "ms");
             }
 
@@ -81,12 +82,10 @@ class AnalyticsController extends BaseController
         }
     }
 
-    /**
-     * Internal method to forward complex math to the Python FastAPI container.
-     */
-    protected function forwardToPythonEngine(array $data, string $endpoint, ?string $apiKey = null): array
+    protected function forwardToPythonEngine(array $data, string $endpoint, ?string $host = null, ?string $apiKey = null): array
     {
-        $host = $_ENV['ANALYTICS_ENGINE_HOST'] ?? 'http://analytics-engine:8050/';
+        // Enforce agnostic architecture: strictly rely on payload injection or the default cloud SaaS
+        $host = $host ?? 'https://analytics.apis-hub.cloud/';
         $apiKey = $apiKey ?? $_ENV['ANALYTICS_API_KEY'] ?? 'dev_secret_key';
         
         // Instantiate the analytics-api client using this dynamic key and host
