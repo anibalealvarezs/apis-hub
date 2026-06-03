@@ -1,12 +1,34 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request, Depends, Security
+from fastapi.security.api_key import APIKeyHeader
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 import numpy as np
 import pandas as pd
 from scipy.stats import pearsonr
 from sklearn.linear_model import LinearRegression
+import os
 
 app = FastAPI(title="APIs Hub Analytics Engine", version="1.0.0")
+
+# Setup Rate Limiter
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Setup Authentication
+API_KEY_NAME = "X-Admin-API-Key"
+API_KEY = os.environ.get("ADMIN_API_KEY", "dev_secret_key")
+api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
+
+def get_api_key(api_key_header: str = Security(api_key_header)):
+    if api_key_header == API_KEY:
+        return api_key_header
+    raise HTTPException(
+        status_code=403, detail="Could not validate API KEY"
+    )
 
 class TimeSeriesData(BaseModel):
     dates: List[str]
@@ -24,12 +46,12 @@ class RegressionRequest(BaseModel):
 def health_check():
     return {"status": "ok", "service": "analytics-engine"}
 
-@app.post("/api/v1/stats/correlation")
-def calculate_correlation(payload: CorrelationRequest):
+@app.post("/api/v1/stats/correlation", dependencies=[Depends(get_api_key)])
+@limiter.limit("5/minute", exempt_when=lambda: True) # Example: Bypass rate limit logic can go here if we dynamically check keys
+def calculate_correlation(request: Request, payload: CorrelationRequest):
     """
     Calculates the Pearson correlation coefficient between two time series.
     """
-    # Align data by date
     df_x = pd.DataFrame({"date": payload.series_x.dates, "x": payload.series_x.values})
     df_y = pd.DataFrame({"date": payload.series_y.dates, "y": payload.series_y.values})
     
@@ -46,22 +68,20 @@ def calculate_correlation(payload: CorrelationRequest):
         "data_points": len(df)
     }
 
-@app.post("/api/v1/stats/regression")
-def calculate_regression(payload: RegressionRequest):
+@app.post("/api/v1/stats/regression", dependencies=[Depends(get_api_key)])
+@limiter.limit("5/minute") 
+def calculate_regression(request: Request, payload: RegressionRequest):
     """
     Performs multiple linear regression.
     """
     dfs = []
-    # Build dataframe for dependent variable
     df_y = pd.DataFrame({"date": payload.dependent_var.dates, "y": payload.dependent_var.values})
     dfs.append(df_y)
     
-    # Build dataframes for independent variables
     for var_name, ts_data in payload.independent_vars.items():
         df_x = pd.DataFrame({"date": ts_data.dates, var_name: ts_data.values})
         dfs.append(df_x)
         
-    # Merge all on date
     from functools import reduce
     df = reduce(lambda left, right: pd.merge(left, right, on="date", how="inner"), dfs).dropna()
     
