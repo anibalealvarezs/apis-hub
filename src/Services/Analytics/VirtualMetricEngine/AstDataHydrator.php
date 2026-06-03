@@ -51,7 +51,8 @@ class AstDataHydrator
 
         foreach ($channelMetrics as $channel => $metricsList) {
             if ($channel !== 'global') {
-                $filterObj->channel = $channel;
+                $channelEntity = $this->em->getRepository(\Entities\Analytics\Channel::class)->findOneBy(['name' => $channel]);
+                $filterObj->channel = $channelEntity ? $channelEntity->getId() : 0;
             }
             
             // Build the aggregations array for the AggregationPlanner
