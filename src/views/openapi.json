@@ -1,475 +1,908 @@
 {
-  "openapi": "3.0.0",
-  "info": {
-    "title": "APIs Hub API",
-    "description": "A headless data extraction and caching engine tailored for Analytics and E-commerce integrations.",
-    "version": "1.0.0",
-    "contact": {
-      "name": "Aníbal Álvarez",
-      "email": "anibalealvarezs@gmail.com"
-    }
-  },
-  "servers": [
-    {
-      "url": "/",
-      "description": "Local server"
-    }
-  ],
-  "components": {
-    "securitySchemes": {
-      "ApiKeyAuth": {
-        "type": "apiKey",
-        "in": "header",
-        "name": "X-API-Key"
-      },
-      "BearerAuth": {
-        "type": "http",
-        "scheme": "bearer"
-      }
+    "openapi": "3.0.0",
+    "info": {
+        "title": "APIs Hub API",
+        "description": "A headless data extraction and caching engine tailored for Analytics and E-commerce integrations.",
+        "version": "1.0.0",
+        "contact": {
+            "name": "An\u00edbal \u00c1lvarez",
+            "email": "anibalealvarezs@gmail.com"
+        }
     },
-    "schemas": {
-      "FilterObject": {
-        "type": "object",
-        "description": "A set of key-value pairs where keys are entity fields and values are the filter criteria.",
-        "example": {
-          "status": "active",
-          "category": "electronics"
+    "servers": [
+        {
+            "url": "/",
+            "description": "Local server"
         }
-      },
-      "AggregationRequest": {
-        "type": "object",
-        "required": ["aggregations"],
-        "properties": {
-          "aggregations": {
-            "type": "object",
-            "description": "Mapping of resulting aliases to DQL aggregate functions (SUM, AVG, COUNT, MIN, MAX).",
-            "example": {
-              "total_sales": "SUM(e.price)",
-              "avg_rating": "AVG(e.rating)"
+    ],
+    "components": {
+        "securitySchemes": {
+            "ApiKeyAuth": {
+                "type": "apiKey",
+                "in": "header",
+                "name": "X-API-Key"
+            },
+            "BearerAuth": {
+                "type": "http",
+                "scheme": "bearer"
             }
-          },
-          "groupBy": {
-            "type": "array",
-            "items": { "type": "string" },
-            "description": "Fields to group the aggregation results by.",
-            "example": ["brand", "model"]
-          },
-          "filters": {
-            "$ref": "#/components/schemas/FilterObject"
-          }
-        }
-      },
-      "CacheRequest": {
-        "type": "object",
-        "properties": {
-          "filters": {
-            "$ref": "#/components/schemas/FilterObject"
-          },
-          "startDate": {
-            "type": "string",
-            "format": "date",
-            "description": "Start date for data extraction (YYYY-MM-DD).",
-            "example": "2024-01-01"
-          },
-          "endDate": {
-            "type": "string",
-            "format": "date",
-            "description": "End date for data extraction (YYYY-MM-DD).",
-            "example": "2024-12-31"
-          }
-        }
-      }
-    }
-  },
-  "security": [
-    {
-      "ApiKeyAuth": []
-    },
-    {
-      "BearerAuth": []
-    }
-  ],
-  "paths": {
-    "/cache/{channel}/{entity}": {
-      "post": {
-        "summary": "Schedule async extraction jobs",
-        "description": "Triggers a background job to pull data from a third-party API.",
-        "tags": ["Cache"],
-        "parameters": [
-          {
-            "name": "channel",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "string" },
-            "description": "Integration channel"
-          },
-          {
-            "name": "entity",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "string" },
-            "description": "Data entity (e.g., products, metric)"
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CacheRequest"
-              }
-            }
-          }
         },
-        "responses": {
-          "200": { "description": "Success" }
-        }
-      }
-    },
-    "/cache/interrupt": {
-      "post": {
-        "summary": "Interrupt running jobs",
-        "tags": ["Cache"],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
+        "schemas": {
+            "FilterObject": {
                 "type": "object",
-                "properties": {
-                  "channel": { "type": "string" },
-                  "entity": { "type": "string" }
+                "description": "A set of key-value pairs where keys are entity fields and values are the filter criteria.",
+                "example": {
+                    "status": "active",
+                    "category": "electronics"
                 }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": { "description": "Success" }
-        }
-      }
-    },
-    "/entity/{entity}": {
-      "get": {
-        "summary": "List entities",
-        "description": "Retrieve a list of records. Supports filtering via Query Parameters or JSON Body.",
-        "tags": ["CRUD"],
-        "parameters": [
-          {
-            "name": "entity",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "string" }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "default": 10,
-              "enum": [10]
             },
-            "description": "Number of records to return. Fixed to 10 in the documentation UI for stability. In production, this can be increased up to 50,000."
-          },
-          {
-            "name": "pagination",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "default": 0
-            },
-            "description": "Page offset (0-indexed). Use this to browse the dataset while the limit is fixed."
-          }
-        ],
-        "responses": {
-          "200": { "description": "Success" }
-        }
-      }
-    },
-    "/entity/{entity}/{id}": {
-      "get": {
-        "summary": "Read entity by ID",
-        "tags": ["CRUD"],
-        "parameters": [
-          {
-            "name": "entity",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "string" }
-          },
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "integer" }
-          }
-        ],
-        "responses": {
-          "200": { "description": "Success" }
-        }
-      }
-    },
-    "/entity/{entity}/count": {
-      "get": {
-        "summary": "Count entities",
-        "tags": ["CRUD"],
-        "parameters": [
-          {
-            "name": "entity",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "string" }
-          }
-        ],
-        "responses": {
-          "200": { "description": "Success" }
-        }
-      }
-    },
-    "/entity/{entity}/aggregate": {
-      "post": {
-        "summary": "Aggregate entity data",
-        "description": "Performs aggregations (SUM, AVG, etc.) on the dataset.",
-        "tags": ["CRUD"],
-        "parameters": [
-          {
-            "name": "entity",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "string" }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AggregationRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": { "description": "Success" }
-        }
-      }
-    },
-    "/{channel}/{entity}/count": {
-      "get": {
-        "summary": "Count channeled entities",
-        "tags": ["Channeled CRUD"],
-        "parameters": [
-          {
-            "name": "channel",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "string" }
-          },
-          {
-            "name": "entity",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "string" }
-          }
-        ],
-        "responses": {
-          "200": { "description": "Success" }
-        }
-      }
-    },
-    "/{channel}/{entity}/aggregate": {
-      "post": {
-        "summary": "Aggregate channeled entity data",
-        "tags": ["Channeled CRUD"],
-        "parameters": [
-          {
-            "name": "channel",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "string" }
-          },
-          {
-            "name": "entity",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "string" }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AggregationRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": { "description": "Success" }
-        }
-      }
-    },
-    "/{channel}/{entity}/{id}": {
-      "get": {
-        "summary": "Read channeled entity by ID",
-        "tags": ["Channeled CRUD"],
-        "parameters": [
-          {
-            "name": "channel",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "string" }
-          },
-          {
-            "name": "entity",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "string" }
-          },
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "integer" }
-          }
-        ],
-        "responses": {
-          "200": { "description": "Success" }
-        }
-      }
-    },
-    "/{channel}/{entity}": {
-      "get": {
-        "summary": "List channeled entities",
-        "tags": ["Channeled CRUD"],
-        "parameters": [
-          {
-            "name": "channel",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "string" }
-          },
-          {
-            "name": "entity",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "string" }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "default": 10,
-              "enum": [10]
-            },
-            "description": "Number of records to return. Fixed to 10 in the documentation UI for stability. In production, this can be increased up to 50,000."
-          },
-          {
-            "name": "pagination",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "default": 0
-            },
-            "description": "Page offset (0-indexed). Use this to browse the dataset while the limit is fixed."
-          }
-        ],
-        "responses": {
-          "200": { "description": "Success" }
-        }
-      }
-    },
-    "/api/monitoring/data": {
-      "get": {
-        "summary": "Get infrastructure monitoring data",
-        "description": "Returns a list of containers (instances) with their configuration and recent job history.",
-        "tags": ["Monitoring"],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "instances": {
-                      "type": "array",
-                      "items": { "type": "object" }
+            "AggregationRequest": {
+                "type": "object",
+                "required": [
+                    "aggregations"
+                ],
+                "properties": {
+                    "aggregations": {
+                        "type": "object",
+                        "description": "Mapping of resulting aliases to DQL aggregate functions (SUM, AVG, COUNT, MIN, MAX).",
+                        "example": {
+                            "total_sales": "SUM(e.price)",
+                            "avg_rating": "AVG(e.rating)"
+                        }
+                    },
+                    "groupBy": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Fields to group the aggregation results by.",
+                        "example": [
+                            "brand",
+                            "model"
+                        ]
+                    },
+                    "filters": {
+                        "$ref": "#/components/schemas/FilterObject"
                     }
-                  }
                 }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/monitoring/jobs/action": {
-      "post": {
-        "summary": "Execute job administrative actions",
-        "description": "Supports actions like 'process' (run now), 'retry' (re-schedule), and 'cancel' (discard).",
-        "tags": ["Monitoring"],
-        "requestBody": {
-          "content": {
-            "application/x-www-form-urlencoded": {
-              "schema": {
-                "type": "object",
-                "required": ["id", "action"],
-                "properties": {
-                  "id": {
-                    "type": "integer",
-                    "description": "numerical Job ID"
-                  },
-                  "action": {
-                    "type": "string",
-                    "enum": ["process", "retry", "cancel"]
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": { "description": "Success" },
-          "400": { "description": "Invalid parameters" }
-        }
-      }
-    },
-    "/api/compute-kpi": {
-      "post": {
-        "summary": "Calculate custom cross-platform KPI",
-        "description": "Evaluates a dynamic AST containing metric operations, forwarding statistical calculations to the Python Analytics Engine when required.",
-        "tags": ["Analytics"],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
+            },
+            "CacheRequest": {
                 "type": "object",
                 "properties": {
-                  "ast": {
-                    "type": "object",
-                    "description": "The dynamic mathematical Abstract Syntax Tree mapping out the cross-metric KPI."
-                  },
-                  "calculate_regression": {
-                    "type": "boolean",
-                    "description": "Flag to pass the aggregated results through the Python Engine's Linear Regression algorithm."
-                  },
-                  "admin_api_key": {
-                    "type": "string",
-                    "description": "The internal admin key passed by Facade to authorize Python Engine matrix processing."
-                  }
+                    "filters": {
+                        "$ref": "#/components/schemas/FilterObject"
+                    },
+                    "startDate": {
+                        "type": "string",
+                        "format": "date",
+                        "description": "Start date for data extraction (YYYY-MM-DD).",
+                        "example": "2024-01-01"
+                    },
+                    "endDate": {
+                        "type": "string",
+                        "format": "date",
+                        "description": "End date for data extraction (YYYY-MM-DD).",
+                        "example": "2024-12-31"
+                    }
                 }
-              }
             }
-          }
-        },
-        "responses": {
-          "200": { "description": "Calculation completed successfully" },
-          "400": { "description": "Invalid AST payload" },
-          "500": { "description": "Python Analytics Engine Communication Error" }
         }
-      }
+    },
+    "security": [
+        {
+            "ApiKeyAuth": []
+        },
+        {
+            "BearerAuth": []
+        }
+    ],
+    "paths": {
+        "/cache/{channel}/{entity}": {
+            "post": {
+                "summary": "Schedule async extraction jobs",
+                "description": "Triggers a background job to pull data from a third-party API.",
+                "tags": [
+                    "Cache"
+                ],
+                "parameters": [
+                    {
+                        "name": "channel",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Integration channel"
+                    },
+                    {
+                        "name": "entity",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Data entity (e.g., products, metric)"
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CacheRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    }
+                }
+            }
+        },
+        "/cache/interrupt": {
+            "post": {
+                "summary": "Interrupt running jobs",
+                "tags": [
+                    "Cache"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "channel": {
+                                        "type": "string"
+                                    },
+                                    "entity": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    }
+                }
+            }
+        },
+        "/entity/{entity}": {
+            "get": {
+                "summary": "List entities",
+                "description": "Retrieve a list of records. Supports filtering via Query Parameters or JSON Body.",
+                "tags": [
+                    "CRUD"
+                ],
+                "parameters": [
+                    {
+                        "name": "entity",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 10,
+                            "enum": [
+                                10
+                            ]
+                        },
+                        "description": "Number of records to return. Fixed to 10 in the documentation UI for stability. In production, this can be increased up to 50,000."
+                    },
+                    {
+                        "name": "pagination",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 0
+                        },
+                        "description": "Page offset (0-indexed). Use this to browse the dataset while the limit is fixed."
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    }
+                }
+            }
+        },
+        "/entity/{entity}/{id}": {
+            "get": {
+                "summary": "Read entity by ID",
+                "tags": [
+                    "CRUD"
+                ],
+                "parameters": [
+                    {
+                        "name": "entity",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    }
+                }
+            }
+        },
+        "/entity/{entity}/count": {
+            "get": {
+                "summary": "Count entities",
+                "tags": [
+                    "CRUD"
+                ],
+                "parameters": [
+                    {
+                        "name": "entity",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    }
+                }
+            }
+        },
+        "/entity/{entity}/aggregate": {
+            "post": {
+                "summary": "Aggregate entity data",
+                "description": "Performs aggregations (SUM, AVG, etc.) on the dataset.",
+                "tags": [
+                    "CRUD"
+                ],
+                "parameters": [
+                    {
+                        "name": "entity",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AggregationRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    }
+                }
+            }
+        },
+        "/{channel}/{entity}/count": {
+            "get": {
+                "summary": "Count channeled entities",
+                "tags": [
+                    "Channeled CRUD"
+                ],
+                "parameters": [
+                    {
+                        "name": "channel",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "entity",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    }
+                }
+            }
+        },
+        "/{channel}/{entity}/aggregate": {
+            "post": {
+                "summary": "Aggregate channeled entity data",
+                "tags": [
+                    "Channeled CRUD"
+                ],
+                "parameters": [
+                    {
+                        "name": "channel",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "entity",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AggregationRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    }
+                }
+            }
+        },
+        "/{channel}/{entity}/{id}": {
+            "get": {
+                "summary": "Read channeled entity by ID",
+                "tags": [
+                    "Channeled CRUD"
+                ],
+                "parameters": [
+                    {
+                        "name": "channel",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "entity",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    }
+                }
+            }
+        },
+        "/{channel}/{entity}": {
+            "get": {
+                "summary": "List channeled entities",
+                "tags": [
+                    "Channeled CRUD"
+                ],
+                "parameters": [
+                    {
+                        "name": "channel",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "entity",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 10,
+                            "enum": [
+                                10
+                            ]
+                        },
+                        "description": "Number of records to return. Fixed to 10 in the documentation UI for stability. In production, this can be increased up to 50,000."
+                    },
+                    {
+                        "name": "pagination",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 0
+                        },
+                        "description": "Page offset (0-indexed). Use this to browse the dataset while the limit is fixed."
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    }
+                }
+            }
+        },
+        "/api/monitoring/data": {
+            "get": {
+                "summary": "Get infrastructure monitoring data",
+                "description": "Returns a list of containers (instances) with their configuration and recent job history.",
+                "tags": [
+                    "Monitoring"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "instances": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/monitoring/jobs/action": {
+            "post": {
+                "summary": "Execute job administrative actions",
+                "description": "Supports actions like 'process' (run now), 'retry' (re-schedule), and 'cancel' (discard).",
+                "tags": [
+                    "Monitoring"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "id",
+                                    "action"
+                                ],
+                                "properties": {
+                                    "id": {
+                                        "type": "integer",
+                                        "description": "numerical Job ID"
+                                    },
+                                    "action": {
+                                        "type": "string",
+                                        "enum": [
+                                            "process",
+                                            "retry",
+                                            "cancel"
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    },
+                    "400": {
+                        "description": "Invalid parameters"
+                    }
+                }
+            }
+        },
+        "/api/compute-kpi": {
+            "post": {
+                "summary": "Calculate custom cross-platform KPI",
+                "description": "Evaluates a dynamic AST containing metric operations, forwarding statistical calculations to the Python Analytics Engine when required.",
+                "tags": [
+                    "Analytics"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "ast": {
+                                        "type": "object",
+                                        "description": "The dynamic mathematical Abstract Syntax Tree mapping out the cross-metric KPI."
+                                    },
+                                    "calculate_regression": {
+                                        "type": "boolean",
+                                        "description": "Flag to pass the aggregated results through the Python Engine's Linear Regression algorithm."
+                                    },
+                                    "admin_api_key": {
+                                        "type": "string",
+                                        "description": "The internal admin key passed by Facade to authorize Python Engine matrix processing."
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Calculation completed successfully"
+                    },
+                    "400": {
+                        "description": "Invalid AST payload"
+                    },
+                    "500": {
+                        "description": "Python Analytics Engine Communication Error"
+                    }
+                }
+            }
+        },
+        "/api/config-manager/assets": {
+            "get": {
+                "summary": "Fetch configuration and assets",
+                "tags": [
+                    "Configuration"
+                ],
+                "parameters": [
+                    {
+                        "name": "type",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "refresh",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "0",
+                                "1"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    }
+                }
+            }
+        },
+        "/api/config-manager/update": {
+            "post": {
+                "summary": "Update node configuration",
+                "tags": [
+                    "Configuration"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "type": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    }
+                }
+            }
+        },
+        "/api/config-manager/validate-tokens": {
+            "post": {
+                "summary": "Validate API tokens",
+                "tags": [
+                    "Configuration"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "type": {
+                                        "type": "string",
+                                        "default": "all"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    }
+                }
+            }
+        },
+        "/api/config-manager/export": {
+            "post": {
+                "summary": "Export configurations",
+                "tags": [
+                    "Configuration"
+                ],
+                "parameters": [
+                    {
+                        "name": "X-Config-Token",
+                        "in": "header",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    }
+                }
+            }
+        },
+        "/api/config-manager/flush-cache": {
+            "post": {
+                "summary": "Flush channel aggregation cache",
+                "tags": [
+                    "Configuration"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "channel": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    }
+                }
+            }
+        },
+        "/api/management/update-credentials": {
+            "post": {
+                "summary": "Update node .env credentials",
+                "tags": [
+                    "Management"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "additionalProperties": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    }
+                }
+            }
+        },
+        "/api/management/redeploy": {
+            "post": {
+                "summary": "Trigger a full redeployment",
+                "tags": [
+                    "Management"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    }
+                }
+            }
+        },
+        "/api/management/start-sync": {
+            "post": {
+                "summary": "Trigger a lightweight sync",
+                "tags": [
+                    "Management"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    }
+                }
+            }
+        },
+        "/api/management/reset-channel": {
+            "post": {
+                "summary": "Perform atomic cleanup for a channel",
+                "tags": [
+                    "Management"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "channel": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    }
+                }
+            }
+        },
+        "/api/management/status": {
+            "get": {
+                "summary": "Get infrastructure status",
+                "tags": [
+                    "Management"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    }
+                }
+            }
+        },
+        "/api/management/container/action": {
+            "post": {
+                "summary": "Perform docker container action",
+                "tags": [
+                    "Management"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "name": {
+                                        "type": "string"
+                                    },
+                                    "action": {
+                                        "type": "string",
+                                        "enum": [
+                                            "start",
+                                            "stop",
+                                            "restart"
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    }
+                }
+            }
+        },
+        "/api/heartbeat": {
+            "get": {
+                "summary": "Node heartbeat and health report",
+                "tags": [
+                    "Management"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    }
+                }
+            }
+        },
+        "/api/monitoring/logs": {
+            "get": {
+                "summary": "Get specific log file tail",
+                "tags": [
+                    "Monitoring"
+                ],
+                "parameters": [
+                    {
+                        "name": "file",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "default": "jobs.log"
+                        }
+                    },
+                    {
+                        "name": "lines",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 500
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    }
+                }
+            }
+        },
+        "/api/monitoring/logs/list": {
+            "get": {
+                "summary": "List available log files",
+                "tags": [
+                    "Monitoring"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    }
+                }
+            }
+        }
     }
-  }
 }
