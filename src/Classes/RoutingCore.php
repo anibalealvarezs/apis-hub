@@ -69,6 +69,13 @@
                 $controller = $attributes['controller'];
                 $isHtml = $attributes['html'] ?? false;
 
+                // Feature: Disable non-api (HTML) routes if configured
+                $enableNonApi = filter_var(getenv('ENABLE_NON_API_ROUTES') ?: 'false', FILTER_VALIDATE_BOOLEAN);
+                if (!$enableNonApi && $isHtml) {
+                    $html = file_get_contents(__DIR__.'/../views/404.html');
+                    return new Response($html, Response::HTTP_NOT_FOUND, ['Content-Type' => 'text/html']);
+                }
+
                 // Security Check
                 // API calls are always protected. HTML pages let the frontend Ghost Guard handle it.
                 if (!$isPublic && !$isHtml && !$this->isAuthorized($request, $isAdminOnly)) {
