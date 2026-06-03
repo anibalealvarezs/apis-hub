@@ -18,6 +18,16 @@ class OperatorNode implements AstNodeInterface
         }
     }
 
+    public function getLeft(): AstNodeInterface
+    {
+        return $this->left;
+    }
+
+    public function getRight(): AstNodeInterface
+    {
+        return $this->right;
+    }
+
     public function evaluate(EvaluationContext $context): float|int|array
     {
         $leftVal = $this->left->evaluate($context);

@@ -63,7 +63,34 @@ class AnalyticsController extends BaseController
                 $tPythonStart = microtime(true);
                 $apiKey = $payload['admin_api_key'] ?? null;
                 $engineHost = $payload['analytics_engine_host'] ?? null;
-                $result = $this->forwardToPythonEngine($result, 'api/v1/stats/regression', $engineHost, $apiKey);
+                
+                // For regression, we treat the AST operator as a relationship bridge (Left = Dependent Y, Right = Independent X)
+                if ($node instanceof \Services\Analytics\VirtualMetricEngine\Nodes\OperatorNode) {
+                    $ySeries = $node->getLeft()->evaluate($context);
+                    $xSeries = $node->getRight()->evaluate($context);
+                    
+                    if (is_array($ySeries) && is_array($xSeries)) {
+                        $dates = array_intersect(array_keys($ySeries), array_keys($xSeries));
+                        $yValues = [];
+                        $xValues = [];
+                        foreach ($dates as $date) {
+                            $yValues[] = (float)$ySeries[$date];
+                            $xValues[] = (float)$xSeries[$date];
+                        }
+                        
+                        $regressionPayload = [
+                            'dependent_var' => $yValues,
+                            'independent_vars' => [$xValues]
+                        ];
+                        
+                        $result = $this->forwardToPythonEngine($regressionPayload, 'api/v1/stats/regression', $engineHost, $apiKey);
+                    } else {
+                        throw new Exception("Regression requires time-series array evaluation. Pass groupBy: ['metricDate'] in filters.");
+                    }
+                } else {
+                    throw new Exception("Regression requires an Operator node at the root to split dependent and independent variables.");
+                }
+
                 $logger->info("Python engine request completed in " . round((microtime(true) - $tPythonStart) * 1000, 2) . "ms");
             }
 
