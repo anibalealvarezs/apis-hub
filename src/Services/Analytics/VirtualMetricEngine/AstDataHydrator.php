@@ -67,7 +67,7 @@ class AstDataHydrator
             // We default to period=lifetime if not provided, but it should be in filters
             $dbStart = microtime(true);
             if ($this->logger) {
-                $this->logger->debug("Starting DB aggregation for channel: {$channel}", ['aggregations' => $aggregations]);
+                $this->logger->info("Starting DB aggregation for channel: {$channel}", ['aggregations' => $aggregations]);
             }
             $result = $executor->executeAggregate(
                 repository: $metricRepository,
@@ -77,7 +77,7 @@ class AstDataHydrator
             );
             $dbTime = round((microtime(true) - $dbStart) * 1000, 2);
             if ($this->logger) {
-                $this->logger->debug("Finished DB aggregation for channel: {$channel} in {$dbTime}ms");
+                $this->logger->info("Finished DB aggregation for channel: {$channel} in {$dbTime}ms");
             }
 
             // Fetch rows
