@@ -35,9 +35,10 @@ class AnalyticsController extends BaseController
             $context = new EvaluationContext($metricData);
             $result = $node->evaluate($context);
 
-            // Forward to Python Analytics Engine if requested (Scaffolding)
+            // Forward to Python Analytics Engine if requested
             if (isset($payload['calculate_regression']) && $payload['calculate_regression']) {
-                $result = $this->forwardToPythonEngine($result);
+                $apiKey = $payload['admin_api_key'] ?? null;
+                $result = $this->forwardToPythonEngine($result, '/api/v1/stats/regression', $apiKey);
             }
 
             return new JsonResponse([
@@ -53,14 +54,14 @@ class AnalyticsController extends BaseController
     /**
      * Internal method to forward complex math to the Python FastAPI container.
      */
-    protected function forwardToPythonEngine(array $data, string $endpoint): array
+    protected function forwardToPythonEngine(array $data, string $endpoint, ?string $apiKey = null): array
     {
         $api = new \Anibalealvarezs\AnalyticsApi\AnalyticsApi();
         // The host should ideally come from environment variables.
-        $api->setHost($_ENV['ANALYTICS_ENGINE_HOST'] ?? 'http://analytics-engine:8001');
+        $api->setHost($_ENV['ANALYTICS_ENGINE_HOST'] ?? 'http://analytics-engine:8050');
         
-        // Setup Auth Key
-        $apiKey = $_ENV['ANALYTICS_API_KEY'] ?? 'dev_secret_key';
+        // Setup Auth Key (Fallback to env if not provided dynamically by Facade)
+        $apiKey = $apiKey ?? $_ENV['ANALYTICS_API_KEY'] ?? 'dev_secret_key';
         
         // Make the HTTP request
         // We use the basic post method from ApiClient skeleton
