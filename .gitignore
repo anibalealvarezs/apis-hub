@@ -132,3 +132,5 @@ scratch/update_openapi.php
 .env-mabe
 
 .env-mabe-prueba
+
+test_db.php

@@ -48,45 +48,57 @@ class AstDataHydrator
         $executor = new AggregationExecutor();
         
         $metricData = [];
+        $startDate = $filters['startDate'] ?? null;
+        $endDate = $filters['endDate'] ?? null;
+        // Unset period and dates so they aren't parsed as direct column filters
+        unset($filters['startDate'], $filters['endDate'], $filters['period']);
+        
         $filterObj = (object) $filters;
 
         foreach ($channelMetrics as $channel => $metricsList) {
+            $channelFilter = clone $filterObj;
             if ($channel !== 'global') {
                 $channelEntity = $this->em->getRepository(\Entities\Analytics\Channel::class)->findOneBy(['name' => $channel]);
-                $filterObj->channel = $channelEntity ? $channelEntity->getId() : 0;
+                $channelFilter->channel = $channelEntity ? $channelEntity->getId() : 0;
             }
             
+            $aggregations = [];
             foreach ($metricsList as $metric) {
-                // Clone the base filters for this specific metric
-                $metricFilters = clone $filterObj;
-                $metricFilters->name = $metric;
-                
-                $aggregations = [$metric => "SUM(value)"];
+                // Use canonical metric mappings instead of hardcoded raw SQL, mirroring the frontend
+                $aggregations[$metric] = $metric;
+            }
 
-                $dbStart = microtime(true);
-                if ($this->logger) {
-                    $this->logger->info("Starting DB aggregation for channel: {$channel}, metric: {$metric}");
-                }
-                
-                $result = $executor->executeAggregate(
-                    repository: $metricRepository,
-                    aggregations: $aggregations,
-                    groupBy: [], // For scalar evaluation
-                    filters: $metricFilters
-                );
-                
-                $dbTime = round((microtime(true) - $dbStart) * 1000, 2);
-                if ($this->logger) {
-                    $this->logger->info("Finished DB aggregation for channel: {$channel}, metric: {$metric} in {$dbTime}ms");
-                }
+            $dbStart = microtime(true);
+            if ($this->logger) {
+                $this->logger->info("Starting DB aggregation for channel: {$channel}", ['aggregations' => $aggregations]);
+            }
+            
+            $result = $executor->executeAggregate(
+                repository: $metricRepository,
+                aggregations: $aggregations,
+                groupBy: [], // For scalar evaluation
+                filters: $channelFilter,
+                startDate: $startDate,
+                endDate: $endDate
+            );
+            
+            $dbTime = round((microtime(true) - $dbStart) * 1000, 2);
+            if ($this->logger) {
+                $this->logger->info("Finished DB aggregation for channel: {$channel} in {$dbTime}ms");
+            }
 
-                // Fetch rows
-                $rows = $result->getRows();
-                $key = $channel !== 'global' ? "{$channel}.{$metric}" : $metric;
-                
-                if (!empty($rows) && isset($rows[0])) {
-                    $metricData[$key] = $rows[0][$metric] ?? 0;
-                } else {
+            // Fetch rows
+            $rows = $result->getRows();
+            if (!empty($rows) && isset($rows[0])) {
+                $row = $rows[0];
+                foreach ($metricsList as $metric) {
+                    $key = $channel !== 'global' ? "{$channel}.{$metric}" : $metric;
+                    // Support legacy aliasing if the planner alters the key slightly
+                    $metricData[$key] = $row[$metric] ?? 0;
+                }
+            } else {
+                foreach ($metricsList as $metric) {
+                    $key = $channel !== 'global' ? "{$channel}.{$metric}" : $metric;
                     $metricData[$key] = 0;
                 }
             }
