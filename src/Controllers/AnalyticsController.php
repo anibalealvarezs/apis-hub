@@ -18,29 +18,44 @@ class AnalyticsController extends BaseController
      */
     public function computeKpi(Request $request): JsonResponse
     {
+        $logger = \Helpers\Helpers::setLogger('analytics.log');
+        $logger->info("--- Incoming AST compute request ---");
+        $startTime = microtime(true);
+        
         try {
             $payload = json_decode($request->getContent(), true);
 
             if (!isset($payload['ast'])) {
+                $logger->error("Missing AST payload.");
                 return $this->errorResponse('Missing AST payload.', 400);
             }
 
+            $tParseStart = microtime(true);
             $parser = new AstParser();
             $node = $parser->parse($payload['ast']);
+            $logger->debug("AST parsed in " . round((microtime(true) - $tParseStart) * 1000, 2) . "ms");
             
             // Use AstDataHydrator to automatically extract required metrics and fetch them
-            $hydrator = new \Services\Analytics\VirtualMetricEngine\AstDataHydrator($this->em);
+            $tHydrateStart = microtime(true);
+            $hydrator = new \Services\Analytics\VirtualMetricEngine\AstDataHydrator($this->em, $logger);
             $filters = $payload['filters'] ?? [];
             $metricData = $hydrator->hydrate($node, $filters);
+            $logger->debug("Total Hydration completed in " . round((microtime(true) - $tHydrateStart) * 1000, 2) . "ms", ['metrics' => $metricData]);
             
+            $tEvalStart = microtime(true);
             $context = new EvaluationContext($metricData);
             $result = $node->evaluate($context);
+            $logger->debug("Mathematical evaluation completed in " . round((microtime(true) - $tEvalStart) * 1000, 2) . "ms");
 
             // Forward to Python Analytics Engine if requested
             if (isset($payload['calculate_regression']) && $payload['calculate_regression']) {
+                $tPythonStart = microtime(true);
                 $apiKey = $payload['admin_api_key'] ?? null;
                 $result = $this->forwardToPythonEngine($result, '/api/v1/stats/regression', $apiKey);
+                $logger->debug("Python engine request completed in " . round((microtime(true) - $tPythonStart) * 1000, 2) . "ms");
             }
+
+            $logger->info("Request completed successfully in " . round((microtime(true) - $startTime) * 1000, 2) . "ms");
 
             return new JsonResponse([
                 'success' => true,
@@ -48,6 +63,9 @@ class AnalyticsController extends BaseController
             ]);
 
         } catch (Exception $e) {
+            if (isset($logger)) {
+                $logger->error("Computation error: " . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
+            }
             return $this->errorResponse($e->getMessage(), 500);
         }
     }

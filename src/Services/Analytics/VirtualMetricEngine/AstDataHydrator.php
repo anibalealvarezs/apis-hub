@@ -6,10 +6,11 @@ use Doctrine\ORM\EntityManager;
 use Repositories\MetricRepository;
 use Services\Aggregation\AggregationExecutor;
 use Exceptions\ConfigurationException;
+use Psr\Log\LoggerInterface;
 
 class AstDataHydrator
 {
-    public function __construct(protected EntityManager $em)
+    public function __construct(protected EntityManager $em, protected ?LoggerInterface $logger = null)
     {
     }
 
@@ -64,12 +65,20 @@ class AstDataHydrator
             }
 
             // We default to period=lifetime if not provided, but it should be in filters
+            $dbStart = microtime(true);
+            if ($this->logger) {
+                $this->logger->debug("Starting DB aggregation for channel: {$channel}", ['aggregations' => $aggregations]);
+            }
             $result = $executor->executeAggregate(
                 repository: $metricRepository,
                 aggregations: $aggregations,
                 groupBy: [], // For scalar evaluation
                 filters: $filterObj
             );
+            $dbTime = round((microtime(true) - $dbStart) * 1000, 2);
+            if ($this->logger) {
+                $this->logger->debug("Finished DB aggregation for channel: {$channel} in {$dbTime}ms");
+            }
 
             // Fetch rows
             $rows = $result->getRows();
