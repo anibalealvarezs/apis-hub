@@ -50,8 +50,9 @@ class AstDataHydrator
         $metricData = [];
         $startDate = $filters['startDate'] ?? null;
         $endDate = $filters['endDate'] ?? null;
+        $groupBy = $filters['groupBy'] ?? [];
         // Unset period and dates so they aren't parsed as direct column filters
-        unset($filters['startDate'], $filters['endDate'], $filters['period']);
+        unset($filters['startDate'], $filters['endDate'], $filters['period'], $filters['groupBy']);
         
         $filterObj = (object) $filters;
 
@@ -76,7 +77,7 @@ class AstDataHydrator
             $result = $executor->executeAggregate(
                 repository: $metricRepository,
                 aggregations: $aggregations,
-                groupBy: [], // For scalar evaluation
+                groupBy: $groupBy,
                 filters: $channelFilter,
                 startDate: $startDate,
                 endDate: $endDate
@@ -89,17 +90,23 @@ class AstDataHydrator
 
             // Fetch rows
             $rows = $result->getRows();
-            if (!empty($rows) && isset($rows[0])) {
-                $row = $rows[0];
-                foreach ($metricsList as $metric) {
-                    $key = $channel !== 'global' ? "{$channel}.{$metric}" : $metric;
-                    // Support legacy aliasing if the planner alters the key slightly
-                    $metricData[$key] = $row[$metric] ?? 0;
-                }
-            } else {
-                foreach ($metricsList as $metric) {
-                    $key = $channel !== 'global' ? "{$channel}.{$metric}" : $metric;
-                    $metricData[$key] = 0;
+            $isSeries = in_array('metricDate', $groupBy);
+
+            foreach ($metricsList as $metric) {
+                $key = $channel !== 'global' ? "{$channel}.{$metric}" : $metric;
+                if ($isSeries) {
+                    $seriesData = [];
+                    foreach ($rows as $row) {
+                        $date = $row['metricDate'] ?? $row['date'] ?? 'unknown';
+                        $seriesData[$date] = $row[$metric] ?? 0;
+                    }
+                    $metricData[$key] = $seriesData;
+                } else {
+                    if (!empty($rows) && isset($rows[0])) {
+                        $metricData[$key] = $rows[0][$metric] ?? 0;
+                    } else {
+                        $metricData[$key] = 0;
+                    }
                 }
             }
         }
