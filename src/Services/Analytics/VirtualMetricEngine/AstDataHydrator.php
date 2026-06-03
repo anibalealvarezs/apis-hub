@@ -59,7 +59,7 @@ class AstDataHydrator
             $aggregations = [];
             foreach ($metricsList as $metric) {
                 // We assume SUM by default for AST hydration.
-                $aggregations[$metric] = "SUM(e.value)";
+                $aggregations[$metric] = "SUM(value)";
             }
 
             // We default to period=lifetime if not provided, but it should be in filters
