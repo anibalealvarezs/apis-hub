@@ -57,20 +57,15 @@ class AnalyticsController extends BaseController
      */
     protected function forwardToPythonEngine(array $data, string $endpoint, ?string $apiKey = null): array
     {
-        $api = new \Anibalealvarezs\AnalyticsApi\AnalyticsApi();
-        // The host should ideally come from environment variables.
-        $api->setHost($_ENV['ANALYTICS_ENGINE_HOST'] ?? 'http://analytics-engine:8050');
-        
-        // Setup Auth Key (Fallback to env if not provided dynamically by Facade)
+        $host = $_ENV['ANALYTICS_ENGINE_HOST'] ?? 'http://analytics-engine:8050';
         $apiKey = $apiKey ?? $_ENV['ANALYTICS_API_KEY'] ?? 'dev_secret_key';
         
-        // Make the HTTP request
-        // We use the basic post method from ApiClient skeleton
+        // Instantiate the analytics-api client using this dynamic key and host
+        $api = new \Anibalealvarezs\AnalyticsApi\AnalyticsApi($host, $apiKey);
+        
         try {
+            // The SDK now inherently injects the X-Admin-API-Key based on the constructor
             $response = $api->post($endpoint, [
-                'headers' => [
-                    'X-Admin-API-Key' => $apiKey
-                ],
                 'json' => $data
             ]);
             
