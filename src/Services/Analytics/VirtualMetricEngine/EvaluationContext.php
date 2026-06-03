@@ -20,13 +20,13 @@ class EvaluationContext
     }
 
     /**
-     * Get the time series array for a specific metric.
+     * Get the time series array or scalar value for a specific metric.
      *
      * @param string $metricAlias
-     * @return array<string, float>
+     * @return array|float|int
      */
-    public function getMetricTimeSeries(string $metricAlias): array
+    public function getMetricTimeSeries(string $metricAlias): array|float|int
     {
-        return $this->metricData[$metricAlias] ?? [];
+        return $this->metricData[$metricAlias] ?? 0;
     }
 }

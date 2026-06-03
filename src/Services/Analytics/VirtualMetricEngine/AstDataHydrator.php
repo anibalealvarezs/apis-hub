@@ -56,43 +56,37 @@ class AstDataHydrator
                 $filterObj->channel = $channelEntity ? $channelEntity->getId() : 0;
             }
             
-            // Build the aggregations array for the AggregationPlanner
-            // e.g. ['spend' => 'SUM(value) AS spend']
-            $aggregations = [];
             foreach ($metricsList as $metric) {
-                // We assume SUM by default for AST hydration.
-                $aggregations[$metric] = "SUM(value)";
-            }
+                // Clone the base filters for this specific metric
+                $metricFilters = clone $filterObj;
+                $metricFilters->name = $metric;
+                
+                $aggregations = [$metric => "SUM(value)"];
 
-            // We default to period=lifetime if not provided, but it should be in filters
-            $dbStart = microtime(true);
-            if ($this->logger) {
-                $this->logger->info("Starting DB aggregation for channel: {$channel}", ['aggregations' => $aggregations]);
-            }
-            $result = $executor->executeAggregate(
-                repository: $metricRepository,
-                aggregations: $aggregations,
-                groupBy: [], // For scalar evaluation
-                filters: $filterObj
-            );
-            $dbTime = round((microtime(true) - $dbStart) * 1000, 2);
-            if ($this->logger) {
-                $this->logger->info("Finished DB aggregation for channel: {$channel} in {$dbTime}ms");
-            }
-
-            // Fetch rows
-            $rows = $result->getRows();
-            if (!empty($rows) && isset($rows[0])) {
-                $row = $rows[0];
-                foreach ($metricsList as $metric) {
-                    $key = $channel !== 'global' ? "{$channel}.{$metric}" : $metric;
-                    // If the metric was aggregated, it will be in the row
-                    $metricData[$key] = $row[$metric] ?? 0;
+                $dbStart = microtime(true);
+                if ($this->logger) {
+                    $this->logger->info("Starting DB aggregation for channel: {$channel}, metric: {$metric}");
                 }
-            } else {
-                // Fallback if no data found
-                foreach ($metricsList as $metric) {
-                    $key = $channel !== 'global' ? "{$channel}.{$metric}" : $metric;
+                
+                $result = $executor->executeAggregate(
+                    repository: $metricRepository,
+                    aggregations: $aggregations,
+                    groupBy: [], // For scalar evaluation
+                    filters: $metricFilters
+                );
+                
+                $dbTime = round((microtime(true) - $dbStart) * 1000, 2);
+                if ($this->logger) {
+                    $this->logger->info("Finished DB aggregation for channel: {$channel}, metric: {$metric} in {$dbTime}ms");
+                }
+
+                // Fetch rows
+                $rows = $result->getRows();
+                $key = $channel !== 'global' ? "{$channel}.{$metric}" : $metric;
+                
+                if (!empty($rows) && isset($rows[0])) {
+                    $metricData[$key] = $rows[0][$metric] ?? 0;
+                } else {
                     $metricData[$key] = 0;
                 }
             }

@@ -73,7 +73,7 @@ class AnalyticsController extends BaseController
                 'data' => $result,
             ]);
 
-        } catch (Exception $e) {
+        } catch (\Throwable $e) {
             if (isset($logger)) {
                 $logger->error("Computation error: " . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
             }
