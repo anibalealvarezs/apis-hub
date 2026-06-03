@@ -93,15 +93,24 @@ class AstDataHydrator
             if ($this->logger) {
                 $this->logger->info("Fetched rows for channel {$channel}", ['rowCount' => count($rows), 'sample' => $rows[0] ?? null]);
             }
-            // Strict temporal grouping via 'daily' flag
-            $isSeries = in_array('daily', $groupBy);
+            $isSeries = false;
+            $temporalField = 'unknown';
+            
+            // AggregationPlanner outputs the date under the literal key of the temporal grouping (e.g. 'daily')
+            foreach (['daily', 'weekly', 'monthly', 'quarterly', 'yearly'] as $tField) {
+                if (in_array($tField, $groupBy)) {
+                    $isSeries = true;
+                    $temporalField = $tField;
+                    break;
+                }
+            }
 
             foreach ($metricsList as $metric) {
                 $key = $channel !== 'global' ? "{$channel}.{$metric}" : $metric;
                 if ($isSeries) {
                     $seriesData = [];
                     foreach ($rows as $row) {
-                        $date = $row['date'] ?? 'unknown';
+                        $date = $row[$temporalField] ?? $row['date'] ?? 'unknown';
                         $seriesData[$date] = $row[$metric] ?? 0;
                     }
                     $metricData[$key] = $seriesData;
