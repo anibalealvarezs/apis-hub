@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "2853e6361a4359c4c44f54805529efd1",
+    "content-hash": "7dba33687323872ebb5506ea229ddf92",
     "packages": [
         {
             "name": "anibalealvarezs/amazon-api",
@@ -103,6 +103,34 @@
             ],
             "description": "Amazon driver for the Hub ecosystem",
             "time": "2026-05-27T12:11:22+00:00"
+        },
+        {
+            "name": "anibalealvarezs/analytics-api",
+            "version": "dev-main",
+            "dist": {
+                "type": "path",
+                "url": "D:/laragon/www/analytics-api",
+                "reference": "5065e29885a9487880539725fb3191a2b547ea61"
+            },
+            "require": {
+                "anibalealvarezs/api-client-skeleton": "^1.0.0"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Anibalealvarezs\\AnalyticsApi\\": "src/"
+                }
+            },
+            "authors": [
+                {
+                    "name": "Aníbal Álvarez",
+                    "email": "anibalealvarezs@gmail.com"
+                }
+            ],
+            "description": "PHP SDK for the APIs Hub Analytics Engine",
+            "transport-options": {
+                "relative": false
+            }
         },
         {
             "name": "anibalealvarezs/api-client-skeleton",
@@ -8090,6 +8118,7 @@
     "aliases": [],
     "minimum-stability": "dev",
     "stability-flags": {
+        "anibalealvarezs/analytics-api": 20,
         "mikey179/vfsstream": 20
     },
     "prefer-stable": true,
