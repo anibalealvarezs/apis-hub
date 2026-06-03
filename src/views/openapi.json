@@ -434,6 +434,42 @@
           "400": { "description": "Invalid parameters" }
         }
       }
+    },
+    "/api/compute-kpi": {
+      "post": {
+        "summary": "Calculate custom cross-platform KPI",
+        "description": "Evaluates a dynamic AST containing metric operations, forwarding statistical calculations to the Python Analytics Engine when required.",
+        "tags": ["Analytics"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "ast": {
+                    "type": "object",
+                    "description": "The dynamic mathematical Abstract Syntax Tree mapping out the cross-metric KPI."
+                  },
+                  "calculate_regression": {
+                    "type": "boolean",
+                    "description": "Flag to pass the aggregated results through the Python Engine's Linear Regression algorithm."
+                  },
+                  "admin_api_key": {
+                    "type": "string",
+                    "description": "The internal admin key passed by Facade to authorize Python Engine matrix processing."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Calculation completed successfully" },
+          "400": { "description": "Invalid AST payload" },
+          "500": { "description": "Python Analytics Engine Communication Error" }
+        }
+      }
     }
   }
 }

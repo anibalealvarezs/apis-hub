@@ -289,6 +289,17 @@
             'html'       => false,
             'admin'      => true
         ],
+        '/api/compute-kpi'                    => [
+            'httpMethod' => 'POST',
+            'callable'   => function (...$args) {
+                $request = $args['request'] ?? Request::createFromGlobals();
+
+                return (new \Controllers\AnalyticsController())->computeKpi($request);
+            },
+            'public'     => false,
+            'html'       => false,
+            'admin'      => true
+        ],
 
         '/api/heartbeat' => [
             'httpMethod' => 'GET',
