@@ -735,7 +735,7 @@
                     return false;
                 }
             } elseif (str_ends_with($accountType, '_page') || str_ends_with($accountType, '_organization')) {
-                if (!is_numeric((string)($filters['page'] ?? null))) {
+                if (!is_numeric((string)($filters['page'] ?? null)) && !is_numeric((string)($filters['channeledAccount'] ?? null))) {
                     return false;
                 }
             } else {

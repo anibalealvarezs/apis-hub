@@ -120,3 +120,9 @@ scratch_test.php
 test_campaigns.php
 
 test_universal.php
+
+test_accounts.php
+
+test_fb_posts.php
+
+test_ig_metrics.php

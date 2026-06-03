@@ -213,11 +213,11 @@
             if (!empty($filtersArr['channeledAccount'])) {
                 $condition = $filterResolver->resolve($filtersArr['channeledAccount']);
                 $whereClauses[] = $this->buildFilterClause('mc.channeled_account_id', $condition, 'channeledAccount');
-                if ($condition['value'] !== null) $sqlParams['channeledAccount'] = (int)$condition['value'];
+                $this->bindFilterParams($sqlParams, 'channeledAccount', $condition);
             } elseif (!empty($filtersArr['page'])) {
                 $condition = $filterResolver->resolve($filtersArr['page']);
                 $whereClauses[] = $this->buildFilterClause('mc.page_id', $condition, 'pageId');
-                if ($condition['value'] !== null) $sqlParams['pageId'] = (int)$condition['value'];
+                $this->bindFilterParams($sqlParams, 'pageId', $condition);
             }
 
             // Handle Channel
@@ -229,7 +229,7 @@
                     if ($ch) $condition['value'] = $ch->getId();
                 }
                 $whereClauses[] = $this->buildFilterClause('mc.channel', $condition, 'channel');
-                if ($condition['value'] !== null) $sqlParams['channel'] = (int)$condition['value'];
+                $this->bindFilterParams($sqlParams, 'channel', $condition);
             }
 
             // Account Type
@@ -335,11 +335,11 @@
             if (!empty($filtersArr['channeledAccount'])) {
                 $condition = $filterResolver->resolve($filtersArr['channeledAccount']);
                 $whereClauses[] = $this->buildFilterClause('mc.channeled_account_id', $condition, 'channeledAccount');
-                if ($condition['value'] !== null) $sqlParams['channeledAccount'] = (int)$condition['value'];
+                $this->bindFilterParams($sqlParams, 'channeledAccount', $condition);
             } elseif (!empty($filtersArr['page'])) {
                 $condition = $filterResolver->resolve($filtersArr['page']);
                 $whereClauses[] = $this->buildFilterClause('mc.page_id', $condition, 'pageId');
-                if ($condition['value'] !== null) $sqlParams['pageId'] = (int)$condition['value'];
+                $this->bindFilterParams($sqlParams, 'pageId', $condition);
             } else {
                 return null;
             }
@@ -352,13 +352,13 @@
                     if ($ch) $condition['value'] = $ch->getId();
                 }
                 $whereClauses[] = $this->buildFilterClause('mc.channel', $condition, 'channel');
-                if ($condition['value'] !== null) $sqlParams['channel'] = (int)$condition['value'];
+                $this->bindFilterParams($sqlParams, 'channel', $condition);
             }
 
             if (isset($filtersArr['post'])) {
                 $condition = $filterResolver->resolve($filtersArr['post']);
                 $whereClauses[] = $this->buildFilterClause('mc.post_id', $condition, 'postId');
-                if ($condition['value'] !== null) $sqlParams['postId'] = (int)$condition['value'];
+                $this->bindFilterParams($sqlParams, 'postId', $condition);
             }
 
             $orderSql = '';
@@ -469,6 +469,14 @@
 
         private function buildFilterClause(string $col, array $condition, string $alias): string
         {
+            if ($condition['operator'] === 'in' && is_array($condition['value'])) {
+                $placeholders = [];
+                foreach (array_keys($condition['value']) as $i) {
+                    $placeholders[] = ":{$alias}_{$i}";
+                }
+                return "$col IN (" . implode(', ', $placeholders) . ")";
+            }
+
             return match ($condition['operator']) {
                 'neq'         => "$col <> :$alias",
                 'is_null'     => "$col IS NULL",
@@ -477,6 +485,19 @@
                 'eq'          => "$col = :$alias",
                 default       => "$col = :$alias",
             };
+        }
+
+        private function bindFilterParams(array &$sqlParams, string $alias, array $condition): void
+        {
+            if ($condition['value'] !== null) {
+                if ($condition['operator'] === 'in' && is_array($condition['value'])) {
+                    foreach ($condition['value'] as $i => $v) {
+                        $sqlParams["{$alias}_{$i}"] = is_numeric($v) ? (int)$v : (string)$v;
+                    }
+                } else {
+                    $sqlParams[$alias] = is_numeric($condition['value']) ? (int)$condition['value'] : (string)$condition['value'];
+                }
+            }
         }
 
         /**
