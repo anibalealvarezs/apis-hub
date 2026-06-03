@@ -74,8 +74,9 @@ class AnalyticsController extends BaseController
                         $yValues = [];
                         $xValues = [];
                         foreach ($dates as $date) {
-                            $yValues[] = (float)$ySeries[$date];
-                            $xValues[] = (float)$xSeries[$date];
+                            // Maintain associative date keys as Pydantic expects Dict[str, float] for Series parsing
+                            $yValues[$date] = (float)$ySeries[$date];
+                            $xValues[$date] = (float)$xSeries[$date];
                         }
                         
                         $regressionPayload = [
