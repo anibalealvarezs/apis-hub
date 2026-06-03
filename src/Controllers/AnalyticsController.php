@@ -73,16 +73,23 @@ class AnalyticsController extends BaseController
                         $dates = array_intersect(array_keys($ySeries), array_keys($xSeries));
                         $yValues = [];
                         $xValues = [];
+                        $finalDates = [];
                         foreach ($dates as $date) {
-                            // Maintain associative date keys as Pydantic expects Dict[str, float] for Series parsing
-                            $yValues[$date] = (float)$ySeries[$date];
-                            $xValues[$date] = (float)$xSeries[$date];
+                            $finalDates[] = $date;
+                            $yValues[] = (float)$ySeries[$date];
+                            $xValues[] = (float)$xSeries[$date];
                         }
                         
                         $regressionPayload = [
-                            'dependent_var' => $yValues,
+                            'dependent_var' => [
+                                'dates' => $finalDates,
+                                'values' => $yValues
+                            ],
                             'independent_vars' => [
-                                'x1' => $xValues
+                                'x1' => [
+                                    'dates' => $finalDates,
+                                    'values' => $xValues
+                                ]
                             ]
                         ];
                         
