@@ -80,7 +80,9 @@ class AnalyticsController extends BaseController
                         
                         $regressionPayload = [
                             'dependent_var' => $yValues,
-                            'independent_vars' => [$xValues]
+                            'independent_vars' => [
+                                'x1' => $xValues
+                            ]
                         ];
                         
                         $result = $this->forwardToPythonEngine($regressionPayload, 'api/v1/stats/regression', $engineHost, $apiKey);
