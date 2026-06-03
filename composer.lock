@@ -110,13 +110,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/analytics-api.git",
-                "reference": "623f8a751ca3b95e5861cc49f37a27967c341b47"
+                "reference": "9e956375486b7a0417888f2b94fd1e8aaa3f96ed"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/analytics-api/anibalealvarezs-analytics-api-623f8a751ca3b95e5861cc49f37a27967c341b47-zip-46a3f2.zip",
-                "reference": "623f8a751ca3b95e5861cc49f37a27967c341b47",
-                "shasum": "2d1e9e68083d1eab101a65578e735c2591bb58ac"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/analytics-api/anibalealvarezs-analytics-api-9e956375486b7a0417888f2b94fd1e8aaa3f96ed-zip-d4f8f6.zip",
+                "reference": "9e956375486b7a0417888f2b94fd1e8aaa3f96ed",
+                "shasum": "3db20b50cd443cd06318108308f7a6f3420ec4a8"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "^1.0.0"
@@ -134,7 +134,7 @@
                 }
             ],
             "description": "PHP SDK for the APIs Hub Analytics Engine",
-            "time": "2026-06-03T15:33:10+00:00"
+            "time": "2026-06-03T22:36:33+00:00"
         },
         {
             "name": "anibalealvarezs/api-client-skeleton",
