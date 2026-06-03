@@ -70,6 +70,9 @@ class AnalyticsController extends BaseController
                     $xSeries = $node->getRight()->evaluate($context);
                     
                     if (is_array($ySeries) && is_array($xSeries)) {
+                        $originalYSize = count($ySeries);
+                        $originalXSize = count($xSeries);
+
                         $dates = array_intersect(array_keys($ySeries), array_keys($xSeries));
                         $yValues = [];
                         $xValues = [];
@@ -87,9 +90,17 @@ class AnalyticsController extends BaseController
                             }
                         }
                         
+                        $finalSize = count($finalDates);
+                        $removedY = $originalYSize - $finalSize;
+                        $removedX = $originalXSize - $finalSize;
+
                         // Regression mathematically requires at least 2 points (preferably more)
-                        if (count($finalDates) < 2) {
-                            throw new Exception("Not enough overlapping non-zero data points for regression. Found: " . count($finalDates));
+                        if ($finalSize < 2) {
+                            throw new Exception(
+                                "Not enough overlapping non-zero data points for regression. Found: {$finalSize}. " .
+                                "Original Dependent (Y) size: {$originalYSize} (Removed: {$removedY}). " .
+                                "Original Independent (X) size: {$originalXSize} (Removed: {$removedX})."
+                            );
                         }
                         
                         $regressionPayload = [
