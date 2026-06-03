@@ -74,10 +74,22 @@ class AnalyticsController extends BaseController
                         $yValues = [];
                         $xValues = [];
                         $finalDates = [];
+                        
                         foreach ($dates as $date) {
-                            $finalDates[] = $date;
-                            $yValues[] = (float)$ySeries[$date];
-                            $xValues[] = (float)$xSeries[$date];
+                            $yVal = (float)$ySeries[$date];
+                            $xVal = (float)$xSeries[$date];
+                            
+                            // Automatically treat the data: only include overlapping dates where both metrics have actual non-zero data
+                            if (!empty($yVal) && !empty($xVal)) {
+                                $finalDates[] = $date;
+                                $yValues[] = $yVal;
+                                $xValues[] = $xVal;
+                            }
+                        }
+                        
+                        // Regression mathematically requires at least 2 points (preferably more)
+                        if (count($finalDates) < 2) {
+                            throw new Exception("Not enough overlapping non-zero data points for regression. Found: " . count($finalDates));
                         }
                         
                         $regressionPayload = [
