@@ -58,29 +58,58 @@ class AnalyticsController extends BaseController
             $result = $node->evaluate($context);
             $logger->info("Mathematical evaluation completed in " . round((microtime(true) - $tEvalStart) * 1000, 2) . "ms");
 
+            // Determine which Python engine statistic is requested
+            $pythonEndpoint = null;
+            $requiresBivariate = false;
+
+            if (!empty($payload['calculate_regression'])) {
+                $pythonEndpoint = 'api/v1/stats/regression';
+                $requiresBivariate = true;
+            } elseif (!empty($payload['calculate_elasticity'])) {
+                $pythonEndpoint = 'api/v1/stats/elasticity';
+                $requiresBivariate = true;
+            } elseif (!empty($payload['calculate_granger'])) {
+                $pythonEndpoint = 'api/v1/stats/granger';
+                $requiresBivariate = true;
+            } elseif (!empty($payload['calculate_autocorrelation'])) {
+                $pythonEndpoint = 'api/v1/stats/autocorrelation';
+            } elseif (!empty($payload['calculate_macd'])) {
+                $pythonEndpoint = 'api/v1/stats/macd';
+            } elseif (!empty($payload['calculate_anomaly'])) {
+                $pythonEndpoint = 'api/v1/stats/anomaly';
+            }
+
             // Forward to Python Analytics Engine if requested
-            if (isset($payload['calculate_regression']) && $payload['calculate_regression']) {
+            if ($pythonEndpoint) {
                 $tPythonStart = microtime(true);
                 $apiKey = $payload['admin_api_key'] ?? null;
                 $engineHost = $payload['analytics_engine_host'] ?? null;
                 
-                // For regression, we treat the AST operator as a relationship bridge (Left = Dependent Y, Right = Independent X)
-                if ($node instanceof \Services\Analytics\VirtualMetricEngine\Nodes\OperatorNode) {
-                    $ySeries = $node->getLeft()->evaluate($context);
-                    $xSeries = $node->getRight()->evaluate($context);
-                    
-                    if (is_array($ySeries) && is_array($xSeries)) {
-                        $originalYSize = count($ySeries);
-                        $originalXSize = count($xSeries);
+                // For bivariate stats (regression, elasticity, granger), we require an AST Operator bridge
+                if ($requiresBivariate) {
+                    if (!$node instanceof \Services\Analytics\VirtualMetricEngine\Nodes\OperatorNode) {
+                        throw new Exception("This statistic requires an Operator node at the root to split dependent and independent variables.");
+                    }
+                    $ySeriesRaw = $node->getLeft()->evaluate($context);
+                    $xSeriesRaw = $node->getRight()->evaluate($context);
+                } else {
+                    // For univariate stats (macd, anomaly, autocorrelation), we just evaluate the root node directly
+                    $ySeriesRaw = $node->evaluate($context);
+                    $xSeriesRaw = $ySeriesRaw; // Dummy clone to pass the alignment loop
+                }
+                
+                if (is_array($ySeriesRaw) && is_array($xSeriesRaw)) {
+                    $originalYSize = count($ySeriesRaw);
+                    $originalXSize = count($xSeriesRaw);
 
-                        $dates = array_intersect(array_keys($ySeries), array_keys($xSeries));
-                        $yValues = [];
-                        $xValues = [];
-                        $finalDates = [];
-                        
-                        foreach ($dates as $date) {
-                            $yVal = (float)$ySeries[$date];
-                            $xVal = (float)$xSeries[$date];
+                    $dates = array_intersect(array_keys($ySeriesRaw), array_keys($xSeriesRaw));
+                    $yValues = [];
+                    $xValues = [];
+                    $finalDates = [];
+                    
+                    foreach ($dates as $date) {
+                        $yVal = (float)$ySeriesRaw[$date];
+                        $xVal = (float)$xSeriesRaw[$date];
                             
                             // Automatically treat the data: only include overlapping dates where both metrics have actual non-zero data
                             if (!empty($yVal) && !empty($xVal)) {
@@ -115,14 +144,15 @@ class AnalyticsController extends BaseController
                                 ]
                             ]
                         ];
-                        
-                        $result = $this->forwardToPythonEngine($regressionPayload, 'api/v1/stats/regression', $engineHost, $apiKey);
+                        if (!$requiresBivariate) {
+                            // Strip dummy independent vars for univariate payloads to keep it clean
+                            $regressionPayload['independent_vars'] = (object)[];
+                        }
+                        $pythonResponse = $this->forwardToPythonEngine($regressionPayload, $pythonEndpoint, $engineHost, $apiKey);
+                        $result = $pythonResponse['data'] ?? $pythonResponse;
                     } else {
-                        throw new Exception("Regression requires time-series array evaluation. Pass groupBy: ['metricDate'] in filters.");
+                        throw new Exception("The mathematical payload requires time-series array evaluation. Pass groupBy: ['daily'] in filters.");
                     }
-                } else {
-                    throw new Exception("Regression requires an Operator node at the root to split dependent and independent variables.");
-                }
 
                 $logger->info("Python engine request completed in " . round((microtime(true) - $tPythonStart) * 1000, 2) . "ms");
             }
