@@ -25,12 +25,13 @@ class AnalyticsController extends BaseController
                 return $this->errorResponse('Missing AST payload.', 400);
             }
 
-            // Note: In Phase 3, we will dynamically fetch these from the DB using AggregationPlanner.
-            // For now, this is the scaffolding structure for the request flow.
-            $metricData = $payload['metricData'] ?? []; 
-            
             $parser = new AstParser();
             $node = $parser->parse($payload['ast']);
+            
+            // Use AstDataHydrator to automatically extract required metrics and fetch them
+            $hydrator = new \Services\Analytics\VirtualMetricEngine\AstDataHydrator($this->em);
+            $filters = $payload['filters'] ?? [];
+            $metricData = $hydrator->hydrate($node, $filters);
             
             $context = new EvaluationContext($metricData);
             $result = $node->evaluate($context);

@@ -15,4 +15,9 @@ class ValueNode implements AstNodeInterface
     {
         return $this->value;
     }
+
+    public function getMetrics(): array
+    {
+        return [];
+    }
 }

@@ -74,4 +74,12 @@ class OperatorNode implements AstNodeInterface
             default => 0,
         };
     }
+
+    public function getMetrics(): array
+    {
+        return array_values(array_unique(array_merge(
+            $this->left->getMetrics(),
+            $this->right->getMetrics()
+        )));
+    }
 }

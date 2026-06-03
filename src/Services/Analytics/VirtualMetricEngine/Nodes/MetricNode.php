@@ -15,4 +15,9 @@ class MetricNode implements AstNodeInterface
     {
         return $context->getMetricTimeSeries($this->metricAlias);
     }
+
+    public function getMetrics(): array
+    {
+        return [$this->metricAlias];
+    }
 }

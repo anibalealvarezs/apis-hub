@@ -15,4 +15,11 @@ interface AstNodeInterface
      * @return float|int|array
      */
     public function evaluate(EvaluationContext $context): float|int|array;
+
+    /**
+     * Extracts all unique metric aliases referenced in this node and its children.
+     *
+     * @return array<int, string>
+     */
+    public function getMetrics(): array;
 }
