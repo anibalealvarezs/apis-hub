@@ -59,28 +59,28 @@ class AnalyticsController extends BaseController
             $logger->info("Mathematical evaluation completed in " . round((microtime(true) - $tEvalStart) * 1000, 2) . "ms");
 
             // Determine which Python engine statistic is requested
-            $pythonEndpoint = null;
+            $sdkMethod = null;
             $requiresBivariate = false;
 
             if (!empty($payload['calculate_regression'])) {
-                $pythonEndpoint = 'api/v1/stats/regression';
+                $sdkMethod = 'calculateRegression';
                 $requiresBivariate = true;
             } elseif (!empty($payload['calculate_elasticity'])) {
-                $pythonEndpoint = 'api/v1/stats/elasticity';
+                $sdkMethod = 'calculateElasticity';
                 $requiresBivariate = true;
             } elseif (!empty($payload['calculate_granger'])) {
-                $pythonEndpoint = 'api/v1/stats/granger';
+                $sdkMethod = 'calculateGranger';
                 $requiresBivariate = true;
             } elseif (!empty($payload['calculate_autocorrelation'])) {
-                $pythonEndpoint = 'api/v1/stats/autocorrelation';
+                $sdkMethod = 'calculateAutocorrelation';
             } elseif (!empty($payload['calculate_macd'])) {
-                $pythonEndpoint = 'api/v1/stats/macd';
+                $sdkMethod = 'calculateMacd';
             } elseif (!empty($payload['calculate_anomaly'])) {
-                $pythonEndpoint = 'api/v1/stats/anomaly';
+                $sdkMethod = 'calculateAnomaly';
             }
 
             // Forward to Python Analytics Engine if requested
-            if ($pythonEndpoint) {
+            if ($sdkMethod) {
                 $tPythonStart = microtime(true);
                 $apiKey = $payload['admin_api_key'] ?? null;
                 $engineHost = $payload['analytics_engine_host'] ?? null;
@@ -148,7 +148,7 @@ class AnalyticsController extends BaseController
                             // Strip dummy independent vars for univariate payloads to keep it clean
                             $regressionPayload['independent_vars'] = (object)[];
                         }
-                        $pythonResponse = $this->forwardToPythonEngine($regressionPayload, $pythonEndpoint, $engineHost, $apiKey);
+                        $pythonResponse = $this->forwardToPythonEngine($regressionPayload, $sdkMethod, $engineHost, $apiKey);
                         $result = $pythonResponse['data'] ?? $pythonResponse;
                     } else {
                         throw new Exception("The mathematical payload requires time-series array evaluation. Pass groupBy: ['daily'] in filters.");
@@ -172,7 +172,7 @@ class AnalyticsController extends BaseController
         }
     }
 
-    protected function forwardToPythonEngine(array $data, string $endpoint, ?string $host = null, ?string $apiKey = null): array
+    protected function forwardToPythonEngine(array $data, string $sdkMethod, ?string $host = null, ?string $apiKey = null): array
     {
         // Enforce agnostic architecture: strictly rely on payload injection or the default cloud SaaS
         $host = $host ?? 'https://analytics.apis-hub.cloud/';
@@ -181,13 +181,15 @@ class AnalyticsController extends BaseController
         // Instantiate the analytics-api client using this dynamic key and host
         $api = new \Anibalealvarezs\AnalyticsApi\AnalyticsApi($host, $apiKey);
         
+        if (!method_exists($api, $sdkMethod)) {
+            throw new \Exception("Analytics Engine SDK Error: Method {$sdkMethod} does not exist.");
+        }
+        
         try {
-            // The SDK now inherently injects the X-Admin-API-Key based on the constructor
-            $response = $api->post($endpoint, [
-                'json' => $data
-            ]);
+            // The SDK inherently injects the API key and routes to the correct endpoint
+            $response = call_user_func([$api, $sdkMethod], $data);
             
-            return json_decode($response->getBody()->getContents(), true) ?? [];
+            return $response;
         } catch (\Exception $e) {
             // Forward the Python engine's HTTP error message if possible
             throw new \Exception("Analytics Engine Error: " . $e->getMessage());
