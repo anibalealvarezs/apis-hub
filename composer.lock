@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "7dba33687323872ebb5506ea229ddf92",
+    "content-hash": "157b68d2267c8debfb0d4bcc0e5ad16b",
     "packages": [
         {
             "name": "anibalealvarezs/amazon-api",
@@ -107,14 +107,21 @@
         {
             "name": "anibalealvarezs/analytics-api",
             "version": "dev-main",
-            "dist": {
-                "type": "path",
-                "url": "D:/laragon/www/analytics-api",
+            "source": {
+                "type": "git",
+                "url": "git@github.com:anibalealvarezs/analytics-api.git",
                 "reference": "5065e29885a9487880539725fb3191a2b547ea61"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/analytics-api/anibalealvarezs-analytics-api-5065e29885a9487880539725fb3191a2b547ea61-zip-7a6550.zip",
+                "reference": "5065e29885a9487880539725fb3191a2b547ea61",
+                "shasum": "f59aef15594fbf05cab68fcd3af39ca2f6f9a394"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "^1.0.0"
             },
+            "default-branch": true,
             "type": "library",
             "autoload": {
                 "psr-4": {
@@ -128,9 +135,7 @@
                 }
             ],
             "description": "PHP SDK for the APIs Hub Analytics Engine",
-            "transport-options": {
-                "relative": false
-            }
+            "time": "2026-06-03T11:54:05+00:00"
         },
         {
             "name": "anibalealvarezs/api-client-skeleton",

@@ -103,10 +103,6 @@
         "mikey179/vfsstream": "2.0.x-dev"
     },
     "repositories": {
-        "anibalealvarezs/analytics-api": {
-            "type": "path",
-            "url": "D:/laragon/www/analytics-api"
-        },
         "0": {
             "type": "composer",
             "url": "https://satis.anibalalvarez.com/"
