@@ -90,14 +90,18 @@ class AstDataHydrator
 
             // Fetch rows
             $rows = $result->getRows();
-            $isSeries = in_array('metricDate', $groupBy);
+            if ($this->logger) {
+                $this->logger->info("Fetched rows for channel {$channel}", ['rowCount' => count($rows), 'sample' => $rows[0] ?? null]);
+            }
+            // Strict temporal grouping via 'daily' flag
+            $isSeries = in_array('daily', $groupBy);
 
             foreach ($metricsList as $metric) {
                 $key = $channel !== 'global' ? "{$channel}.{$metric}" : $metric;
                 if ($isSeries) {
                     $seriesData = [];
                     foreach ($rows as $row) {
-                        $date = $row['metricDate'] ?? $row['date'] ?? 'unknown';
+                        $date = $row['date'] ?? 'unknown';
                         $seriesData[$date] = $row[$metric] ?? 0;
                     }
                     $metricData[$key] = $seriesData;
