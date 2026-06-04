@@ -134,3 +134,5 @@ scratch/update_openapi.php
 .env-mabe-prueba
 
 test_db.php
+
+test_agg.php
