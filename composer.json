@@ -96,11 +96,11 @@
                      },
     "require-dev":  {
                         "doctrine/instantiator":  "^1.5",
+                        "phpunit/phpunit":  "^9",
                         "phpbench/phpbench":  "^1.2.6",
                         "doctrine/data-fixtures":  "^1.5.3",
                         "phpstan/phpstan":  "^1.10",
-                        "mikey179/vfsstream":  "2.0.x-dev",
-                        "phpunit/phpunit":  "^9"
+                        "mikey179/vfsstream":  "2.0.x-dev"
                     },
     "repositories":  {
                          "0":  {
