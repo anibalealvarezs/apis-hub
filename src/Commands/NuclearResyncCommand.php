@@ -110,6 +110,17 @@ class NuclearResyncCommand extends Command
 
         $output->writeln("<comment>Worker restart is now handled externally by bin/nuclear-sync.sh to ensure graceful container lifecycle management.</comment>");
 
+        // 4. Force invalidate telemetry cache at the end of the process
+        try {
+            $output->writeln("<info>Invalidating telemetry cache...</info>");
+            $invalidateSyncCacheCmd = new InvalidateSyncCacheCommand();
+            $invalidateSyncCacheInput = new ArrayInput($isAll ? [] : ['--channel' => $channel]);
+            $invalidateSyncCacheCmd->run($invalidateSyncCacheInput, $output);
+            $output->writeln("<info>✓ Telemetry cache successfully invalidated.</info>");
+        } catch (\Throwable $e) {
+            $output->writeln("<error>✗ Telemetry cache invalidation error: " . $e->getMessage() . "</error>");
+        }
+
         $output->writeln("<info>✓ Nuclear Resync complete.</info>");
 
         return Command::SUCCESS;
