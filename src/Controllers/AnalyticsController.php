@@ -33,6 +33,9 @@ class AnalyticsController extends BaseController
                 return $this->errorResponse('Missing AST payload.', 400);
             }
 
+            // Translate Facade external platform IDs to internal APIs Hub IDs
+            $this->translatePlatformIds($payload['ast'], $this->em);
+
             $logger->info("3. Initializing AstParser...");
             $tParseStart = microtime(true);
             $parser = new AstParser();
@@ -199,5 +202,54 @@ class AnalyticsController extends BaseController
     protected function errorResponse(string $message, int $code): JsonResponse
     {
         return new JsonResponse(['success' => false, 'error' => $message], $code);
+    }
+
+    /**
+     * Recursively traverses the AST payload and maps any external 'asset_platform_id'
+     * to the internal 'channeledAccount' ID of the corresponding APIs Hub entity.
+     *
+     * @param array $node
+     * @param \Doctrine\ORM\EntityManager $em
+     * @throws \Exception
+     */
+    protected function translatePlatformIds(array &$node, \Doctrine\ORM\EntityManager $em): void
+    {
+        if (isset($node['type'])) {
+            if ($node['type'] === 'metric') {
+                if (isset($node['filters']['asset_platform_id'])) {
+                    $platformId = $node['filters']['asset_platform_id'];
+                    $metricString = $node['metric'] ?? '';
+                    $parts = explode('.', $metricString, 2);
+                    $channelName = count($parts) === 2 ? $parts[0] : 'global';
+
+                    if ($channelName !== 'global') {
+                        $qb = $em->createQueryBuilder();
+                        $qb->select('ca.id')
+                           ->from(\Entities\Analytics\Channeled\ChanneledAccount::class, 'ca')
+                           ->join('ca.channel', 'c')
+                           ->where('ca.platformId = :platformId')
+                           ->andWhere('c.name = :channelName')
+                           ->setParameter('platformId', $platformId)
+                           ->setParameter('channelName', $channelName)
+                           ->setMaxResults(1);
+                        
+                        $result = $qb->getQuery()->getOneOrNullResult();
+                        if ($result) {
+                            $node['filters']['channeledAccount'] = $result['id'];
+                            unset($node['filters']['asset_platform_id']);
+                        } else {
+                            throw new \Exception("Asset with platform ID '{$platformId}' for channel '{$channelName}' has not been synced to APIs Hub yet.");
+                        }
+                    }
+                }
+            } elseif ($node['type'] === 'operator') {
+                if (isset($node['left']) && is_array($node['left'])) {
+                    $this->translatePlatformIds($node['left'], $em);
+                }
+                if (isset($node['right']) && is_array($node['right'])) {
+                    $this->translatePlatformIds($node['right'], $em);
+                }
+            }
+        }
     }
 }
