@@ -40,7 +40,7 @@ class AstParser
 
         return match ($type) {
             'value' => new ValueNode($data['value']),
-            'metric' => new MetricNode($data['metric']),
+            'metric' => new MetricNode($data['metric'], $data['filters'] ?? []),
             'operator' => new OperatorNode(
                 $data['operator'],
                 $this->buildNode($data['left']),

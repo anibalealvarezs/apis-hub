@@ -17,9 +17,9 @@ interface AstNodeInterface
     public function evaluate(EvaluationContext $context): float|int|array;
 
     /**
-     * Extracts all unique metric aliases referenced in this node and its children.
+     * Extracts all unique MetricNode instances referenced in this node and its children.
      *
-     * @return array<int, string>
+     * @return array<int, \Services\Analytics\VirtualMetricEngine\Nodes\MetricNode>
      */
-    public function getMetrics(): array;
+    public function getMetricNodes(): array;
 }

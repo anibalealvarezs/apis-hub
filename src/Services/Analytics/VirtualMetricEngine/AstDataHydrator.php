@@ -23,24 +23,41 @@ class AstDataHydrator
      */
     public function hydrate(AstNodeInterface $node, array $filters): array
     {
-        $metrics = $node->getMetrics();
-        if (empty($metrics)) {
+        $metricNodes = $node->getMetricNodes();
+        if (empty($metricNodes)) {
             return [];
         }
 
-        // Group by channel
-        $channelMetrics = [];
-        foreach ($metrics as $metricAlias) {
+        // Group by channel and specific filter hash
+        $batchedQueries = [];
+        foreach ($metricNodes as $mNode) {
+            $metricAlias = $mNode->getMetricAlias();
             $parts = explode('.', $metricAlias, 2);
-            if (count($parts) === 2) {
-                $channel = $parts[0];
-                $metric = $parts[1];
-                $channelMetrics[$channel][] = $metric;
-            } else {
-                // If no channel prefix, we might default to a specific channel or throw error.
-                // For now, let's assume it's valid if there's no prefix, maybe 'global'.
-                $channelMetrics['global'][] = $metricAlias;
+            $channel = count($parts) === 2 ? $parts[0] : 'global';
+            $metric = count($parts) === 2 ? $parts[1] : $metricAlias;
+
+            // Merge global non-temporal filters with node-specific filters (node overrides global)
+            $nodeFilters = $mNode->getFilters();
+            $combinedFilters = array_merge($filters, $nodeFilters);
+            
+            // Temporal filters are excluded from the hash because they are handled globally
+            $hashFilters = $combinedFilters;
+            unset($hashFilters['startDate'], $hashFilters['endDate'], $hashFilters['period'], $hashFilters['groupBy']);
+
+            ksort($hashFilters);
+            $filterHash = md5(json_encode($hashFilters));
+            $batchKey = $channel . '_' . $filterHash;
+
+            if (!isset($batchedQueries[$batchKey])) {
+                $batchedQueries[$batchKey] = [
+                    'channel' => $channel,
+                    'filters' => $hashFilters,
+                    'metrics' => [],
+                    'nodes' => []
+                ];
             }
+            $batchedQueries[$batchKey]['metrics'][$metric] = $metric;
+            $batchedQueries[$batchKey]['nodes'][] = clone $mNode; // store for mapping back to keys
         }
 
         /** @var MetricRepository $metricRepository */
@@ -51,27 +68,21 @@ class AstDataHydrator
         $startDate = $filters['startDate'] ?? null;
         $endDate = $filters['endDate'] ?? null;
         $groupBy = $filters['groupBy'] ?? [];
-        // Unset period and dates so they aren't parsed as direct column filters
-        unset($filters['startDate'], $filters['endDate'], $filters['period'], $filters['groupBy']);
         
-        $filterObj = (object) $filters;
-
-        foreach ($channelMetrics as $channel => $metricsList) {
-            $channelFilter = clone $filterObj;
+        foreach ($batchedQueries as $batch) {
+            $channel = $batch['channel'];
+            $channelFilter = (object) $batch['filters'];
+            
             if ($channel !== 'global') {
                 $channelEntity = $this->em->getRepository(\Entities\Analytics\Channel::class)->findOneBy(['name' => $channel]);
                 $channelFilter->channel = $channelEntity ? $channelEntity->getId() : 0;
             }
             
-            $aggregations = [];
-            foreach ($metricsList as $metric) {
-                // Use canonical metric mappings instead of hardcoded raw SQL, mirroring the frontend
-                $aggregations[$metric] = $metric;
-            }
+            $aggregations = $batch['metrics'];
 
             $dbStart = microtime(true);
             if ($this->logger) {
-                $this->logger->info("Starting DB aggregation for channel: {$channel}", ['aggregations' => $aggregations]);
+                $this->logger->info("Starting DB aggregation for channel: {$channel}", ['aggregations' => $aggregations, 'filters' => (array)$channelFilter]);
             }
             
             $result = $executor->executeAggregate(
@@ -105,20 +116,23 @@ class AstDataHydrator
                 }
             }
 
-            foreach ($metricsList as $metric) {
-                $key = $channel !== 'global' ? "{$channel}.{$metric}" : $metric;
+            // Map data back to unique hash keys
+            foreach ($batch['nodes'] as $mNode) {
+                $metric = count(explode('.', $mNode->getMetricAlias(), 2)) === 2 ? explode('.', $mNode->getMetricAlias(), 2)[1] : $mNode->getMetricAlias();
+                $hashKey = $mNode->getHashKey();
+                
                 if ($isSeries) {
                     $seriesData = [];
                     foreach ($rows as $row) {
                         $date = $row[$temporalField] ?? $row['date'] ?? 'unknown';
                         $seriesData[$date] = $row[$metric] ?? 0;
                     }
-                    $metricData[$key] = $seriesData;
+                    $metricData[$hashKey] = $seriesData;
                 } else {
                     if (!empty($rows) && isset($rows[0])) {
-                        $metricData[$key] = $rows[0][$metric] ?? 0;
+                        $metricData[$hashKey] = $rows[0][$metric] ?? 0;
                     } else {
-                        $metricData[$key] = 0;
+                        $metricData[$hashKey] = 0;
                     }
                 }
             }

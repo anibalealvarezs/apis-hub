@@ -85,11 +85,11 @@ class OperatorNode implements AstNodeInterface
         };
     }
 
-    public function getMetrics(): array
+    public function getMetricNodes(): array
     {
-        return array_values(array_unique(array_merge(
-            $this->left->getMetrics(),
-            $this->right->getMetrics()
-        )));
+        return array_merge(
+            $this->left->getMetricNodes(),
+            $this->right->getMetricNodes()
+        );
     }
 }

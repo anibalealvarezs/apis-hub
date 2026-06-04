@@ -16,7 +16,7 @@ class ValueNode implements AstNodeInterface
         return $this->value;
     }
 
-    public function getMetrics(): array
+    public function getMetricNodes(): array
     {
         return [];
     }
