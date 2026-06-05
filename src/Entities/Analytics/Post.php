@@ -26,7 +26,7 @@ use Repositories\PostRepository;
     'channeled_account_id'
 ])]
 #[ORM\HasLifecycleCallbacks]
-class Post extends Entity
+class Post extends Entity implements JsonSerializable
 {
     #[ORM\Column(name: 'post_id', type: 'string')]
     protected string $postId;
