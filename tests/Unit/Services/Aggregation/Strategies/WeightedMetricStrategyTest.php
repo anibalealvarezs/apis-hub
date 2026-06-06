@@ -13,6 +13,53 @@
 
     final class WeightedMetricStrategyTest extends BaseUnitTestCase
     {
+        public function testAppliesChanneledAccountFilterWhenProvided(): void
+        {
+            $capturedSql = null;
+            $capturedParams = [];
+
+            $connection = $this->createMock(Connection::class);
+            $connection->expects($this->once())
+                ->method('fetchAllAssociative')
+                ->willReturnCallback(static function (string $sql, array $params = []) use (&$capturedSql, &$capturedParams): array {
+                    $capturedSql = $sql;
+                    $capturedParams = $params;
+
+                    return [];
+                });
+
+            $repository = $this->createMock(BaseRepository::class);
+            $repository->expects($this->once())->method('appendOptimizedStrategyMeta');
+
+            $plan = new AggregationPlan(
+                aggregations: [
+                    'position' => 'position',
+                ],
+                groupBy: ['query'],
+                filters: (object)[
+                    'channel' => 'google_search_console',
+                    'channeledAccount' => '336',
+                ],
+                startDate: '2026-05-06',
+                endDate: '2026-06-03',
+                context: [
+                    'repository' => $repository,
+                ],
+                stages: [
+                    'grouping' => ['normalized_pattern' => 'query'],
+                ],
+            );
+
+            $strategy = new WeightedMetricStrategy(new CanonicalMetricSqlResolver());
+            $rows = $strategy->execute($connection, $plan, true);
+
+            $this->assertIsArray($rows);
+            $this->assertNotNull($capturedSql);
+            $this->assertStringContainsString('mc.channeled_account_id = :channeledAccountVal', (string)$capturedSql);
+            $this->assertArrayHasKey('channeledAccountVal', $capturedParams);
+            $this->assertSame('336', (string)$capturedParams['channeledAccountVal']);
+        }
+
         public function testUsesCanonicalResolverForWeightedMetrics(): void
         {
             $capturedSql = null;

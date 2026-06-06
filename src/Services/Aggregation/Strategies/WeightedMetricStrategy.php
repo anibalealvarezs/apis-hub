@@ -177,7 +177,16 @@
             $configParams = [];
 
             $filterResolver = new FilterConditionResolver();
-            foreach (['page' => 'page_id', 'channel' => 'channel', 'country' => 'country_id', 'device' => 'device_id', 'query' => 'query_id'] as $filterKey => $col) {
+            foreach ([
+                'page' => 'page_id',
+                'channel' => 'channel',
+                'country' => 'country_id',
+                'device' => 'device_id',
+                'query' => 'query_id',
+                'account' => 'channeled_account_id',
+                'channeledAccount' => 'channeled_account_id',
+                'channeled_account_id' => 'channeled_account_id',
+            ] as $filterKey => $col) {
                 if (!isset($filtersArr[$filterKey])) continue;
 
                 $condition = $filterResolver->resolve($filtersArr[$filterKey]);
