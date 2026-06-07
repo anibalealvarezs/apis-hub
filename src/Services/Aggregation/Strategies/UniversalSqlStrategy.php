@@ -289,12 +289,13 @@
                 
                 if ($metricSql === null) {
                     // Try organic metric as fallback
+                    $organicPeriod = $this->resolveOrganicFallbackPeriod($filtersArr, $groupBy);
                     $resolvedOrganicMetric = $metricSqlResolver->resolveOrganicMetric(
                         requestedMetric: $normalizedExpr,
                         channel: $channelKey,
                         nameCol: $nameCol,
                         periodCol: $periodCol,
-                        period: 'lifetime'
+                        period: $organicPeriod
                     );
 
                     if (is_string($resolvedOrganicMetric['sql_expression'])) {
@@ -425,7 +426,62 @@
 
             return true;
         }
-        
+
+        /**
+         * Organic fallback metrics should use daily totals for chart/breakdown queries,
+         * and lifetime only when the query is explicitly post-granular or snapshot-based.
+         *
+         * @param array<string, mixed> $filtersArr
+         * @param array<int, string> $groupBy
+         */
+        private function resolveOrganicFallbackPeriod(array $filtersArr, array $groupBy): string
+        {
+            if (isset($filtersArr['period']) && is_string($filtersArr['period'])) {
+                $period = strtolower(trim($filtersArr['period']));
+                if ($period !== '') {
+                    return $period;
+                }
+            }
+
+            $isSnapshotQuery = false;
+            if (isset($filtersArr['latest_snapshot'])) {
+                $isSnapshotQuery = filter_var($filtersArr['latest_snapshot'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+                $isSnapshotQuery = $isSnapshotQuery ?? (bool)$filtersArr['latest_snapshot'];
+            }
+
+            if ($isSnapshotQuery) {
+                return 'lifetime';
+            }
+
+            if (isset($filtersArr['post'])) {
+                $postFilter = strtoupper(trim((string)$filtersArr['post']));
+                if ($postFilter !== '' && $postFilter !== 'NULL' && $postFilter !== 'N/A') {
+                    return 'lifetime';
+                }
+            }
+
+            $postGranularFields = [
+                'post',
+                'post_id',
+                'caption',
+                'message',
+                'media_type',
+                'permalink',
+                'permalink_url',
+                'timestamp',
+                'created_time',
+            ];
+
+            foreach ($groupBy as $field) {
+                $normalizedField = strtolower(trim((string)$field));
+                if (in_array($normalizedField, $postGranularFields, true)) {
+                    return 'lifetime';
+                }
+            }
+
+            return 'daily';
+        }
+
         private function buildFilterClause(string $col, array $condition, string $alias): string
         {
             if ($condition['operator'] === 'in' && is_array($condition['value'])) {

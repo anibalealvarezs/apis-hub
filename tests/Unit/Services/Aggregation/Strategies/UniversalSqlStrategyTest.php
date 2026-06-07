@@ -32,7 +32,7 @@ final class UniversalSqlStrategyTest extends BaseUnitTestCase
         $repository->expects($this->once())->method('appendOptimizedStrategyMeta');
 
         $plan = new AggregationPlan(
-            aggregations: ['reach' => 'reach'],
+            aggregations: ['page_views_total' => 'page_views_total'],
             groupBy: ['daily'],
             filters: (object)[
                 'channel' => 'facebook_organic',
@@ -110,6 +110,100 @@ final class UniversalSqlStrategyTest extends BaseUnitTestCase
         $this->assertIsArray($rows);
         $this->assertNotNull($capturedSql);
         $this->assertStringNotContainsString('mc.post_id IS NULL', (string)$capturedSql);
+    }
+
+    public function testFacebookOrganicChartFallbackUsesDailyOrganicPeriod(): void
+    {
+        $capturedSql = null;
+
+        $connection = $this->createMock(Connection::class);
+        $connection->expects($this->once())
+            ->method('fetchAllAssociative')
+            ->willReturnCallback(static function (string $sql, array $params = []) use (&$capturedSql): array {
+                $capturedSql = $sql;
+
+                return [[
+                    'daily' => '2026-06-06',
+                    'page_views_total' => 17,
+                ]];
+            });
+
+        $repository = $this->createMock(BaseRepository::class);
+        $repository->expects($this->once())->method('appendOptimizedStrategyMeta');
+
+        $plan = new AggregationPlan(
+            aggregations: ['page_views_total' => 'page_views_total'],
+            groupBy: ['daily'],
+            filters: (object)[
+                'channel' => 'facebook_organic',
+                'account_type' => 'facebook_page',
+                'page_platform_id' => '147613761768682',
+            ],
+            startDate: '2026-05-08',
+            endDate: '2026-06-06',
+            context: [
+                'repository' => $repository,
+            ],
+            stages: [
+                'grouping' => ['normalized_pattern' => 'daily'],
+            ],
+            candidateOptimizedStrategies: ['universal_sql']
+        );
+
+        $strategy = new UniversalSqlStrategy();
+        $rows = $strategy->execute($connection, $plan, true);
+
+        $this->assertIsArray($rows);
+        $this->assertNotNull($capturedSql);
+        $this->assertStringContainsString("LOWER(mc.period) = 'daily'", (string)$capturedSql);
+        $this->assertStringNotContainsString("LOWER(mc.period) = 'lifetime'", (string)$capturedSql);
+    }
+
+    public function testFacebookOrganicPostFallbackUsesLifetimeOrganicPeriod(): void
+    {
+        $capturedSql = null;
+
+        $connection = $this->createMock(Connection::class);
+        $connection->expects($this->once())
+            ->method('fetchAllAssociative')
+            ->willReturnCallback(static function (string $sql, array $params = []) use (&$capturedSql): array {
+                $capturedSql = $sql;
+
+                return [[
+                    'post' => '123_abc',
+                    'reach' => 42,
+                ]];
+            });
+
+        $repository = $this->createMock(BaseRepository::class);
+        $repository->expects($this->once())->method('appendOptimizedStrategyMeta');
+
+        $plan = new AggregationPlan(
+            aggregations: ['reach' => 'reach'],
+            groupBy: ['post', 'post_id', 'caption', 'message', 'media_type', 'permalink', 'permalink_url', 'timestamp', 'created_time'],
+            filters: (object)[
+                'channel' => 'facebook_organic',
+                'account_type' => 'facebook_page',
+                'post' => 'NOT_NULL',
+            ],
+            startDate: '2026-05-08',
+            endDate: '2026-06-06',
+            context: [
+                'repository' => $repository,
+            ],
+            stages: [
+                'grouping' => ['normalized_pattern' => 'caption+created_time+media_type+message+permalink+permalink_url+post+post_id+timestamp'],
+            ],
+            candidateOptimizedStrategies: ['universal_sql']
+        );
+
+        $strategy = new UniversalSqlStrategy();
+        $rows = $strategy->execute($connection, $plan, true);
+
+        $this->assertIsArray($rows);
+        $this->assertNotNull($capturedSql);
+        $this->assertStringContainsString("LOWER(mc.period) = 'daily'", (string)$capturedSql);
+        $this->assertStringNotContainsString("LOWER(mc.period) = 'lifetime'", (string)$capturedSql);
     }
 }
 
