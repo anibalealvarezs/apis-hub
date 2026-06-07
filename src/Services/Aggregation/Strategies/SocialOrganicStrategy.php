@@ -111,6 +111,7 @@
                 'm.metric_date >= :startDate',
                 'm.metric_date <= :endDate',
                 'LOWER(ca.type) = LOWER(:accountType)',
+                'mc.post_id IS NULL',
                 "{$pagePlatformExpr} = :pagePlatformId",
             ];
             if (isset($filtersArr['channel'])) {

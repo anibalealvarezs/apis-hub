@@ -73,6 +73,49 @@
             $this->assertStringContainsString("'comments'", (string)$capturedSql);
         }
 
+        public function testPageSummaryExcludesPostLevelRows(): void
+        {
+            $capturedSql = null;
+
+            $connection = $this->createMock(Connection::class);
+            $connection->expects($this->once())
+                ->method('fetchAllAssociative')
+                ->willReturnCallback(static function (string $sql, array $params = []) use (&$capturedSql): array {
+                    $capturedSql = $sql;
+
+                    return [['page' => 'https://www.facebook.com/123', 'page_id' => 1, 'page_title' => 'Demo', 'reach' => 1353]];
+                });
+
+            $repository = $this->createMock(BaseRepository::class);
+            $repository->expects($this->once())->method('appendOptimizedStrategyMeta');
+
+            $plan = new AggregationPlan(
+                aggregations: ['reach' => 'reach'],
+                groupBy: ['page', 'page_id', 'page_title'],
+                filters: (object)[
+                    'channel' => 'facebook_organic',
+                    'account_type' => 'facebook_page',
+                    'page_platform_id' => '147613761768682',
+                ],
+                startDate: '2026-06-01',
+                endDate: '2026-06-06',
+                context: [
+                    'repository' => $repository,
+                ],
+                stages: [
+                    'grouping' => ['normalized_pattern' => 'page+page_id+page_title'],
+                ],
+                candidateOptimizedStrategies: ['social_organic_page_summary']
+            );
+
+            $strategy = new SocialOrganicStrategy(new CanonicalMetricSqlResolver());
+            $rows = $strategy->execute($connection, $plan, true);
+
+            $this->assertIsArray($rows);
+            $this->assertNotNull($capturedSql);
+            $this->assertStringContainsString('mc.post_id IS NULL', (string)$capturedSql);
+        }
+
         public function testReturnsNullForUnsupportedMetric(): void
         {
             $connection = $this->createMock(Connection::class);
