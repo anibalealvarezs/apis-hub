@@ -76,6 +76,10 @@
                 $sqlParams['endDate'] = $endDate;
             }
 
+            if ($this->shouldRestrictFacebookOrganicToPageLevel($channelKey, $groupBy, $filtersArr)) {
+                $whereClauses[] = 'mc.post_id IS NULL';
+            }
+
             // Track unique joins to avoid duplicate LEFT JOIN clauses
             $joinedTables = [];
             $safeLeftJoin = function (string $table, string $alias, string $condition) use (&$joins, &$joinedTables) {
@@ -378,6 +382,48 @@
                 $orderSql";
 
             return $connection->fetchAllAssociative($sql, $sqlParams);
+        }
+
+        /**
+         * Facebook Organic page-level chart/breakdown queries must ignore post rows,
+         * but post-granular queries still need to keep them.
+         *
+         * @param array<int, string> $groupBy
+         * @param array<string, mixed> $filtersArr
+         */
+        private function shouldRestrictFacebookOrganicToPageLevel(?string $channelKey, array $groupBy, array $filtersArr): bool
+        {
+            if ($channelKey !== 'facebook_organic') {
+                return false;
+            }
+
+            if (isset($filtersArr['post'])) {
+                $postFilter = strtoupper(trim((string)$filtersArr['post']));
+                if ($postFilter !== '' && $postFilter !== 'NULL' && $postFilter !== 'N/A') {
+                    return false;
+                }
+            }
+
+            $postGranularFields = [
+                'post',
+                'post_id',
+                'caption',
+                'message',
+                'media_type',
+                'permalink',
+                'permalink_url',
+                'timestamp',
+                'created_time',
+            ];
+
+            foreach ($groupBy as $field) {
+                $normalizedField = strtolower(trim((string)$field));
+                if (in_array($normalizedField, $postGranularFields, true)) {
+                    return false;
+                }
+            }
+
+            return true;
         }
         
         private function buildFilterClause(string $col, array $condition, string $alias): string
