@@ -302,5 +302,56 @@ final class UniversalSqlStrategyTest extends BaseUnitTestCase
         $this->assertStringContainsString("LOWER(mc.period) = 'daily'", (string)$capturedSql);
         $this->assertStringNotContainsString("LOWER(mc.period) = 'lifetime'", (string)$capturedSql);
     }
-}
 
+    public function testFacebookOrganicStringPostFiltersUsePlatformPostIdColumn(): void
+    {
+        $capturedSql = null;
+        $capturedParams = [];
+
+        $connection = $this->createMock(Connection::class);
+        $connection->expects($this->once())
+            ->method('fetchAllAssociative')
+            ->willReturnCallback(static function (string $sql, array $params = []) use (&$capturedSql, &$capturedParams): array {
+                $capturedSql = $sql;
+                $capturedParams = $params;
+
+                return [[
+                    'daily' => '2026-06-06',
+                    'reach' => 17,
+                ]];
+            });
+
+        $repository = $this->createMock(BaseRepository::class);
+        $repository->expects($this->once())->method('appendOptimizedStrategyMeta');
+
+        $plan = new AggregationPlan(
+            aggregations: ['reach' => 'reach'],
+            groupBy: ['daily'],
+            filters: (object)[
+                'channel' => 'facebook_organic',
+                'account_type' => 'facebook_page',
+                'post' => '147613761768682_122268816536074498',
+                'page' => '119',
+                'period' => 'lifetime',
+            ],
+            startDate: '2026-05-08',
+            endDate: '2026-06-07',
+            context: [
+                'repository' => $repository,
+            ],
+            stages: [
+                'grouping' => ['normalized_pattern' => 'daily'],
+            ],
+            candidateOptimizedStrategies: ['universal_sql']
+        );
+
+        $strategy = new UniversalSqlStrategy();
+        $rows = $strategy->execute($connection, $plan, true);
+
+        $this->assertIsArray($rows);
+        $this->assertNotNull($capturedSql);
+        $this->assertStringContainsString('LEFT JOIN posts fpost ON fpost.id = mc.post_id', (string)$capturedSql);
+        $this->assertStringContainsString('fpost.post_id = :filter_post', (string)$capturedSql);
+        $this->assertSame('147613761768682_122268816536074498', $capturedParams['filter_post'] ?? null);
+    }
+}

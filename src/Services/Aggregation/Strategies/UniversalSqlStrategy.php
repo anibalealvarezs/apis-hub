@@ -183,22 +183,16 @@
 
                 $paramName = 'filter_'.preg_replace('/[^a-z0-9]/i', '_', $key);
                 $condition = $filterResolver->resolve($value);
-                
+
                 // Exclude some internal filters that shouldn't generate SQL WHERE clauses directly
                 if (in_array($key, ['snapshot_delta', 'latest_snapshot', 'period'], true)) {
                     continue;
                 }
 
-                if (isset($relationMap[$key])) {
-                    $relationKey = $key;
-                } elseif (str_ends_with($key, '_id') && isset($relationMap[substr($key, 0, -3)])) {
-                    $relationKey = substr($key, 0, -3);
-                } else {
-                    $relationKey = null;
-                }
+                if (in_array($key, ['post', 'post_id'], true) && $this->shouldFilterPostByPlatformId($condition)) {
+                    $safeLeftJoin('posts', 'fpost', 'fpost.id = mc.post_id');
+                    $whereClauses[] = $this->buildFilterClause('fpost.post_id', $condition, $paramName);
 
-                if ($relationKey !== null) {
-                    $whereClauses[] = $this->buildFilterClause("mc.{$relationMap[$relationKey]['fk']}", $condition, $paramName);
                     if ($condition['value'] !== null) {
                         if ($condition['operator'] === 'in' && is_array($condition['value'])) {
                             foreach ($condition['value'] as $i => $v) {
@@ -211,41 +205,29 @@
                     continue;
                 }
 
-                if ($key === 'channel') {
-                    $channelIds = is_array($condition['value']) ? $condition['value'] : [$condition['value']];
-                    foreach ($channelIds as &$channelId) {
-                        if (is_scalar($channelId) && !ctype_digit((string)$channelId)) {
-                            $ch = Channel::tryFromName((string)$channelId);
-                            if ($ch) $channelId = $ch->getId();
-                        }
-                    }
-                    unset($channelId);
-
-                    $condition['value'] = is_array($condition['value']) ? $channelIds : $channelIds[0];
-                    
-                    $whereClauses[] = $this->buildFilterClause('mc.channel', $condition, $paramName);
-                    if ($condition['value'] !== null) {
-                        if ($condition['operator'] === 'in' && is_array($condition['value'])) {
-                            foreach ($condition['value'] as $i => $v) {
-                                $sqlParams["{$paramName}_{$i}"] = (int)$v;
-                            }
-                        } else {
-                            $sqlParams[$paramName] = (int)$condition['value'];
-                        }
-                    }
-                    continue;
+                if (isset($relationMap[$key])) {
+                    $relationKey = $key;
+                } elseif (str_ends_with($key, '_id') && isset($relationMap[substr($key, 0, -3)])) {
+                    $relationKey = substr($key, 0, -3);
+                } else {
+                    $relationKey = null;
                 }
 
-                if ($key === 'account_type') {
-                    $safeLeftJoin('channeled_accounts', 'ca', 'ca.id = mc.channeled_account_id');
-                    $whereClauses[] = $this->buildFilterClause('LOWER(ca.type)', $condition, $paramName);
+                if ($relationKey !== null) {
+                    if ($relationKey === 'post' && $this->shouldFilterPostByPlatformId($condition)) {
+                        $safeLeftJoin('posts', 'fpost', 'fpost.id = mc.post_id');
+                        $whereClauses[] = $this->buildFilterClause('fpost.post_id', $condition, $paramName);
+                    } else {
+                        $whereClauses[] = $this->buildFilterClause("mc.{$relationMap[$relationKey]['fk']}", $condition, $paramName);
+                    }
+
                     if ($condition['value'] !== null) {
                         if ($condition['operator'] === 'in' && is_array($condition['value'])) {
                             foreach ($condition['value'] as $i => $v) {
-                                $sqlParams["{$paramName}_{$i}"] = strtolower((string)$v);
+                                $sqlParams["{$paramName}_{$i}"] = $this->formatFilterValue($v);
                             }
                         } else {
-                            $sqlParams[$paramName] = strtolower((string)$condition['value']);
+                            $sqlParams[$paramName] = $this->formatFilterValue($condition['value']);
                         }
                     }
                     continue;
@@ -290,7 +272,7 @@
                     periodCol: $periodCol,
                 );
                 $metricSql = is_string($resolvedMetric['sql_expression']) ? $resolvedMetric['sql_expression'] : null;
-                
+
                 if ($metricSql === null) {
                     // Try organic metric as fallback
                     $organicPeriod = $this->resolveOrganicFallbackPeriod($filtersArr, $groupBy);
@@ -307,7 +289,7 @@
                         $resolvedMetric = $resolvedOrganicMetric;
                     }
                 }
-                
+
                 if ($metricSql === null) {
                     $repository = $plan->getContextValue('repository');
                     if ($repository instanceof BaseRepository) {
@@ -347,7 +329,7 @@
                     'source'           => $resolvedMetric['source'] ?? 'none',
                 ];
             }
-            
+
             // If there are no select fields (e.g., no aggregations requested), we can't execute
             if ($selectFields === []) {
                 return null;
@@ -587,6 +569,28 @@
             return true;
         }
 
+        private function shouldFilterPostByPlatformId(array $condition): bool
+        {
+            $operator = (string)($condition['operator'] ?? 'eq');
+            $value = $condition['value'] ?? null;
+
+            if (in_array($operator, ['is_null', 'is_not_null'], true)) {
+                return false;
+            }
+
+            if (is_array($value)) {
+                foreach ($value as $item) {
+                    if (!is_numeric((string)$item)) {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            return $value !== null && !is_numeric((string)$value);
+        }
+
         /**
          * Organic fallback metrics should use daily totals for chart/breakdown queries,
          * and lifetime only when the query is explicitly post-granular or snapshot-based.
@@ -661,7 +665,7 @@
                 default       => "$col = :$alias",
             };
         }
-        
+
         private function formatFilterValue(mixed $value): mixed
         {
             if (is_array($value)) {
@@ -715,3 +719,5 @@
             return $channel instanceof Channel ? strtolower(trim($channel->getName())) : null;
         }
     }
+
+
