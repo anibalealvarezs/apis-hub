@@ -363,7 +363,11 @@
                 $condition = $filterResolver->resolve($filtersArr['post']);
                 $postFilterColumn = $this->shouldFilterPostByPlatformId($condition) ? 'ps.post_id' : 'mc.post_id';
                 $whereClauses[] = $this->buildFilterClause($postFilterColumn, $condition, 'postId');
-                $this->bindFilterParams($sqlParams, 'postId', $condition);
+                if ($postFilterColumn === 'ps.post_id') {
+                    $this->bindFilterParamsAsString($sqlParams, 'postId', $condition);
+                } else {
+                    $this->bindFilterParams($sqlParams, 'postId', $condition);
+                }
             }
 
             $orderSql = '';
@@ -505,6 +509,19 @@
             }
         }
 
+        private function bindFilterParamsAsString(array &$sqlParams, string $alias, array $condition): void
+        {
+            if ($condition['value'] !== null) {
+                if ($condition['operator'] === 'in' && is_array($condition['value'])) {
+                    foreach ($condition['value'] as $i => $v) {
+                        $sqlParams["{$alias}_{$i}"] = (string)$v;
+                    }
+                } else {
+                    $sqlParams[$alias] = (string)$condition['value'];
+                }
+            }
+        }
+
         private function shouldFilterPostByPlatformId(array $condition): bool
         {
             $operator = (string)($condition['operator'] ?? 'eq');
@@ -516,7 +533,7 @@
 
             if (is_array($value)) {
                 foreach ($value as $item) {
-                    if (!is_numeric((string)$item)) {
+                    if ($this->isPlatformPostIdentifier($item)) {
                         return true;
                     }
                 }
@@ -524,7 +541,37 @@
                 return false;
             }
 
-            return $value !== null && !is_numeric((string)$value);
+            return $this->isPlatformPostIdentifier($value);
+        }
+
+        private function isPlatformPostIdentifier(mixed $value): bool
+        {
+            if ($value === null) {
+                return false;
+            }
+
+            $normalized = trim((string)$value);
+            if ($normalized === '') {
+                return false;
+            }
+
+            // Non-integer-like values (e.g. page_post format with underscore) are platform IDs.
+            if (!preg_match('/^[+-]?\d+$/', $normalized)) {
+                return true;
+            }
+
+            $digits = ltrim($normalized, '+-');
+            $digits = ltrim($digits, '0');
+            if ($digits === '') {
+                return false;
+            }
+
+            // metric_configs.post_id is integer in current schema (int32), so larger numeric IDs must use posts.post_id.
+            if (strlen($digits) > 10) {
+                return true;
+            }
+
+            return strlen($digits) === 10 && strcmp($digits, '2147483647') > 0;
         }
 
         /**

@@ -248,4 +248,52 @@
             $this->assertStringContainsString('ps.post_id = :postId', (string)$capturedSql);
             $this->assertSame('147613761768682_122205341918074498', $capturedParams['postId'] ?? null);
         }
+
+        public function testPostSnapshotUsesPlatformPostIdFilterForOversizedNumericPostIds(): void
+        {
+            $capturedSql = null;
+            $capturedParams = [];
+
+            $connection = $this->createMock(Connection::class);
+            $connection->expects($this->once())
+                ->method('fetchAllAssociative')
+                ->willReturnCallback(static function (string $sql, array $params = []) use (&$capturedSql, &$capturedParams): array {
+                    $capturedSql = $sql;
+                    $capturedParams = $params;
+
+                    return [];
+                });
+
+            $repository = $this->createMock(BaseRepository::class);
+            $repository->expects($this->once())->method('appendOptimizedStrategyMeta');
+
+            $plan = new AggregationPlan(
+                aggregations: ['trend_total_reach' => 'reach'],
+                groupBy: ['daily'],
+                filters: (object)[
+                    'channel' => 'facebook_organic',
+                    'account_type' => 'instagram_account',
+                    'post' => '18121430740577061',
+                    'channeledAccount' => '124',
+                    'period' => 'daily',
+                ],
+                startDate: '2026-05-08',
+                endDate: '2026-06-07',
+                context: [
+                    'repository' => $repository,
+                ],
+                stages: [
+                    'grouping' => ['normalized_pattern' => 'daily'],
+                ],
+                candidateOptimizedStrategies: ['social_organic_post_snapshot']
+            );
+
+            $strategy = new SocialOrganicStrategy(new CanonicalMetricSqlResolver());
+            $rows = $strategy->execute($connection, $plan, true);
+
+            $this->assertIsArray($rows);
+            $this->assertNotNull($capturedSql);
+            $this->assertStringContainsString('ps.post_id = :postId', (string)$capturedSql);
+            $this->assertSame('18121430740577061', $capturedParams['postId'] ?? null);
+        }
     }

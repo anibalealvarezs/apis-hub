@@ -580,7 +580,7 @@
 
             if (is_array($value)) {
                 foreach ($value as $item) {
-                    if (!is_numeric((string)$item)) {
+                    if ($this->isPlatformPostIdentifier($item)) {
                         return true;
                     }
                 }
@@ -588,7 +588,37 @@
                 return false;
             }
 
-            return $value !== null && !is_numeric((string)$value);
+            return $this->isPlatformPostIdentifier($value);
+        }
+
+        private function isPlatformPostIdentifier(mixed $value): bool
+        {
+            if ($value === null) {
+                return false;
+            }
+
+            $normalized = trim((string)$value);
+            if ($normalized === '') {
+                return false;
+            }
+
+            // Non-integer-like values (e.g. page_post format with underscore) are platform IDs.
+            if (!preg_match('/^[+-]?\d+$/', $normalized)) {
+                return true;
+            }
+
+            $digits = ltrim($normalized, '+-');
+            $digits = ltrim($digits, '0');
+            if ($digits === '') {
+                return false;
+            }
+
+            // metric_configs.post_id is integer in current schema (int32), so larger numeric IDs must use posts.post_id.
+            if (strlen($digits) > 10) {
+                return true;
+            }
+
+            return strlen($digits) === 10 && strcmp($digits, '2147483647') > 0;
         }
 
         /**
