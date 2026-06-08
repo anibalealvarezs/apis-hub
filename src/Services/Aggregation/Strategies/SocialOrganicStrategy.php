@@ -325,36 +325,27 @@
 
             $sqlParams = [];
             $whereClauses = [];
-
-            $isLatestSnapshot = (bool)($filtersArr['latest_snapshot'] ?? false);
-            $metricsJoin = 'metrics m';
-            if ($isLatestSnapshot) {
-                $metricsJoin = '(
-                SELECT *, ROW_NUMBER() OVER (PARTITION BY metric_config_id ORDER BY metric_date DESC) as rn
-                FROM metrics
-            ) m';
-                $whereClauses[] = 'm.rn = 1';
-            } else {
-                $sqlParams['startDate'] = $startDate;
-                $sqlParams['endDate']   = $endDate;
-                $whereClauses[] = 'm.metric_date >= :startDate';
-                $whereClauses[] = 'm.metric_date <= :endDate';
-            }
-
             $filterResolver = new FilterConditionResolver();
 
+            $isLatestSnapshot = (bool)($filtersArr['latest_snapshot'] ?? false);
+
+            // Pre-build account and channel filters as they are needed for the subquery
+            $accountFilterWhere = null;
+            $accountFilterParams = [];
             if (!empty($filtersArr['channeledAccount'])) {
                 $condition = $filterResolver->resolve($filtersArr['channeledAccount']);
-                $whereClauses[] = $this->buildFilterClause('mc.channeled_account_id', $condition, 'channeledAccount');
-                $this->bindFilterParams($sqlParams, 'channeledAccount', $condition);
+                $accountFilterWhere = $this->buildFilterClause('mc.channeled_account_id', $condition, 'channeledAccount');
+                $this->bindFilterParams($accountFilterParams, 'channeledAccount', $condition);
             } elseif (!empty($filtersArr['page'])) {
                 $condition = $filterResolver->resolve($filtersArr['page']);
-                $whereClauses[] = $this->buildFilterClause('mc.page_id', $condition, 'pageId');
-                $this->bindFilterParams($sqlParams, 'pageId', $condition);
+                $accountFilterWhere = $this->buildFilterClause('mc.page_id', $condition, 'pageId');
+                $this->bindFilterParams($accountFilterParams, 'pageId', $condition);
             } else {
                 return null;
             }
 
+            $channelFilterWhere = null;
+            $channelFilterParams = [];
             if (isset($filtersArr['channel'])) {
                 $condition = $filterResolver->resolve($filtersArr['channel']);
                 $channelVal = $condition['value'];
@@ -362,8 +353,45 @@
                     $ch = Channel::tryFromName((string)$channelVal);
                     if ($ch) $condition['value'] = $ch->getId();
                 }
-                $whereClauses[] = $this->buildFilterClause('mc.channel', $condition, 'channel');
-                $this->bindFilterParams($sqlParams, 'channel', $condition);
+                $channelFilterWhere = $this->buildFilterClause('mc.channel', $condition, 'channel');
+                $this->bindFilterParams($channelFilterParams, 'channel', $condition);
+            }
+
+            if ($isLatestSnapshot) {
+                // Find the single latest metric_date for the given account/channel filters
+                $subQuerySql = "SELECT MAX(m.metric_date) FROM metrics m JOIN metric_configs mc ON m.metric_config_id = mc.id";
+                $subQueryWhere = [$accountFilterWhere];
+                $subQueryParams = $accountFilterParams;
+
+                if ($channelFilterWhere) {
+                    $subQueryWhere[] = $channelFilterWhere;
+                    $subQueryParams = array_merge($subQueryParams, $channelFilterParams);
+                }
+                $subQueryWhere[] = 'm.metric_date <= :endDate';
+                $subQueryParams['endDate'] = $endDate;
+
+                $subQuerySql .= " WHERE " . implode(" AND ", $subQueryWhere);
+                $latestDate = $connection->fetchOne($subQuerySql, $subQueryParams);
+
+                if (!$latestDate) {
+                    return []; // No data found for this account in the given range
+                }
+
+                $whereClauses[] = 'm.metric_date = :latestDate';
+                $sqlParams['latestDate'] = $latestDate;
+            } else {
+                $sqlParams['startDate'] = $startDate;
+                $sqlParams['endDate']   = $endDate;
+                $whereClauses[] = 'm.metric_date >= :startDate';
+                $whereClauses[] = 'm.metric_date <= :endDate';
+            }
+
+            // Add the main filters to the query
+            $whereClauses[] = $accountFilterWhere;
+            $sqlParams = array_merge($sqlParams, $accountFilterParams);
+            if ($channelFilterWhere) {
+                $whereClauses[] = $channelFilterWhere;
+                $sqlParams = array_merge($sqlParams, $channelFilterParams);
             }
 
             if (isset($filtersArr['post'])) {
@@ -389,7 +417,7 @@
 
             $sql = "SELECT
             ".implode(",\n                ", $selectFields)."
-        FROM $metricsJoin
+        FROM metrics m
         JOIN metric_configs mc ON m.metric_config_id = mc.id
         LEFT JOIN posts ps ON ps.id = mc.post_id
         WHERE ".implode("\n              AND ", $whereClauses)."
@@ -518,7 +546,7 @@
 
         private function bindFilterParamsAsString(array &$sqlParams, string $alias, array $condition): void
         {
-            if ($'value'] !== null) {
+            if ($condition['value'] !== null) {
                 if ($condition['operator'] === 'in' && is_array($condition['value'])) {
                     foreach ($condition['value'] as $i => $v) {
                         $sqlParams["{$alias}_{$i}"] = (string)$v;
