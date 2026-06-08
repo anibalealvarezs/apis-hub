@@ -361,7 +361,8 @@
 
             if (isset($filtersArr['post'])) {
                 $condition = $filterResolver->resolve($filtersArr['post']);
-                $whereClauses[] = $this->buildFilterClause('mc.post_id', $condition, 'postId');
+                $postFilterColumn = $this->shouldFilterPostByPlatformId($condition) ? 'ps.post_id' : 'mc.post_id';
+                $whereClauses[] = $this->buildFilterClause($postFilterColumn, $condition, 'postId');
                 $this->bindFilterParams($sqlParams, 'postId', $condition);
             }
 
@@ -502,6 +503,28 @@
                     $sqlParams[$alias] = is_numeric($condition['value']) ? (int)$condition['value'] : (string)$condition['value'];
                 }
             }
+        }
+
+        private function shouldFilterPostByPlatformId(array $condition): bool
+        {
+            $operator = (string)($condition['operator'] ?? 'eq');
+            $value = $condition['value'] ?? null;
+
+            if (in_array($operator, ['is_null', 'is_not_null'], true)) {
+                return false;
+            }
+
+            if (is_array($value)) {
+                foreach ($value as $item) {
+                    if (!is_numeric((string)$item)) {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            return $value !== null && !is_numeric((string)$value);
         }
 
         /**
