@@ -327,7 +327,14 @@
             $whereClauses = [];
 
             $isLatestSnapshot = (bool)($filtersArr['latest_snapshot'] ?? false);
-            if (!$isLatestSnapshot) {
+            $metricsJoin = 'metrics m';
+            if ($isLatestSnapshot) {
+                $metricsJoin = '(
+                SELECT *, ROW_NUMBER() OVER (PARTITION BY metric_config_id ORDER BY metric_date DESC) as rn
+                FROM metrics
+            ) m';
+                $whereClauses[] = 'm.rn = 1';
+            } else {
                 $sqlParams['startDate'] = $startDate;
                 $sqlParams['endDate']   = $endDate;
                 $whereClauses[] = 'm.metric_date >= :startDate';
@@ -382,7 +389,7 @@
 
             $sql = "SELECT
             ".implode(",\n                ", $selectFields)."
-        FROM metrics m
+        FROM $metricsJoin
         JOIN metric_configs mc ON m.metric_config_id = mc.id
         LEFT JOIN posts ps ON ps.id = mc.post_id
         WHERE ".implode("\n              AND ", $whereClauses)."
@@ -511,7 +518,7 @@
 
         private function bindFilterParamsAsString(array &$sqlParams, string $alias, array $condition): void
         {
-            if ($condition['value'] !== null) {
+            if ($'value'] !== null) {
                 if ($condition['operator'] === 'in' && is_array($condition['value'])) {
                     foreach ($condition['value'] as $i => $v) {
                         $sqlParams["{$alias}_{$i}"] = (string)$v;
