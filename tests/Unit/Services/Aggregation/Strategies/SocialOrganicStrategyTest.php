@@ -69,7 +69,7 @@
 
             $this->assertIsArray($rows);
             $this->assertNotNull($capturedSql);
-            $this->assertStringContainsString("'post_reactions_by_type_total'", (string)$capturedSql);
+            $this->assertStringContainsString("'likes'", (string)$capturedSql);
             $this->assertStringContainsString("'comments'", (string)$capturedSql);
         }
 
@@ -106,6 +106,55 @@
                     'grouping' => ['normalized_pattern' => 'page+page_id+page_title'],
                 ],
                 candidateOptimizedStrategies: ['social_organic_page_summary']
+            );
+
+            $strategy = new SocialOrganicStrategy(new CanonicalMetricSqlResolver());
+            $rows = $strategy->execute($connection, $plan, true);
+
+            $this->assertIsArray($rows);
+            $this->assertNotNull($capturedSql);
+            $this->assertStringContainsString('mc.post_id IS NULL', (string)$capturedSql);
+        }
+
+        public function testLinkedPagesExcludesPostLevelRows(): void
+        {
+            $capturedSql = null;
+
+            $connection = $this->createMock(Connection::class);
+            $connection->expects($this->once())
+                ->method('fetchAllAssociative')
+                ->willReturnCallback(static function (string $sql, array $params = []) use (&$capturedSql): array {
+                    $capturedSql = $sql;
+
+                    return [[
+                        'channeled_account_id' => 177,
+                        'channeledaccount' => 'Demo IG',
+                        'linked_platform_entity_id' => '178',
+                        'page_platform_id' => '112975583443266',
+                        'reach' => 1353,
+                    ]];
+                });
+
+            $repository = $this->createMock(BaseRepository::class);
+            $repository->expects($this->once())->method('appendOptimizedStrategyMeta');
+
+            $plan = new AggregationPlan(
+                aggregations: ['reach' => 'reach'],
+                groupBy: ['channeled_account_id', 'channeledaccount', 'linked_platform_entity_id', 'page_platform_id'],
+                filters: (object)[
+                    'channel' => 'facebook_organic',
+                    'account_type' => 'instagram_account',
+                    'channeledAccount' => '177',
+                ],
+                startDate: '2026-06-01',
+                endDate: '2026-06-06',
+                context: [
+                    'repository' => $repository,
+                ],
+                stages: [
+                    'grouping' => ['normalized_pattern' => 'channeled_account_id+channeledaccount+linked_platform_entity_id+page_platform_id'],
+                ],
+                candidateOptimizedStrategies: ['social_organic_linked_pages']
             );
 
             $strategy = new SocialOrganicStrategy(new CanonicalMetricSqlResolver());

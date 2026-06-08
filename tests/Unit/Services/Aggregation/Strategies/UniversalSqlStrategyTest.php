@@ -58,6 +58,52 @@ final class UniversalSqlStrategyTest extends BaseUnitTestCase
         $this->assertStringContainsString('mc.post_id IS NULL', (string)$capturedSql);
     }
 
+    public function testFacebookOrganicAccountLevelQueriesExcludePostRows(): void
+    {
+        $capturedSql = null;
+
+        $connection = $this->createMock(Connection::class);
+        $connection->expects($this->once())
+            ->method('fetchAllAssociative')
+            ->willReturnCallback(static function (string $sql, array $params = []) use (&$capturedSql): array {
+                $capturedSql = $sql;
+
+                return [[
+                    'daily' => '2026-06-06',
+                    'reach' => 1353,
+                ]];
+            });
+
+        $repository = $this->createMock(BaseRepository::class);
+        $repository->expects($this->once())->method('appendOptimizedStrategyMeta');
+
+        $plan = new AggregationPlan(
+            aggregations: ['reach' => 'reach'],
+            groupBy: ['daily'],
+            filters: (object)[
+                'channel' => 'facebook_organic',
+                'account_type' => 'instagram_account',
+                'channeledAccount' => '177',
+            ],
+            startDate: '2026-06-01',
+            endDate: '2026-06-06',
+            context: [
+                'repository' => $repository,
+            ],
+            stages: [
+                'grouping' => ['normalized_pattern' => 'daily'],
+            ],
+            candidateOptimizedStrategies: ['universal_sql']
+        );
+
+        $strategy = new UniversalSqlStrategy();
+        $rows = $strategy->execute($connection, $plan, true);
+
+        $this->assertIsArray($rows);
+        $this->assertNotNull($capturedSql);
+        $this->assertStringContainsString('mc.post_id IS NULL', (string)$capturedSql);
+    }
+
     public function testFacebookOrganicPostGranularQueriesKeepPostRows(): void
     {
         $capturedSql = null;

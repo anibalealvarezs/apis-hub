@@ -206,6 +206,7 @@
             $whereClauses = [
                 'm.metric_date >= :startDate',
                 'm.metric_date <= :endDate',
+                'mc.post_id IS NULL',
             ];
 
             $filterResolver = new FilterConditionResolver();
