@@ -319,15 +319,15 @@
                 'timestamp'     => $timestampExpr,
             ];
 
-            $isLatestSnapshot = (bool)($filtersArr['latest_snapshot'] ?? false);
-
-            if (!$this->resolveAndAppendAggregations($aggregations, $metricSqlResolver, $channelKey, $nameCol, $periodCol, 'lifetime', $plan, $selectFields, $orderMap, $quoteChar, $isLatestSnapshot)) {
+            if (!$this->resolveAndAppendAggregations($aggregations, $metricSqlResolver, $channelKey, $nameCol, $periodCol, 'lifetime', $plan, $selectFields, $orderMap, $quoteChar)) {
                 return null;
             }
 
             $sqlParams = [];
             $whereClauses = [];
             $filterResolver = new FilterConditionResolver();
+
+            $isLatestSnapshot = (bool)($filtersArr['latest_snapshot'] ?? false);
 
             // Pre-build account and channel filters as they are needed for the subquery
             $accountFilterWhere = null;
@@ -443,8 +443,7 @@
             AggregationPlan            $plan,
             array                      &$selectFields,
             array                      &$orderMap,
-            string                     $quoteChar,
-            bool                       $isSnapshot = false
+            string                     $quoteChar
         ): bool
         {
             $resolvedMetrics = [];
@@ -479,10 +478,6 @@
                     }
 
                     return false;
-                }
-
-                if ($isSnapshot && str_starts_with(strtoupper($metricSql), 'SUM(')) {
-                    $metricSql = 'MAX(' . substr($metricSql, 4);
                 }
 
                 $safeAlias = preg_replace('/[^a-z0-9_]/i', '_', (string)$alias) ?: (string)$alias;
