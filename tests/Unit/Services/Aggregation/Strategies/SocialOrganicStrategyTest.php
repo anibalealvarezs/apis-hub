@@ -114,6 +114,7 @@
             $this->assertIsArray($rows);
             $this->assertNotNull($capturedSql);
             $this->assertStringContainsString('mc.post_id IS NULL', (string)$capturedSql);
+            $this->assertStringContainsString('mc.dimension_set_id IS NULL', (string)$capturedSql);
         }
 
         public function testLinkedPagesExcludesPostLevelRows(): void
@@ -163,6 +164,7 @@
             $this->assertIsArray($rows);
             $this->assertNotNull($capturedSql);
             $this->assertStringContainsString('mc.post_id IS NULL', (string)$capturedSql);
+            $this->assertStringContainsString('mc.dimension_set_id IS NULL', (string)$capturedSql);
         }
 
         public function testReturnsNullForUnsupportedMetric(): void

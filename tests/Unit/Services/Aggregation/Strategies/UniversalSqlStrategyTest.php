@@ -32,7 +32,7 @@ final class UniversalSqlStrategyTest extends BaseUnitTestCase
         $repository->expects($this->once())->method('appendOptimizedStrategyMeta');
 
         $plan = new AggregationPlan(
-            aggregations: ['page_views_total' => 'page_views_total'],
+            aggregations: ['reach' => 'reach'],
             groupBy: ['daily'],
             filters: (object)[
                 'channel' => 'facebook_organic',
@@ -56,6 +56,7 @@ final class UniversalSqlStrategyTest extends BaseUnitTestCase
         $this->assertIsArray($rows);
         $this->assertNotNull($capturedSql);
         $this->assertStringContainsString('mc.post_id IS NULL', (string)$capturedSql);
+        $this->assertStringContainsString('mc.dimension_set_id IS NULL', (string)$capturedSql);
     }
 
     public function testFacebookOrganicAccountLevelQueriesExcludePostRows(): void
@@ -102,6 +103,55 @@ final class UniversalSqlStrategyTest extends BaseUnitTestCase
         $this->assertIsArray($rows);
         $this->assertNotNull($capturedSql);
         $this->assertStringContainsString('mc.post_id IS NULL', (string)$capturedSql);
+        $this->assertStringContainsString('mc.dimension_set_id IS NULL', (string)$capturedSql);
+    }
+
+    public function testFacebookOrganicBreakdownQueriesKeepDimensionRows(): void
+    {
+        $capturedSql = null;
+
+        $connection = $this->createMock(Connection::class);
+        $connection->expects($this->once())
+            ->method('fetchAllAssociative')
+            ->willReturnCallback(static function (string $sql, array $params = []) use (&$capturedSql): array {
+                $capturedSql = $sql;
+
+                return [[
+                    'daily' => '2026-06-06',
+                    'reaction_type' => 'like',
+                    'reach' => 321,
+                ]];
+            });
+
+        $repository = $this->createMock(BaseRepository::class);
+        $repository->expects($this->once())->method('appendOptimizedStrategyMeta');
+
+        $plan = new AggregationPlan(
+            aggregations: ['reach' => 'reach'],
+            groupBy: ['daily', 'reaction_type'],
+            filters: (object)[
+                'channel' => 'facebook_organic',
+                'account_type' => 'facebook_page',
+                'page_platform_id' => '147613761768682',
+            ],
+            startDate: '2026-06-01',
+            endDate: '2026-06-06',
+            context: [
+                'repository' => $repository,
+            ],
+            stages: [
+                'grouping' => ['normalized_pattern' => 'daily+reaction_type'],
+            ],
+            candidateOptimizedStrategies: ['universal_sql']
+        );
+
+        $strategy = new UniversalSqlStrategy();
+        $rows = $strategy->execute($connection, $plan, true);
+
+        $this->assertIsArray($rows);
+        $this->assertNotNull($capturedSql);
+        $this->assertStringContainsString('mc.post_id IS NULL', (string)$capturedSql);
+        $this->assertStringNotContainsString('mc.dimension_set_id IS NULL', (string)$capturedSql);
     }
 
     public function testFacebookOrganicPostGranularQueriesKeepPostRows(): void
@@ -156,6 +206,7 @@ final class UniversalSqlStrategyTest extends BaseUnitTestCase
         $this->assertIsArray($rows);
         $this->assertNotNull($capturedSql);
         $this->assertStringNotContainsString('mc.post_id IS NULL', (string)$capturedSql);
+        $this->assertStringNotContainsString('mc.dimension_set_id IS NULL', (string)$capturedSql);
     }
 
     public function testFacebookOrganicChartFallbackUsesDailyOrganicPeriod(): void
@@ -170,7 +221,7 @@ final class UniversalSqlStrategyTest extends BaseUnitTestCase
 
                 return [[
                     'daily' => '2026-06-06',
-                    'page_views_total' => 17,
+                    'reach' => 17,
                 ]];
             });
 
@@ -178,7 +229,7 @@ final class UniversalSqlStrategyTest extends BaseUnitTestCase
         $repository->expects($this->once())->method('appendOptimizedStrategyMeta');
 
         $plan = new AggregationPlan(
-            aggregations: ['page_views_total' => 'page_views_total'],
+            aggregations: ['reach' => 'reach'],
             groupBy: ['daily'],
             filters: (object)[
                 'channel' => 'facebook_organic',

@@ -80,6 +80,10 @@
                 $whereClauses[] = 'mc.post_id IS NULL';
             }
 
+            if ($this->shouldRestrictFacebookOrganicToGlobalMetrics($channelKey, $groupBy, $filtersArr)) {
+                $whereClauses[] = 'mc.dimension_set_id IS NULL';
+            }
+
             // Track unique joins to avoid duplicate LEFT JOIN clauses
             $joinedTables = [];
             $safeLeftJoin = function (string $table, string $alias, string $condition) use (&$joins, &$joinedTables) {
@@ -422,6 +426,162 @@
                 if (in_array($normalizedField, $postGranularFields, true)) {
                     return false;
                 }
+            }
+
+            return true;
+        }
+
+        /**
+         * Facebook Organic base totals should not mix global rows with breakdown dimensions
+         * unless the request explicitly asks for a breakdown.
+         *
+         * @param array<int, string> $groupBy
+         * @param array<string, mixed> $filtersArr
+         */
+        private function shouldRestrictFacebookOrganicToGlobalMetrics(?string $channelKey, array $groupBy, array $filtersArr): bool
+        {
+            if ($channelKey !== 'facebook_organic') {
+                return false;
+            }
+
+            if ($this->isPostGranularSocialOrganicQuery($groupBy, $filtersArr)) {
+                return false;
+            }
+
+            if ($this->isBreakdownRequested($groupBy, $filtersArr)) {
+                return false;
+            }
+
+            return true;
+        }
+
+        /**
+         * @param array<int, string> $groupBy
+         * @param array<string, mixed> $filtersArr
+         */
+        private function isBreakdownRequested(array $groupBy, array $filtersArr): bool
+        {
+            $relationMap = BaseRepository::getRelationMap();
+            $postGranularFields = $this->getPostGranularFields();
+
+            $nonBreakdownFields = [
+                'account_type',
+                'metric_date',
+                'daily',
+                'weekly',
+                'monthly',
+                'quarterly',
+                'yearly',
+                'channel',
+                'page',
+                'page_id',
+                'page_title',
+                'channeled_account_id',
+                'channeledaccount',
+                'linked_platform_entity_id',
+            ];
+
+            foreach ($groupBy as $field) {
+                $normalizedField = strtolower(trim((string)$field));
+
+                if ($normalizedField === '') {
+                    continue;
+                }
+
+                if (str_starts_with($normalizedField, 'dimensions.')) {
+                    return true;
+                }
+
+                if (in_array($normalizedField, $postGranularFields, true)) {
+                    continue;
+                }
+
+                if (in_array($normalizedField, $nonBreakdownFields, true)) {
+                    continue;
+                }
+
+                if (isset($relationMap[$normalizedField])) {
+                    continue;
+                }
+
+                if (str_ends_with($normalizedField, '_id')) {
+                    $baseField = substr($normalizedField, 0, -3);
+                    if ($baseField !== '' && isset($relationMap[$baseField])) {
+                        continue;
+                    }
+                }
+
+                return true;
+            }
+
+            foreach ($filtersArr as $key => $value) {
+                $normalizedKey = strtolower(trim((string)$key));
+                if (!str_starts_with($normalizedKey, 'dimensions.')) {
+                    continue;
+                }
+
+                if ($this->hasMeaningfulBreakdownFilterValue($value)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /**
+         * @param array<int, string> $groupBy
+         * @param array<string, mixed> $filtersArr
+         */
+        private function isPostGranularSocialOrganicQuery(array $groupBy, array $filtersArr): bool
+        {
+            if (isset($filtersArr['post'])) {
+                $postFilter = strtoupper(trim((string)$filtersArr['post']));
+                if ($postFilter !== '' && $postFilter !== 'NULL' && $postFilter !== 'N/A') {
+                    return true;
+                }
+            }
+
+            $postGranularFields = $this->getPostGranularFields();
+            foreach ($groupBy as $field) {
+                $normalizedField = strtolower(trim((string)$field));
+                if (in_array($normalizedField, $postGranularFields, true)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /**
+         * @return array<int, string>
+         */
+        private function getPostGranularFields(): array
+        {
+            return [
+                'post',
+                'post_id',
+                'caption',
+                'message',
+                'media_type',
+                'permalink',
+                'permalink_url',
+                'timestamp',
+                'created_time',
+            ];
+        }
+
+        private function hasMeaningfulBreakdownFilterValue(mixed $value): bool
+        {
+            if ($value === null) {
+                return false;
+            }
+
+            if (is_array($value)) {
+                return $value !== [];
+            }
+
+            if (is_string($value)) {
+                return trim($value) !== '';
             }
 
             return true;

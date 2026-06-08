@@ -112,6 +112,7 @@
                 'm.metric_date <= :endDate',
                 'LOWER(ca.type) = LOWER(:accountType)',
                 'mc.post_id IS NULL',
+                'mc.dimension_set_id IS NULL',
                 "{$pagePlatformExpr} = :pagePlatformId",
             ];
             if (isset($filtersArr['channel'])) {
@@ -207,6 +208,7 @@
                 'm.metric_date >= :startDate',
                 'm.metric_date <= :endDate',
                 'mc.post_id IS NULL',
+                'mc.dimension_set_id IS NULL',
             ];
 
             $filterResolver = new FilterConditionResolver();
