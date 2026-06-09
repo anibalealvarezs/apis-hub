@@ -327,7 +327,41 @@
             $whereClauses = [];
 
             $isLatestSnapshot = (bool)($filtersArr['latest_snapshot'] ?? false);
-            if (!$isLatestSnapshot) {
+            if ($isLatestSnapshot) {
+                $nullSafeComparator = $isPostgres ? 'IS NOT DISTINCT FROM' : '<=>';
+                $latestSnapshotBaseSql = "
+                    FROM metrics m_ls
+                    JOIN metric_configs mc_ls ON m_ls.metric_config_id = mc_ls.id
+                    WHERE mc_ls.channel = mc.channel
+                      AND mc_ls.period = mc.period
+                      AND (mc_ls.channeled_account_id $nullSafeComparator mc.channeled_account_id)
+                      AND (mc_ls.page_id $nullSafeComparator mc.page_id)
+                      AND (mc_ls.post_id $nullSafeComparator mc.post_id)
+                      AND (mc_ls.dimension_set_id $nullSafeComparator mc.dimension_set_id)
+                      AND (mc_ls.query_id $nullSafeComparator mc.query_id)
+                      AND (mc_ls.country_id $nullSafeComparator mc.country_id)
+                      AND (mc_ls.device_id $nullSafeComparator mc.device_id)
+                ";
+                $latestSnapshotSql = "SELECT MAX(m_ls.metric_date) {$latestSnapshotBaseSql}";
+
+                if ($startDate !== null || $endDate !== null) {
+                    $latestSnapshotRangeSql = $latestSnapshotSql;
+                    if ($startDate !== null) {
+                        $latestSnapshotRangeSql .= ' AND m_ls.metric_date >= :startDate';
+                        $sqlParams['startDate'] = $startDate;
+                    }
+                    if ($endDate !== null) {
+                        $latestSnapshotRangeSql .= ' AND m_ls.metric_date <= :endDate';
+                        $sqlParams['endDate'] = $endDate;
+                    }
+                    $snapshotFallbackMode = strtolower(trim((string)($filtersArr['snapshot_fallback_mode'] ?? 'resilient')));
+                    $latestSnapshotSql = $snapshotFallbackMode === 'resilient'
+                        ? "COALESCE(($latestSnapshotRangeSql), ($latestSnapshotSql))"
+                        : $latestSnapshotRangeSql;
+                }
+
+                $whereClauses[] = "m.metric_date = ($latestSnapshotSql)";
+            } else {
                 $sqlParams['startDate'] = $startDate;
                 $sqlParams['endDate']   = $endDate;
                 $whereClauses[] = 'm.metric_date >= :startDate';
