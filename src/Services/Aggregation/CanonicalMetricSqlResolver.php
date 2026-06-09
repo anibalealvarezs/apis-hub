@@ -31,7 +31,7 @@
          * @var array<int, string>
          */
         private const array SUPPORTED_ORGANIC_METRICS = [
-            'likes', 'comments', 'views', 'profile_views', 'website_clicks',
+            'likes', 'comments', 'content_views', 'views', 'profile_views', 'website_clicks',
             'profile_links_taps', 'follows_and_unfollows', 'saves', 'shares',
             'total_interactions', 'replies', 'accounts_engaged', 'post_clicks',
             'ig_reels_avg_watch_time', 'ig_reels_video_view_total_time',
@@ -77,11 +77,13 @@
             '__default__'      => [
                 'likes'                          => ['likes', 'likes_daily'],
                 'comments'                       => ['comments', 'comments_daily'],
+                'content_views'                  => ['content_views', 'content_views_daily'],
                 'shares'                         => ['shares', 'shares_daily'],
                 'reach'                          => ['reach', 'reach_daily'],
                 'views'                          => ['views', 'views_daily'],
                 'conversions'                    => ['results', 'results_daily'],
                 'follows'                        => ['follows', 'follows_daily'],
+                'follows_and_unfollows'          => ['follows_and_unfollows', 'follows_and_unfollows_daily'],
                 'ig_reels_avg_watch_time'        => ['ig_reels_avg_watch_time', 'ig_reels_avg_watch_time_daily'],
                 'ig_reels_video_view_total_time' => ['ig_reels_video_view_total_time', 'ig_reels_video_view_total_time_daily'],
                 'profile_activity'               => ['profile_activity', 'profile_activity_daily'],
@@ -236,7 +238,7 @@
             $resolvedNames = $this->resolveRawMetricNamesOrganic($resolutionMetric, $channel);
 
             $sqlExpression = match ($resolutionMetric) {
-                'likes', 'comments', 'views', 'page_views_total', 'video_views', 'profile_views', 'website_clicks',
+                'likes', 'comments', 'content_views', 'views', 'page_views_total', 'video_views', 'profile_views', 'website_clicks',
                 'profile_links_taps', 'follows_and_unfollows', 'saves', 'shares',
                 'total_interactions', 'replies', 'accounts_engaged', 'post_clicks',
                 'ig_reels_avg_watch_time', 'ig_reels_video_view_total_time',
