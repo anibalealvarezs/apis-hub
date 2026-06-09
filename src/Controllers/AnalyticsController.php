@@ -234,6 +234,13 @@ class AnalyticsController extends BaseController
                            ->setMaxResults(1);
                         
                         $result = $qb->getQuery()->getOneOrNullResult();
+
+                        // Some channels (e.g. GSC) store platformId as MD5 hash of the URL
+                        if (!$result) {
+                            $qb->setParameter('platformId', md5(trim($platformId)));
+                            $result = $qb->getQuery()->getOneOrNullResult();
+                        }
+
                         if ($result) {
                             $node['filters']['channeledAccount'] = $result['id'];
                             unset($node['filters']['asset_platform_id']);
