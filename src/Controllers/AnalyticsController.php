@@ -91,7 +91,7 @@ class AnalyticsController extends BaseController
                 // For bivariate stats (regression, elasticity, granger), we require an AST Operator bridge
                 if ($requiresBivariate) {
                     if (!$node instanceof \Services\Analytics\VirtualMetricEngine\Nodes\OperatorNode) {
-                        throw new Exception("This statistic requires an Operator node at the root to split dependent and independent variables.");
+                        return $this->errorResponse("This statistic requires an Operator node at the root to split dependent and independent variables.", 500);
                     }
                     $ySeriesRaw = $node->getLeft()->evaluate($context);
                     $xSeriesRaw = $node->getRight()->evaluate($context);
@@ -106,34 +106,70 @@ class AnalyticsController extends BaseController
                     $originalXSize = count($xSeriesRaw);
 
                     $dates = array_intersect(array_keys($ySeriesRaw), array_keys($xSeriesRaw));
-                    $yValues = [];
-                    $xValues = [];
-                    $finalDates = [];
-                    
-                    foreach ($dates as $date) {
-                        $yVal = (float)$ySeriesRaw[$date];
-                        $xVal = (float)$xSeriesRaw[$date];
-                            
-                            // Automatically treat the data: only include overlapping dates where both metrics have actual non-zero data
-                            if (!empty($yVal) && !empty($xVal)) {
-                                $finalDates[] = $date;
-                                $yValues[] = $yVal;
-                                $xValues[] = $xVal;
-                            }
-                        }
-                        
-                        $finalSize = count($finalDates);
-                        $removedY = $originalYSize - $finalSize;
-                        $removedX = $originalXSize - $finalSize;
+                    $zeroHandling = $payload['zero_handling'] ?? 'remove';
 
-                        // Regression mathematically requires at least 2 points (preferably more)
-                        if ($finalSize < 2) {
-                            throw new Exception(
-                                "Not enough overlapping non-zero data points for regression. Found: {$finalSize}. " .
-                                "Original Dependent (Y) size: {$originalYSize} (Removed: {$removedY}). " .
-                                "Original Independent (X) size: {$originalXSize} (Removed: {$removedX})."
-                            );
-                        }
+                    // Collect all aligned points (including zeros) in order
+                    $alignedDates = [];
+                    $alignedY = [];
+                    $alignedX = [];
+                    foreach ($dates as $date) {
+                        $alignedDates[] = $date;
+                        $alignedY[] = (float)$ySeriesRaw[$date];
+                        $alignedX[] = (float)$xSeriesRaw[$date];
+                    }
+
+                    // Apply the chosen zero-handling strategy
+                    switch ($zeroHandling) {
+                        case 'keep':
+                            $finalDates = $alignedDates;
+                            $yValues = $alignedY;
+                            $xValues = $alignedX;
+                            break;
+
+                        case 'trim':
+                            $firstNonZero = null;
+                            $lastNonZero = null;
+                            foreach ($alignedY as $i => $yVal) {
+                                if (!empty($yVal) && !empty($alignedX[$i])) {
+                                    if ($firstNonZero === null) $firstNonZero = $i;
+                                    $lastNonZero = $i;
+                                }
+                            }
+                            if ($firstNonZero === null) {
+                                $finalDates = [];
+                                $yValues = [];
+                                $xValues = [];
+                            } else {
+                                $finalDates = array_slice($alignedDates, $firstNonZero, $lastNonZero - $firstNonZero + 1);
+                                $yValues = array_slice($alignedY, $firstNonZero, $lastNonZero - $firstNonZero + 1);
+                                $xValues = array_slice($alignedX, $firstNonZero, $lastNonZero - $firstNonZero + 1);
+                            }
+                            break;
+
+                        case 'remove':
+                        default:
+                            foreach ($alignedDates as $i => $date) {
+                                if (!empty($alignedY[$i]) && !empty($alignedX[$i])) {
+                                    $finalDates[] = $date;
+                                    $yValues[] = $alignedY[$i];
+                                    $xValues[] = $alignedX[$i];
+                                }
+                            }
+                            break;
+                    }
+
+                    $finalSize = count($finalDates);
+                    $removedY = $originalYSize - $finalSize;
+                    $removedX = $originalXSize - $finalSize;
+
+                    if ($finalSize < 2) {
+                        return $this->errorResponse(
+                            "Not enough overlapping non-zero data points for regression. Found: {$finalSize}. " .
+                            "Original Dependent (Y) size: {$originalYSize} (Removed: {$removedY}). " .
+                            "Original Independent (X) size: {$originalXSize} (Removed: {$removedX}).",
+                            500
+                        );
+                    }
                         
                         $regressionPayload = [
                             'dependent_var' => [
@@ -154,7 +190,7 @@ class AnalyticsController extends BaseController
                         $pythonResponse = $this->forwardToPythonEngine($regressionPayload, $sdkMethod, $engineHost, $apiKey);
                         $result = $pythonResponse['data'] ?? $pythonResponse;
                     } else {
-                        throw new Exception("The mathematical payload requires time-series array evaluation. Pass groupBy: ['daily'] in filters.");
+                        return $this->errorResponse("The mathematical payload requires time-series array evaluation. Pass groupBy: ['daily'] in filters.", 500);
                     }
 
                 $logger->info("Python engine request completed in " . round((microtime(true) - $tPythonStart) * 1000, 2) . "ms");
