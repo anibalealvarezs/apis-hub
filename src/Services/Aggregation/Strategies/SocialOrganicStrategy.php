@@ -319,33 +319,35 @@
                 'timestamp'     => $timestampExpr,
             ];
 
-            $isLatestSnapshot = (bool)($filtersArr['latest_snapshot'] ?? false);
-
-            if (!$this->resolveAndAppendAggregations($aggregations, $metricSqlResolver, $channelKey, $nameCol, $periodCol, 'lifetime', $plan, $selectFields, $orderMap, $quoteChar, $isLatestSnapshot)) {
+            if (!$this->resolveAndAppendAggregations($aggregations, $metricSqlResolver, $channelKey, $nameCol, $periodCol, 'lifetime', $plan, $selectFields, $orderMap, $quoteChar)) {
                 return null;
             }
 
             $sqlParams = [];
             $whereClauses = [];
+
+            $isLatestSnapshot = (bool)($filtersArr['latest_snapshot'] ?? false);
+            if (!$isLatestSnapshot) {
+                $sqlParams['startDate'] = $startDate;
+                $sqlParams['endDate']   = $endDate;
+                $whereClauses[] = 'm.metric_date >= :startDate';
+                $whereClauses[] = 'm.metric_date <= :endDate';
+            }
+
             $filterResolver = new FilterConditionResolver();
 
-            // Pre-build account and channel filters as they are needed for the subquery
-            $accountFilterWhere = null;
-            $accountFilterParams = [];
             if (!empty($filtersArr['channeledAccount'])) {
                 $condition = $filterResolver->resolve($filtersArr['channeledAccount']);
-                $accountFilterWhere = $this->buildFilterClause('mc.channeled_account_id', $condition, 'channeledAccount');
-                $this->bindFilterParams($accountFilterParams, 'channeledAccount', $condition);
+                $whereClauses[] = $this->buildFilterClause('mc.channeled_account_id', $condition, 'channeledAccount');
+                $this->bindFilterParams($sqlParams, 'channeledAccount', $condition);
             } elseif (!empty($filtersArr['page'])) {
                 $condition = $filterResolver->resolve($filtersArr['page']);
-                $accountFilterWhere = $this->buildFilterClause('mc.page_id', $condition, 'pageId');
-                $this->bindFilterParams($accountFilterParams, 'pageId', $condition);
+                $whereClauses[] = $this->buildFilterClause('mc.page_id', $condition, 'pageId');
+                $this->bindFilterParams($sqlParams, 'pageId', $condition);
             } else {
                 return null;
             }
 
-            $channelFilterWhere = null;
-            $channelFilterParams = [];
             if (isset($filtersArr['channel'])) {
                 $condition = $filterResolver->resolve($filtersArr['channel']);
                 $channelVal = $condition['value'];
@@ -353,45 +355,8 @@
                     $ch = Channel::tryFromName((string)$channelVal);
                     if ($ch) $condition['value'] = $ch->getId();
                 }
-                $channelFilterWhere = $this->buildFilterClause('mc.channel', $condition, 'channel');
-                $this->bindFilterParams($channelFilterParams, 'channel', $condition);
-            }
-
-            if ($isLatestSnapshot) {
-                // Find the single latest metric_date for the given account/channel filters
-                $subQuerySql = "SELECT MAX(m.metric_date) FROM metrics m JOIN metric_configs mc ON m.metric_config_id = mc.id";
-                $subQueryWhere = [$accountFilterWhere];
-                $subQueryParams = $accountFilterParams;
-
-                if ($channelFilterWhere) {
-                    $subQueryWhere[] = $channelFilterWhere;
-                    $subQueryParams = array_merge($subQueryParams, $channelFilterParams);
-                }
-                $subQueryWhere[] = 'm.metric_date <= :endDate';
-                $subQueryParams['endDate'] = $endDate;
-
-                $subQuerySql .= " WHERE " . implode(" AND ", $subQueryWhere);
-                $latestDate = $connection->fetchOne($subQuerySql, $subQueryParams);
-
-                if (!$latestDate) {
-                    return []; // No data found for this account in the given range
-                }
-
-                $whereClauses[] = 'm.metric_date = :latestDate';
-                $sqlParams['latestDate'] = $latestDate;
-            } else {
-                $sqlParams['startDate'] = $startDate;
-                $sqlParams['endDate']   = $endDate;
-                $whereClauses[] = 'm.metric_date >= :startDate';
-                $whereClauses[] = 'm.metric_date <= :endDate';
-            }
-
-            // Add the main filters to the query
-            $whereClauses[] = $accountFilterWhere;
-            $sqlParams = array_merge($sqlParams, $accountFilterParams);
-            if ($channelFilterWhere) {
-                $whereClauses[] = $channelFilterWhere;
-                $sqlParams = array_merge($sqlParams, $channelFilterParams);
+                $whereClauses[] = $this->buildFilterClause('mc.channel', $condition, 'channel');
+                $this->bindFilterParams($sqlParams, 'channel', $condition);
             }
 
             if (isset($filtersArr['post'])) {
@@ -443,8 +408,7 @@
             AggregationPlan            $plan,
             array                      &$selectFields,
             array                      &$orderMap,
-            string                     $quoteChar,
-            bool                       $isSnapshot = false
+            string                     $quoteChar
         ): bool
         {
             $resolvedMetrics = [];
@@ -455,8 +419,7 @@
                     channel: $channelKey,
                     nameCol: $nameCol,
                     periodCol: $periodCol,
-                    period: $period,
-                    isSnapshot: $isSnapshot
+                    period: $period
                 );
                 $metricSql = is_string($resolvedMetric['sql_expression']) ? $resolvedMetric['sql_expression'] : null;
                 if ($metricSql === null) {
