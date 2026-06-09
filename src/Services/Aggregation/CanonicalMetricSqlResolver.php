@@ -701,7 +701,9 @@
                         continue;
                     }
 
-                    $normalized[$channelKey][$metricKey] = $rawNames;
+                    $existing = $normalized[$channelKey][$metricKey] ?? [];
+                    $rawNamesArray = is_array($rawNames) ? $rawNames : [$rawNames];
+                    $normalized[$channelKey][$metricKey] = array_unique(array_merge($existing, $rawNamesArray));
                 }
             }
 

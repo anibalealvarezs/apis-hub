@@ -435,7 +435,7 @@
                 $metricSql = is_string($resolvedMetric['sql_expression']) ? $resolvedMetric['sql_expression'] : null;
 
                 if ($useMaxForSnapshot && $metricSql !== null) {
-                    $metricSql = preg_replace('/^SUM\((.+)\s+ELSE\s+0\s+END\)$/i', 'MAX($1 END)', $metricSql);
+                    $metricSql = preg_replace('/^SUM\((.+)\s+ELSE\s+0\s+END\)$/i', 'MAX($1 ELSE 0 END)', $metricSql);
                 }
                 if ($metricSql === null) {
                     $repository = $plan->getContextValue('repository');
