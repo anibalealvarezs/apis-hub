@@ -205,13 +205,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/api-driver-core.git",
-                "reference": "970774343d2aee19a9393060e9c9d18b63298cd0"
+                "reference": "bca155bdb80255373b1836af67631ae007591544"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/api-driver-core/anibalealvarezs-api-driver-core-970774343d2aee19a9393060e9c9d18b63298cd0-zip-a3da38.zip",
-                "reference": "970774343d2aee19a9393060e9c9d18b63298cd0",
-                "shasum": "0cde0238b8dc82e0ea23e138f98ffa1fad976624"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/api-driver-core/anibalealvarezs-api-driver-core-bca155bdb80255373b1836af67631ae007591544-zip-b0cf5b.zip",
+                "reference": "bca155bdb80255373b1836af67631ae007591544",
+                "shasum": "422aefc8a6fab826cb0c6a688a23725613b189d2"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "^1.0.0",
@@ -245,7 +245,7 @@
                 }
             ],
             "description": "Core interfaces and orchestration logic for APIs Hub drivers.",
-            "time": "2026-05-25T01:56:40+00:00"
+            "time": "2026-06-09T12:12:37+00:00"
         },
         {
             "name": "anibalealvarezs/bigcommerce-hub-driver",
@@ -297,13 +297,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/facebook-graph-api.git",
-                "reference": "6dbf560d4ee438db6b101941f5c5a757577aec72"
+                "reference": "3061252392e993b9931cf783c27b590cda832eed"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/facebook-graph-api/anibalealvarezs-facebook-graph-api-6dbf560d4ee438db6b101941f5c5a757577aec72-zip-f425f2.zip",
-                "reference": "6dbf560d4ee438db6b101941f5c5a757577aec72",
-                "shasum": "be82dad610ffaef22a58cf11a0a820883f1c0044"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/facebook-graph-api/anibalealvarezs-facebook-graph-api-3061252392e993b9931cf783c27b590cda832eed-zip-2883d3.zip",
+                "reference": "3061252392e993b9931cf783c27b590cda832eed",
+                "shasum": "dadff87630fd11a0cd5e11cc41ced010abdb3688"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "^1.0.0",
@@ -354,7 +354,7 @@
             "support": {
                 "issues": "https://github.com/anibalealvarezs/facebook-graph-api/issues"
             },
-            "time": "2026-06-07T21:37:56+00:00"
+            "time": "2026-06-09T12:19:01+00:00"
         },
         {
             "name": "anibalealvarezs/google-api",
@@ -621,13 +621,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/meta-hub-driver.git",
-                "reference": "10b6eabf2ebd58119ffd1a5d52e5d6d686c826fa"
+                "reference": "afa53e61b8132c01b7c7228887748f7a7bedd41a"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/meta-hub-driver/anibalealvarezs-meta-hub-driver-10b6eabf2ebd58119ffd1a5d52e5d6d686c826fa-zip-a2c1ec.zip",
-                "reference": "10b6eabf2ebd58119ffd1a5d52e5d6d686c826fa",
-                "shasum": "72232ac96a0b219da1c3935d3465550fad00a393"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/meta-hub-driver/anibalealvarezs-meta-hub-driver-afa53e61b8132c01b7c7228887748f7a7bedd41a-zip-a3d306.zip",
+                "reference": "afa53e61b8132c01b7c7228887748f7a7bedd41a",
+                "shasum": "957ca4b5c368b3f822f5867d6e79f65e7360aced"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "^1.0.0",
@@ -660,7 +660,7 @@
                 }
             ],
             "description": "APIs-Hub driver for Meta (Facebook & Instagram) integration.",
-            "time": "2026-06-08T16:21:15+00:00"
+            "time": "2026-06-09T12:20:59+00:00"
         },
         {
             "name": "anibalealvarezs/netsuite-api",
@@ -4473,16 +4473,16 @@
         },
         {
             "name": "symfony/polyfill-mbstring",
-            "version": "v1.38.1",
+            "version": "v1.38.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/polyfill-mbstring.git",
-                "reference": "14c5439eec4ccff081ac14eca2dc57feb2a66d92"
+                "reference": "d3d318bad5e7a1bfbd026009c8bfb8d8f99ae6b6"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/polyfill-mbstring/zipball/14c5439eec4ccff081ac14eca2dc57feb2a66d92",
-                "reference": "14c5439eec4ccff081ac14eca2dc57feb2a66d92",
+                "url": "https://api.github.com/repos/symfony/polyfill-mbstring/zipball/d3d318bad5e7a1bfbd026009c8bfb8d8f99ae6b6",
+                "reference": "d3d318bad5e7a1bfbd026009c8bfb8d8f99ae6b6",
                 "shasum": ""
             },
             "require": {
@@ -4534,7 +4534,7 @@
                 "shim"
             ],
             "support": {
-                "source": "https://github.com/symfony/polyfill-mbstring/tree/v1.38.1"
+                "source": "https://github.com/symfony/polyfill-mbstring/tree/v1.38.2"
             },
             "funding": [
                 {
@@ -4554,7 +4554,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-05-26T12:51:13+00:00"
+            "time": "2026-05-27T06:59:30+00:00"
         },
         {
             "name": "symfony/polyfill-php80",
@@ -4642,16 +4642,16 @@
         },
         {
             "name": "symfony/polyfill-php83",
-            "version": "v1.38.1",
+            "version": "v1.38.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/polyfill-php83.git",
-                "reference": "8339098cae28673c15cce00d80734af0453054e2"
+                "reference": "796a26abb75ce49f3a84433cd81bf1009d73d5f8"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/polyfill-php83/zipball/8339098cae28673c15cce00d80734af0453054e2",
-                "reference": "8339098cae28673c15cce00d80734af0453054e2",
+                "url": "https://api.github.com/repos/symfony/polyfill-php83/zipball/796a26abb75ce49f3a84433cd81bf1009d73d5f8",
+                "reference": "796a26abb75ce49f3a84433cd81bf1009d73d5f8",
                 "shasum": ""
             },
             "require": {
@@ -4698,7 +4698,7 @@
                 "shim"
             ],
             "support": {
-                "source": "https://github.com/symfony/polyfill-php83/tree/v1.38.1"
+                "source": "https://github.com/symfony/polyfill-php83/tree/v1.38.2"
             },
             "funding": [
                 {
@@ -4718,7 +4718,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-05-26T12:51:13+00:00"
+            "time": "2026-05-27T06:51:48+00:00"
         },
         {
             "name": "symfony/polyfill-php84",
@@ -6160,16 +6160,16 @@
         },
         {
             "name": "phpbench/phpbench",
-            "version": "1.6.1",
+            "version": "1.7.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/phpbench/phpbench.git",
-                "reference": "661c8c6abbc7734986cf7bc6062c237fbb450461"
+                "reference": "3d13c0d5dcf8730a67b70fa7fb03b4556b5cc0fe"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/phpbench/phpbench/zipball/661c8c6abbc7734986cf7bc6062c237fbb450461",
-                "reference": "661c8c6abbc7734986cf7bc6062c237fbb450461",
+                "url": "https://api.github.com/repos/phpbench/phpbench/zipball/3d13c0d5dcf8730a67b70fa7fb03b4556b5cc0fe",
+                "reference": "3d13c0d5dcf8730a67b70fa7fb03b4556b5cc0fe",
                 "shasum": ""
             },
             "require": {
@@ -6194,14 +6194,14 @@
             "require-dev": {
                 "dantleech/invoke": "^2.0",
                 "ergebnis/composer-normalize": "^2.39",
-                "jangregor/phpstan-prophecy": "^1.0",
+                "jangregor/phpstan-prophecy": "^2.0",
                 "php-cs-fixer/shim": "^3.9",
                 "phpspec/prophecy": "^1.22",
                 "phpstan/extension-installer": "^1.1",
-                "phpstan/phpstan": "^1.0",
-                "phpstan/phpstan-phpunit": "^1.0",
+                "phpstan/phpstan": "^2.0",
+                "phpstan/phpstan-phpunit": "^2.0",
                 "phpunit/phpunit": "^11.5",
-                "rector/rector": "^1.2",
+                "rector/rector": "^2.2",
                 "sebastian/exporter": "^6.3.2",
                 "symfony/error-handler": "^6.1 || ^7.0 || ^8.0",
                 "symfony/var-dumper": "^6.1 || ^7.0 || ^8.0"
@@ -6247,7 +6247,7 @@
             ],
             "support": {
                 "issues": "https://github.com/phpbench/phpbench/issues",
-                "source": "https://github.com/phpbench/phpbench/tree/1.6.1"
+                "source": "https://github.com/phpbench/phpbench/tree/1.7.0"
             },
             "funding": [
                 {
@@ -6255,7 +6255,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-03-22T10:27:20+00:00"
+            "time": "2026-06-08T19:09:20+00:00"
         },
         {
             "name": "phpstan/phpstan",
