@@ -319,15 +319,19 @@
                 'timestamp'     => $timestampExpr,
             ];
 
-            if (!$this->resolveAndAppendAggregations($aggregations, $metricSqlResolver, $channelKey, $nameCol, $periodCol, 'lifetime', $plan, $selectFields, $orderMap, $quoteChar)) {
+            $isLatestSnapshot = (bool)($filtersArr['latest_snapshot'] ?? false);
+
+            if (!$this->resolveAndAppendAggregations($aggregations, $metricSqlResolver, $channelKey, $nameCol, $periodCol, 'lifetime', $plan, $selectFields, $orderMap, $quoteChar, $isLatestSnapshot)) {
                 return null;
             }
 
             $sqlParams = [];
             $whereClauses = [];
 
-            $isLatestSnapshot = (bool)($filtersArr['latest_snapshot'] ?? false);
-            if (!$isLatestSnapshot) {
+            if ($isLatestSnapshot) {
+                $whereClauses[] = 'm.metric_date = :endDate';
+                $sqlParams['endDate'] = $endDate;
+            } else {
                 $sqlParams['startDate'] = $startDate;
                 $sqlParams['endDate']   = $endDate;
                 $whereClauses[] = 'm.metric_date >= :startDate';
@@ -408,7 +412,8 @@
             AggregationPlan            $plan,
             array                      &$selectFields,
             array                      &$orderMap,
-            string                     $quoteChar
+            string                     $quoteChar,
+            bool                       $isSnapshot = false
         ): bool
         {
             $resolvedMetrics = [];
@@ -443,6 +448,10 @@
                     }
 
                     return false;
+                }
+
+                if ($isSnapshot && $period === 'lifetime' && str_starts_with(strtoupper($metricSql), 'SUM(')) {
+                    $metricSql = 'MAX(' . substr($metricSql, 4);
                 }
 
                 $safeAlias = preg_replace('/[^a-z0-9_]/i', '_', (string)$alias) ?: (string)$alias;
