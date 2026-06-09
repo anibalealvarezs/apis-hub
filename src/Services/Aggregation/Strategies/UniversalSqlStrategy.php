@@ -65,51 +65,15 @@
             $orderMap = [];
 
             $relationMap = BaseRepository::getRelationMap();
-            $isLatestSnapshot = (bool)($filtersArr['latest_snapshot'] ?? false);
 
-            if ($isLatestSnapshot) {
-                $accountFilterWhere = null;
-                $accountFilterParams = [];
-                if (!empty($filtersArr['channeledAccount'])) {
-                    $condition = $filterResolver->resolve($filtersArr['channeledAccount']);
-                    $accountFilterWhere = $this->buildFilterClause('mc.channeled_account_id', $condition, 'channeledAccount');
-                    $this->bindFilterParams($accountFilterParams, 'channeledAccount', $condition);
-                } elseif (!empty($filtersArr['page'])) {
-                    $condition = $filterResolver->resolve($filtersArr['page']);
-                    $accountFilterWhere = $this->buildFilterClause('mc.page_id', $condition, 'pageId');
-                    $this->bindFilterParams($accountFilterParams, 'pageId', $condition);
-                }
+            if ($startDate !== null) {
+                $whereClauses[] = 'm.metric_date >= :startDate';
+                $sqlParams['startDate'] = $startDate;
+            }
 
-                $subQuerySql = "SELECT MAX(m.metric_date) FROM metrics m JOIN metric_configs mc ON m.metric_config_id = mc.id";
-                $subQueryWhere = [];
-                $subQueryParams = [];
-
-                if ($accountFilterWhere) {
-                    $subQueryWhere[] = $accountFilterWhere;
-                    $subQueryParams = $accountFilterParams;
-                }
-
-                $subQueryWhere[] = 'm.metric_date <= :endDate';
-                $subQueryParams['endDate'] = $endDate;
-
-                $subQuerySql .= " WHERE " . implode(" AND ", $subQueryWhere);
-                $latestDate = $connection->fetchOne($subQuerySql, $subQueryParams);
-
-                if (!$latestDate) {
-                    return [];
-                }
-
-                $whereClauses[] = 'm.metric_date = :latestDate';
-                $sqlParams['latestDate'] = $latestDate;
-            } else {
-                if ($startDate !== null) {
-                    $whereClauses[] = 'm.metric_date >= :startDate';
-                    $sqlParams['startDate'] = $startDate;
-                }
-                if ($endDate !== null) {
-                    $whereClauses[] = 'm.metric_date <= :endDate';
-                    $sqlParams['endDate'] = $endDate;
-                }
+            if ($endDate !== null) {
+                $whereClauses[] = 'm.metric_date <= :endDate';
+                $sqlParams['endDate'] = $endDate;
             }
 
             if ($this->shouldRestrictFacebookOrganicToPageLevel($channelKey, $groupBy, $filtersArr)) {
@@ -317,8 +281,7 @@
                         channel: $channelKey,
                         nameCol: $nameCol,
                         periodCol: $periodCol,
-                        period: $organicPeriod,
-                        isSnapshot: $isLatestSnapshot
+                        period: $organicPeriod
                     );
 
                     if (is_string($resolvedOrganicMetric['sql_expression'])) {
@@ -786,3 +749,5 @@
             return $channel instanceof Channel ? strtolower(trim($channel->getName())) : null;
         }
     }
+
+
