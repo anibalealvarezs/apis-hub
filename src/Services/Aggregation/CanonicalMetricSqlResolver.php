@@ -195,7 +195,8 @@
             ?string $channel,
             string  $nameCol,
             string  $periodCol,
-            string  $period = 'daily'
+            string  $period = 'daily',
+            bool    $isSnapshot = false
         ): array
         {
             $normalizedRequested = strtolower(trim($requestedMetric));
@@ -241,7 +242,7 @@
                 'total_interactions', 'replies', 'accounts_engaged', 'post_clicks',
                 'ig_reels_avg_watch_time', 'ig_reels_video_view_total_time',
                 'profile_activity', 'profile_visits', 'reposts', 'follows', 'reach', 'post_video_avg_time_watched' =>
-                $this->buildSumExpression($resolvedNames['raw_names'], $nameCol, $periodCol, $period),
+                $this->buildSumExpression($resolvedNames['raw_names'], $nameCol, $periodCol, $period, $isSnapshot),
                 default => null,
             };
 
@@ -331,10 +332,11 @@
             ?string $channel,
             string  $nameCol,
             string  $periodCol,
-            string  $period = 'daily'
+            string  $period = 'daily',
+            bool    $isSnapshot = false
         ): ?string
         {
-            $resolved = $this->resolveOrganicMetric($requestedMetric, $channel, $nameCol, $periodCol, $period);
+            $resolved = $this->resolveOrganicMetric($requestedMetric, $channel, $nameCol, $periodCol, $period, $isSnapshot);
 
             return is_string($resolved['sql_expression']) ? $resolved['sql_expression'] : null;
         }
@@ -397,13 +399,15 @@
         /**
          * @param array<int, string> $rawNames
          */
-        private function buildSumExpression(array $rawNames, string $nameCol, string $periodCol, string $period = 'daily'): ?string
+        private function buildSumExpression(array $rawNames, string $nameCol, string $periodCol, string $period = 'daily', bool $isSnapshot = false): ?string
         {
             if ($rawNames === []) {
                 return null;
             }
 
-            return "SUM(CASE WHEN $nameCol IN (".$this->toSqlStringList($rawNames).") AND $periodCol = '$period' THEN m.value ELSE 0 END)";
+            $aggregator = ($isSnapshot && $period === 'lifetime') ? 'MAX' : 'SUM';
+
+            return "$aggregator(CASE WHEN $nameCol IN (".$this->toSqlStringList($rawNames).") AND $periodCol = '$period' THEN m.value ELSE 0 END)";
         }
 
         /**
@@ -784,4 +788,3 @@
             return 'unknown';
         }
     }
-
