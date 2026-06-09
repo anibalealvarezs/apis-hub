@@ -75,12 +75,20 @@
          */
         private const array DEFAULT_ORGANIC_DICTIONARY = [
             '__default__'      => [
-                'likes'       => ['likes', 'likes_daily'],
-                'comments'    => ['comments', 'comments_daily'],
-                'shares'      => ['shares', 'shares_daily'],
-                'reach'       => ['reach', 'reach_daily'],
-                'views'       => ['views', 'views_daily'],
-                'conversions' => ['results', 'results_daily'],
+                'likes'                          => ['likes', 'likes_daily'],
+                'comments'                       => ['comments', 'comments_daily'],
+                'shares'                         => ['shares', 'shares_daily'],
+                'reach'                          => ['reach', 'reach_daily'],
+                'views'                          => ['views', 'views_daily'],
+                'conversions'                    => ['results', 'results_daily'],
+                'follows'                        => ['follows', 'follows_daily'],
+                'ig_reels_avg_watch_time'        => ['ig_reels_avg_watch_time', 'ig_reels_avg_watch_time_daily'],
+                'ig_reels_video_view_total_time' => ['ig_reels_video_view_total_time', 'ig_reels_video_view_total_time_daily'],
+                'profile_activity'               => ['profile_activity', 'profile_activity_daily'],
+                'profile_visits'                 => ['profile_visits', 'profile_visits_daily'],
+                'reposts'                        => ['reposts', 'reposts_daily'],
+                'saved'                          => ['saved', 'saved_daily'],
+                'total_interactions'             => ['total_interactions', 'total_interactions_daily'],
             ],
         ];
 
