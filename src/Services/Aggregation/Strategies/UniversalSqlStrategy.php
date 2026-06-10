@@ -679,6 +679,9 @@
         private function buildFilterClause(string $col, array $condition, string $alias): string
         {
             if ($condition['operator'] === 'in' && is_array($condition['value'])) {
+                if (empty($condition['value'])) {
+                    return "1 = 0";
+                }
                 $placeholders = [];
                 foreach (array_keys($condition['value']) as $i) {
                     $placeholders[] = ":{$alias}_{$i}";
