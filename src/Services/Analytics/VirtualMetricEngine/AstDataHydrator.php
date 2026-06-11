@@ -60,8 +60,6 @@ class AstDataHydrator
             $batchedQueries[$batchKey]['nodes'][] = clone $mNode; // store for mapping back to keys
         }
 
-        /** @var MetricRepository $metricRepository */
-        $metricRepository = $this->em->getRepository(\Entities\Analytics\Metric::class);
         $executor = new AggregationExecutor();
         
         $metricData = [];
@@ -73,9 +71,20 @@ class AstDataHydrator
             $channel = $batch['channel'];
             $channelFilter = (object) $batch['filters'];
             
+            $repository = null;
             if ($channel !== 'global') {
                 $channelEntity = $this->em->getRepository(\Entities\Analytics\Channel::class)->findOneBy(['name' => $channel]);
                 $channelFilter->channel = $channelEntity ? $channelEntity->getId() : 0;
+                
+                $entitiesConfig = \Helpers\Helpers::getEntitiesConfig();
+                $channeledClass = $entitiesConfig['metric']['channeled_class'] ?? null;
+                if ($channeledClass && class_exists($channeledClass)) {
+                    $repository = $this->em->getRepository($channeledClass);
+                }
+            }
+            
+            if (!$repository) {
+                $repository = $this->em->getRepository(\Entities\Analytics\Metric::class);
             }
             
             $aggregations = $batch['metrics'];
@@ -86,7 +95,7 @@ class AstDataHydrator
             }
             
             $result = $executor->executeAggregate(
-                repository: $metricRepository,
+                repository: $repository,
                 aggregations: $aggregations,
                 groupBy: $groupBy,
                 filters: $channelFilter,

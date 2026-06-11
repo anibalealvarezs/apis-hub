@@ -263,25 +263,35 @@ class AnalyticsController extends BaseController
                         $qb->select('ca.id')
                            ->from(\Entities\Analytics\Channeled\ChanneledAccount::class, 'ca')
                            ->join('ca.channel', 'c')
-                           ->where('ca.platformId = :platformId')
                            ->andWhere('c.name = :channelName')
-                           ->setParameter('platformId', $platformId)
-                           ->setParameter('channelName', $channelName)
-                           ->setMaxResults(1);
+                           ->setParameter('channelName', $channelName);
+                           
+                        $isArray = is_array($platformId);
+                        if ($isArray) {
+                            $qb->andWhere('ca.platformId IN (:platformId)')
+                               ->setParameter('platformId', $platformId);
+                        } else {
+                            $qb->andWhere('ca.platformId = :platformId')
+                               ->setParameter('platformId', $platformId)
+                               ->setMaxResults(1);
+                        }
                         
-                        $result = $qb->getQuery()->getOneOrNullResult();
+                        $result = $qb->getQuery()->getResult();
 
                         // Some channels (e.g. GSC) store platformId as MD5 hash of the URL
-                        if (!$result) {
+                        if (empty($result) && !$isArray) {
                             $qb->setParameter('platformId', md5(trim($platformId)));
-                            $result = $qb->getQuery()->getOneOrNullResult();
+                            $result = $qb->getQuery()->getResult();
                         }
 
-                        if ($result) {
-                            $node['filters']['channeledAccount'] = $result['id'];
+                        if (!empty($result)) {
+                            $ids = array_column($result, 'id');
+                            // If array was passed, return array, else return string/int
+                            $node['filters']['channeledAccount'] = $isArray ? $ids : $ids[0];
                             unset($node['filters']['asset_platform_id']);
                         } else {
-                            throw new \Exception("Asset with platform ID '{$platformId}' for channel '{$channelName}' has not been synced to APIs Hub yet.");
+                            $displayId = $isArray ? implode(', ', $platformId) : $platformId;
+                            throw new \Exception("Asset with platform ID '{$displayId}' for channel '{$channelName}' has not been synced to APIs Hub yet.");
                         }
                     }
                 }
