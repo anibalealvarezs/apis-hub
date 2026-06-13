@@ -162,6 +162,10 @@
                     for ($i = 1; $i < count($channelInstances); $i++) {
                         // Recent jobs should run independently to avoid blocking daily updates
                         if (str_ends_with($channelInstances[$i]['name'], '-recent')) {
+                            // But they MUST wait for entity sync jobs to complete if applicable
+                            if ($entitiesSyncValue) {
+                                $channelInstances[$i]['requires'] = $channelInstances[0]['name'];
+                            }
                             continue;
                         }
                         $channelInstances[$i]['requires'] = $channelInstances[$i - 1]['name'];

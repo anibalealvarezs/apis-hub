@@ -722,19 +722,25 @@ class JobRepository extends BaseRepository
      * @throws Exception
      * @throws \DateMalformedStringException
      */
-    public function hasSuccessfulRecentJob(string $instanceName, int $withinHours = 24): bool
+    public function hasSuccessfulRecentJob(string $instanceName, int $withinHours = 24, ?string $accountId = null): bool
     {
         if (Helpers::isPostgres()) {
             $since = new DateTime();
             $since->modify("-$withinHours hours");
 
             $sql = "SELECT count(j.id) FROM jobs j WHERE CAST(j.payload AS text) LIKE :instance_name_pattern AND j.status = :completed AND j.updated_at >= :since";
-
-            $result = $this->_em->getConnection()->executeQuery($sql, [
+            $sqlParams = [
                 'instance_name_pattern' => '%instance_name%'.$instanceName.'%',
                 'completed' => JobStatus::completed->value,
                 'since' => $since->format('Y-m-d H:i:s'),
-            ]);
+            ];
+
+            if ($accountId !== null) {
+                $sql .= " AND (CAST(j.payload AS JSONB)->'params'->>'account_id' = :account_id OR CAST(j.payload AS JSONB)->>'account_id' = :account_id)";
+                $sqlParams['account_id'] = $accountId;
+            }
+
+            $result = $this->_em->getConnection()->executeQuery($sql, $sqlParams);
 
             return (int)$result->fetchOne() > 0;
         }
@@ -745,16 +751,21 @@ class JobRepository extends BaseRepository
 
         $payloadField = 'e.payload';
 
-        $count = $qb->select('count(e.id)')
+        $qb->select('count(e.id)')
             ->from($this->getEntityName(), 'e')
             ->where("$payloadField LIKE :instance_name_pattern")
             ->andWhere('e.status = :completed')
             ->andWhere('e.updatedAt >= :since')
             ->setParameter('instance_name_pattern', '%instance_name%'.$instanceName.'%')
             ->setParameter('completed', JobStatus::completed->value)
-            ->setParameter('since', $since)
-            ->getQuery()
-            ->getSingleScalarResult();
+            ->setParameter('since', $since);
+
+        if ($accountId !== null) {
+            $qb->andWhere("$payloadField LIKE :account_pattern")
+               ->setParameter('account_pattern', '%account_id%'.$accountId.'%');
+        }
+
+        $count = $qb->getQuery()->getSingleScalarResult();
 
         return (int)$count > 0;
     }
