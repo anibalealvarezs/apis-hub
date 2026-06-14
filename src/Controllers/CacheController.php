@@ -175,6 +175,10 @@
                         $sql .= " AND $payloadField LIKE :instance_pattern";
                         $sqlParams['instance_pattern'] = '%instance_name%'.$params['instance_name'].'%';
                     }
+                    if ($params && isset($params['account_id'])) {
+                        $sql .= " AND $payloadField LIKE :account_pattern";
+                        $sqlParams['account_pattern'] = '%account_id%'.$params['account_id'].'%';
+                    }
 
                     $sqlTypes = [
                         'entities' => ArrayParameterType::STRING,
@@ -205,6 +209,10 @@
                     if ($params && isset($params['instance_name'])) {
                         $qb->andWhere("{$payloadField} LIKE :instance_pattern")
                             ->setParameter('instance_pattern', '%instance_name%'.$params['instance_name'].'%');
+                    }
+                    if ($params && isset($params['account_id'])) {
+                        $qb->andWhere("{$payloadField} LIKE :account_pattern")
+                            ->setParameter('account_pattern', '%account_id%'.$params['account_id'].'%');
                     }
                     $existingJobs = $qb->getQuery()->getResult();
                 }

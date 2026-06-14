@@ -102,13 +102,44 @@ foreach ($instances as $instance) {
         }
     }
 
-    $paramString = "";
-    if (!empty($params)) {
-        $paramString = ' --params="' . http_build_query($params) . '"';
+    // For granular entities sync, create per-account cron lines instead of one global
+    $isGranular = $channelConfig['granular_sync'] ?? false;
+    $resourceKey = $config[$channel]['resource_key'] ?? null;
+    $accounts = [];
+
+    if ($isGranular && $resourceKey && str_contains($instanceName, 'entities') && isset($channelConfig[$resourceKey])) {
+        $accounts = $channelConfig[$resourceKey];
     }
 
-    // Command to schedule the job in the database
-    $cronLines[] = "{$frequency} cd /app && /usr/local/bin/php bin/cli.php apis-hub:cache \"{$channel}\" \"{$entity}\"{$paramString} > /dev/null 2>&1";
+    if (!empty($accounts)) {
+        foreach ($accounts as $account) {
+            if (isset($account['enabled']) && !$account['enabled']) {
+                continue;
+            }
+
+            $accountId = $account['id'] ?? null;
+            if (!$accountId) {
+                continue;
+            }
+
+            $accountParams = $params;
+            $accountParams['account_id'] = $accountId;
+
+            $paramString = "";
+            if (!empty($accountParams)) {
+                $paramString = ' --params="' . http_build_query($accountParams) . '"';
+            }
+
+            $cronLines[] = "{$frequency} cd /app && /usr/local/bin/php bin/cli.php apis-hub:cache \"{$channel}\" \"{$entity}\"{$paramString} > /dev/null 2>&1";
+        }
+    } else {
+        $paramString = "";
+        if (!empty($params)) {
+            $paramString = ' --params="' . http_build_query($params) . '"';
+        }
+
+        $cronLines[] = "{$frequency} cd /app && /usr/local/bin/php bin/cli.php apis-hub:cache \"{$channel}\" \"{$entity}\"{$paramString} > /dev/null 2>&1";
+    }
 }
 
 
