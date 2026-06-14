@@ -107,7 +107,7 @@ foreach ($instances as $instance) {
     $resourceKey = $config[$channel]['resource_key'] ?? null;
     $accounts = [];
 
-    if ($isGranular && $resourceKey && str_contains($instanceName, 'entities') && isset($channelConfig[$resourceKey])) {
+    if ($isGranular && $resourceKey && (str_contains($instanceName, 'entities') || str_contains($instanceName, 'recent')) && isset($channelConfig[$resourceKey])) {
         $accounts = $channelConfig[$resourceKey];
     }
 
