@@ -243,8 +243,20 @@
                 $ip = $request->headers->get('CF-Connecting-IP') ?: $request->getClientIp();
                 $isAdmin = $this->isAuthorized($request, true);
 
-                // Tiered Limits: Admin gets 1000/min, others 500/min
-                $limit = $isAdmin ? 1000 : 500;
+                $envLimit = getenv('API_RATE_LIMIT_PER_MINUTE');
+                $limit = $envLimit !== false ? (int)$envLimit : 500;
+                
+                if ($isAdmin) {
+                    $limit = 1000; // Admin bypasses standard rate limits
+                }
+
+                if ($limit === 0 && !$isAdmin) {
+                    return new Response(json_encode([
+                        'status'  => 'error',
+                        'error'   => 'Forbidden',
+                        'message' => 'API access is not included in your current subscription tier.'
+                    ]), Response::HTTP_FORBIDDEN, ['Content-Type' => 'application/json']);
+                }
                 $window = 60; // 1 minute
 
                 $key = "rate_limit:$ip";
