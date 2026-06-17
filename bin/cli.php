@@ -18,6 +18,8 @@
     use Commands\Analytics\ResetMetricsCommand;
     use Commands\Analytics\ResetEntitiesCommand;
     use Commands\Analytics\ResetChannelCommand;
+    use Commands\Analytics\RetryFailedJobCommand;
+    use Commands\Analytics\RetryFailedJobsCommand;
     use Commands\Analytics\SwooleWorkerCommand;
     use Commands\HealthCheckCommand;
     use Commands\Crud\AggregateEntityCommand;
@@ -27,12 +29,14 @@
     use Commands\Crud\UpdateEntityCommand;
     use Commands\GenerateEntitiesConfigCommand;
     use Commands\Infrastructure\ScaleWorkersCommand;
+    use Commands\InitializeDefaultEntitiesCommand;
     use Commands\InitializeEntitiesCommand;
     use Commands\RefreshInstancesCommand;
     use Commands\SetupDatabaseCommand;
     use Commands\SeedDemoDataCommand;
     use Commands\MigratePagesCanonicalCommand;
     use Commands\InstallDriversCommand;
+    use Commands\NuclearResyncCommand;
     use Doctrine\ORM\Tools\Console\ConsoleRunner;
     use Doctrine\ORM\Tools\Console\EntityManagerProvider\SingleManagerProvider;
     use Exceptions\ConfigurationException;
@@ -82,6 +86,7 @@
             new ReadEntityCommand(),
             new UpdateEntityCommand(),
             new GenerateEntitiesConfigCommand(),
+            new InitializeDefaultEntitiesCommand(Helpers::getManager()),
             new InitializeEntitiesCommand(Helpers::getManager()),
             new ScheduleInitialJobsCommand($entityManager),
             new CacheEntityCommand(),
@@ -105,6 +110,9 @@
             new MigratePagesCanonicalCommand(Helpers::getManager()),
             new InstallDriversCommand(),
             new ScaleWorkersCommand($entityManager),
+            new RetryFailedJobCommand($entityManager),
+            new RetryFailedJobsCommand($entityManager),
+            new NuclearResyncCommand($entityManager),
         ];
 
         foreach ($commands as $command) {

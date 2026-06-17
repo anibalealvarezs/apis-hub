@@ -31,7 +31,7 @@
          * @var array<int, string>
          */
         private const array SUPPORTED_ORGANIC_METRICS = [
-            'likes', 'comments', 'views', 'profile_views', 'website_clicks',
+            'likes', 'comments', 'content_views', 'views', 'profile_views', 'website_clicks',
             'profile_links_taps', 'follows_and_unfollows', 'saves', 'shares',
             'total_interactions', 'replies', 'accounts_engaged', 'post_clicks',
             'ig_reels_avg_watch_time', 'ig_reels_video_view_total_time',
@@ -75,12 +75,22 @@
          */
         private const array DEFAULT_ORGANIC_DICTIONARY = [
             '__default__'      => [
-                'likes'       => ['likes', 'likes_daily'],
-                'comments'    => ['comments', 'comments_daily'],
-                'shares'      => ['shares', 'shares_daily'],
-                'reach'       => ['reach', 'reach_daily'],
-                'views'       => ['views', 'views_daily'],
-                'conversions' => ['results', 'results_daily'],
+                'likes'                          => ['likes', 'likes_daily'],
+                'comments'                       => ['comments', 'comments_daily'],
+                'content_views'                  => ['content_views', 'content_views_daily'],
+                'shares'                         => ['shares', 'shares_daily'],
+                'reach'                          => ['reach', 'reach_daily'],
+                'views'                          => ['views', 'views_daily'],
+                'conversions'                    => ['results', 'results_daily'],
+                'follows'                        => ['follows', 'follows_daily'],
+                'follows_and_unfollows'          => ['follows_and_unfollows', 'follows_and_unfollows_daily'],
+                'ig_reels_avg_watch_time'        => ['ig_reels_avg_watch_time', 'ig_reels_avg_watch_time_daily'],
+                'ig_reels_video_view_total_time' => ['ig_reels_video_view_total_time', 'ig_reels_video_view_total_time_daily'],
+                'profile_activity'               => ['profile_activity', 'profile_activity_daily'],
+                'profile_visits'                 => ['profile_visits', 'profile_visits_daily'],
+                'reposts'                        => ['reposts', 'reposts_daily'],
+                'saved'                          => ['saved', 'saved_daily'],
+                'total_interactions'             => ['total_interactions', 'total_interactions_daily'],
             ],
         ];
 
@@ -228,7 +238,7 @@
             $resolvedNames = $this->resolveRawMetricNamesOrganic($resolutionMetric, $channel);
 
             $sqlExpression = match ($resolutionMetric) {
-                'likes', 'comments', 'views', 'page_views_total', 'video_views', 'profile_views', 'website_clicks',
+                'likes', 'comments', 'content_views', 'views', 'page_views_total', 'video_views', 'profile_views', 'website_clicks',
                 'profile_links_taps', 'follows_and_unfollows', 'saves', 'shares',
                 'total_interactions', 'replies', 'accounts_engaged', 'post_clicks',
                 'ig_reels_avg_watch_time', 'ig_reels_video_view_total_time',
@@ -693,7 +703,9 @@
                         continue;
                     }
 
-                    $normalized[$channelKey][$metricKey] = $rawNames;
+                    $existing = $normalized[$channelKey][$metricKey] ?? [];
+                    $rawNamesArray = is_array($rawNames) ? $rawNames : [$rawNames];
+                    $normalized[$channelKey][$metricKey] = array_unique(array_merge($existing, $rawNamesArray));
                 }
             }
 

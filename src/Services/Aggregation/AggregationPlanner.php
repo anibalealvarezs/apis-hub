@@ -576,6 +576,10 @@
             if (($isMetric || $isChanneledMetric) && $this->matchesWeightedMetric($groupPattern, $reducerAnalysis, $startDate, $endDate)) {
                 $candidates[] = 'weighted_metric';
             }
+            
+            if ($isMetric || $isChanneledMetric) {
+                $candidates[] = 'universal_sql';
+            }
 
             return array_values(array_unique($candidates));
         }
@@ -731,7 +735,7 @@
                     return false;
                 }
             } elseif (str_ends_with($accountType, '_page') || str_ends_with($accountType, '_organization')) {
-                if (!is_numeric((string)($filters['page'] ?? null))) {
+                if (!is_numeric((string)($filters['page'] ?? null)) && !is_numeric((string)($filters['channeledAccount'] ?? null))) {
                     return false;
                 }
             } else {

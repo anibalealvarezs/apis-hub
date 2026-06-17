@@ -62,16 +62,22 @@ echo -e "${GREEN}✔ Environment ready ($ENV_FILE).${NC}"
 
 # ── Step 1: Install Composer dependencies ────────────────────────────────────
 echo ""
-if [ ! -d "vendor" ] || [ "$1" = "--update" ]; then
-    echo -e "${YELLOW}📦 [1/5] Installing/Updating dependencies...${NC}"
+if [ "$1" = "--update" ]; then
+    echo -e "${YELLOW}📦 [1/5] Updating dependencies (composer update)...${NC}"
+    MSYS_NO_PATHCONV=1 docker run --rm \
+        -v "$(pwd):/app" \
+        -w /app \
+        composer:latest \
+        update --no-dev --no-scripts --no-interaction --prefer-dist --optimize-autoloader --ignore-platform-reqs
+    echo -e "${GREEN}✔ Dependencies updated.${NC}"
+else
+    echo -e "${YELLOW}📦 [1/5] Installing dependencies from lock file...${NC}"
     MSYS_NO_PATHCONV=1 docker run --rm \
         -v "$(pwd):/app" \
         -w /app \
         composer:latest \
         install --no-dev --no-scripts --no-interaction --prefer-dist --optimize-autoloader --ignore-platform-reqs
     echo -e "${GREEN}✔ Dependencies installed.${NC}"
-else
-    echo -e "${YELLOW}📦 [1/5] Dependencies already present. Skipping install.${NC}"
 fi
 
 # ── Step 1b: Fetch Remote Configuration (Optional) ──────────────────────────
@@ -92,6 +98,9 @@ REDIS_CONTAINER_NAME="${DEPLOYMENT_NAME}-redis-build"
 
 # Create a temporary network
 docker network create "$BUILD_NETWORK" >/dev/null 2>&1 || echo "  ℹ️  Build network already exists."
+
+# Clean up any previously stuck container
+docker rm -f "$REDIS_CONTAINER_NAME" >/dev/null 2>&1 || true
 
 # Start a temporary redis container on that network
 docker run -d --rm --name "$REDIS_CONTAINER_NAME" --network "$BUILD_NETWORK" --network-alias redis redis:alpine >/dev/null

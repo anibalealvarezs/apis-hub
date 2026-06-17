@@ -58,25 +58,27 @@
                 $isPostgres = Helpers::isPostgres($em);
 
                 $jsonExtract = $isPostgres
-                    ? "COALESCE(payload->>'account_id', payload->'params'->>'account_id', 'global')"
-                    : "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.account_id')), JSON_UNQUOTE(JSON_EXTRACT(payload, '$.params.account_id')), 'global')";
+                    ? "COALESCE(j.payload->>'account_id', j.payload->'params'->>'account_id', 'global')"
+                    : "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(j.payload, '$.account_id')), JSON_UNQUOTE(JSON_EXTRACT(j.payload, '$.params.account_id')), 'global')";
 
                 $isRecentJob = $isPostgres
-                    ? "(payload->'params'->>'type' = 'recent')"
-                    : "(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.params.type')) = 'recent')";
+                    ? "(j.payload->'params'->>'type' = 'recent')"
+                    : "(JSON_UNQUOTE(JSON_EXTRACT(j.payload, '$.params.type')) = 'recent')";
 
                 $sql = "
                     SELECT
-                        channel,
+                        j.channel,
                         $jsonExtract as account_id,
                         COUNT(*) as total,
                         SUM(CASE WHEN status = :completed THEN 1 ELSE 0 END) as completed,
                         SUM(CASE WHEN status = :failed THEN 1 ELSE 0 END) as failed,
                         SUM(CASE WHEN status = :processing THEN 1 ELSE 0 END) as processing,
                         SUM(CASE WHEN status = :scheduled THEN 1 ELSE 0 END) as scheduled,
-                        SUM(CASE WHEN $isRecentJob AND status IN (:scheduled, :delayed, :cancelled) THEN 0 ELSE 1 END) as total_for_percentage
-                    FROM jobs
-                    GROUP BY channel, account_id
+                        SUM(CASE WHEN status IN (:cancelled, :delayed) THEN 0 WHEN $isRecentJob AND status IN (:scheduled) THEN 0 ELSE 1 END) as total_for_percentage
+                    FROM jobs j
+                    LEFT JOIN channeled_accounts ca ON ca.platform_id = $jsonExtract
+                    WHERE (ca.enabled IS NOT FALSE OR $jsonExtract = 'global')
+                    GROUP BY j.channel, $jsonExtract
                 ";
 
                 $rows = $conn->fetchAllAssociative($sql, [
@@ -188,24 +190,25 @@
                 $isPostgres = Helpers::isPostgres($em);
 
                 $jsonExtract = $isPostgres
-                    ? "COALESCE(payload->>'account_id', payload->'params'->>'account_id', 'global')"
-                    : "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.account_id')), JSON_UNQUOTE(JSON_EXTRACT(payload, '$.params.account_id')), 'global')";
+                    ? "COALESCE(j.payload->>'account_id', j.payload->'params'->>'account_id', 'global')"
+                    : "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(j.payload, '$.account_id')), JSON_UNQUOTE(JSON_EXTRACT(j.payload, '$.params.account_id')), 'global')";
 
                 $isRecentJob = $isPostgres
-                    ? "(payload->'params'->>'type' = 'recent')"
-                    : "(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.params.type')) = 'recent')";
+                    ? "(j.payload->>'instance_name' LIKE '%-recent' OR j.payload->'params'->>'type' = 'recent' OR j.payload->'params'->>'startDate' = '-3 days' OR j.payload->'params'->>'start_date' = '-3 days')"
+                    : "(JSON_UNQUOTE(JSON_EXTRACT(j.payload, '$.instance_name')) LIKE '%-recent' OR JSON_UNQUOTE(JSON_EXTRACT(j.payload, '$.params.type')) = 'recent' OR JSON_UNQUOTE(JSON_EXTRACT(j.payload, '$.params.startDate')) = '-3 days' OR JSON_UNQUOTE(JSON_EXTRACT(j.payload, '$.params.start_date')) = '-3 days')";
 
                 $query = "
                     SELECT
                         $jsonExtract as account_id,
-                        COUNT(*) as total,
+                        SUM(CASE WHEN status = :cancelled THEN 0 ELSE 1 END) as total,
                         SUM(CASE WHEN status = :completed THEN 1 ELSE 0 END) as completed,
                         SUM(CASE WHEN status = :failed THEN 1 ELSE 0 END) as failed,
                         SUM(CASE WHEN status = :processing THEN 1 ELSE 0 END) as processing,
                         SUM(CASE WHEN status = :scheduled THEN 1 ELSE 0 END) as scheduled,
-                        SUM(CASE WHEN $isRecentJob AND status IN (:scheduled, :delayed, :cancelled) THEN 0 ELSE 1 END) as total_for_percentage
-                    FROM jobs
-                    WHERE channel = :channel
+                        SUM(CASE WHEN status IN (:cancelled, :delayed) THEN 0 WHEN $isRecentJob AND status IN (:scheduled) THEN 0 ELSE 1 END) as total_for_percentage
+                    FROM jobs j
+                    LEFT JOIN channeled_accounts ca ON ca.platform_id = $jsonExtract
+                    WHERE j.channel = :channel AND (ca.enabled IS NOT FALSE OR $jsonExtract = 'global')
                 ";
 
                 $params = [
@@ -223,7 +226,7 @@
                     $params['account_id'] = $targetAccountId;
                 }
 
-                $query .= " GROUP BY account_id";
+                $query .= " GROUP BY $jsonExtract";
 
                 $rows = $conn->fetchAllAssociative($query, $params);
 
@@ -256,9 +259,10 @@
 
                 foreach ($assets as $id => $stats) {
                     $completion = $stats['total_for_percentage'] > 0 ? round(($stats['completed'] / $stats['total_for_percentage']) * 100, 2) : 0;
+                    if ($completion > 100) $completion = 100;
                     if ($completion >= 100) $fullySyncedCount++;
 
-                    $assetObj = array_merge(['id' => $id, 'completion' => $completion], $stats);
+                    $assetObj = array_merge(['id' => $id, 'completion' => $completion, 'enabled' => true], $stats);
                     $formattedAssets[$id] = $assetObj;
                     $platformIds[] = $id;
 
@@ -282,6 +286,7 @@
                             $pId = $ca->getPlatformId();
                             if (isset($formattedAssets[$pId])) {
                                 $formattedAssets[$pId]['name'] = $ca->getName();
+                                $formattedAssets[$pId]['enabled'] = $ca->isEnabled();
                             }
                         }
                     } catch (Throwable $e) {
@@ -326,8 +331,8 @@
                 $isPostgres = Helpers::isPostgres($em);
 
                 $jsonExtract = $isPostgres
-                    ? "COALESCE(payload->>'account_id', payload->'params'->>'account_id', 'global')"
-                    : "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.account_id')), JSON_UNQUOTE(JSON_EXTRACT(payload, '$.params.account_id')), 'global')";
+                    ? "COALESCE(j.payload->>'account_id', j.payload->'params'->>'account_id', 'global')"
+                    : "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(j.payload, '$.account_id')), JSON_UNQUOTE(JSON_EXTRACT(j.payload, '$.params.account_id')), 'global')";
 
                 $jsonStart = $isPostgres ? "payload->'params'->>'startDate'" : "JSON_UNQUOTE(JSON_EXTRACT(payload, '$.params.startDate'))";
                 $jsonEnd = $isPostgres ? "payload->'params'->>'endDate'" : "JSON_UNQUOTE(JSON_EXTRACT(payload, '$.params.endDate'))";

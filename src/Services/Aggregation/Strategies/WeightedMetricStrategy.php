@@ -71,6 +71,7 @@
                 'startDate' => $startDate,
                 'endDate'   => $endDate,
             ];
+            $sqlTypes = [];
 
             $metricSqlResolver = $this->metricSqlResolver ?? new CanonicalMetricSqlResolver();
             $channelKey = $this->resolveChannelKey($filtersArr);
@@ -176,11 +177,64 @@
             $configParams = [];
 
             $filterResolver = new FilterConditionResolver();
-            foreach (['page' => 'page_id', 'channel' => 'channel', 'country' => 'country_id', 'device' => 'device_id', 'query' => 'query_id'] as $filterKey => $col) {
+            foreach ([
+                'page' => 'page_id',
+                'channel' => 'channel',
+                'country' => 'country_id',
+                'device' => 'device_id',
+                'query' => 'query_id',
+                'account' => 'channeled_account_id',
+                'channeledAccount' => 'channeled_account_id',
+                'channeled_account_id' => 'channeled_account_id',
+            ] as $filterKey => $col) {
                 if (!isset($filtersArr[$filterKey])) continue;
 
                 $condition = $filterResolver->resolve($filtersArr[$filterKey]);
                 $alias = $filterKey."Val";
+
+                $isStringEntity = in_array($filterKey, ['country', 'device', 'query'], true);
+
+                if ($isStringEntity) {
+                    $table = match($filterKey) { 'country' => 'countries', 'device' => 'devices', 'query' => 'queries' };
+                    $matchCol = match($filterKey) { 'country' => 'code', 'device' => 'type', 'query' => 'query' };
+
+                    if (in_array($condition['operator'], ['is_null', 'is_not_null'])) {
+                        $configWhere[] = $condition['operator'] === 'is_null' ? "mc.$col IS NULL" : "mc.$col IS NOT NULL";
+                        continue;
+                    }
+
+                    $values = is_array($condition['value']) ? array_values($condition['value']) : [$condition['value']];
+                    $hasNA = false;
+                    $actualVals = [];
+                    foreach ($values as $v) {
+                        if ($v === 'N/A' || $v === 'NULL') {
+                            $hasNA = true;
+                        } else {
+                            $actualVals[] = $v;
+                        }
+                    }
+
+                    $parts = [];
+                    $isNegative = in_array($condition['operator'], ['neq', 'not_in']);
+
+                    if ($hasNA) {
+                        $parts[] = $isNegative ? "mc.$col IS NOT NULL" : "mc.$col IS NULL";
+                    }
+
+                    if (!empty($actualVals)) {
+                        $op = $isNegative ? 'NOT IN' : 'IN';
+                        $parts[] = "mc.$col $op (SELECT id FROM $table WHERE $matchCol IN (:$alias))";
+                        $configParams[$alias] = $actualVals;
+                        $sqlTypes[$alias] = \Doctrine\DBAL\ArrayParameterType::STRING;
+                    }
+
+                    if (empty($parts)) {
+                        $configWhere[] = "1 = 0";
+                    } else {
+                        $configWhere[] = "(" . implode($isNegative ? ' AND ' : ' OR ', $parts) . ")";
+                    }
+                    continue;
+                }
 
                 switch ($condition['operator']) {
                     case 'neq':
@@ -192,6 +246,16 @@
                         break;
                     case 'is_not_null':
                         $configWhere[] = "mc.$col IS NOT NULL";
+                        break;
+                    case 'in':
+                        $configWhere[] = "mc.$col IN (:$alias)";
+                        $configParams[$alias] = $condition['value'];
+                        $sqlTypes[$alias] = \Doctrine\DBAL\ArrayParameterType::STRING;
+                        break;
+                    case 'not_in':
+                        $configWhere[] = "mc.$col NOT IN (:$alias)";
+                        $configParams[$alias] = $condition['value'];
+                        $sqlTypes[$alias] = \Doctrine\DBAL\ArrayParameterType::STRING;
                         break;
                     case 'eq':
                     default:
@@ -214,6 +278,8 @@
                         'is_null' => "dv_$alias.value IS NULL",
                         'is_not_null' => "dv_$alias.value IS NOT NULL",
                         'eq' => "dv_$alias.value = :{$alias}_val",
+                        'in' => "dv_$alias.value IN (:{$alias}_val)",
+                        'not_in' => "dv_$alias.value NOT IN (:{$alias}_val)",
                         default => null
                     };
 
@@ -232,6 +298,9 @@
                 )";
                     $sqlParams["{$alias}_key"] = $dk;
                     $sqlParams["{$alias}_val"] = $condition['value'];
+                    if (in_array($condition['operator'], ['in', 'not_in'], true)) {
+                        $sqlTypes["{$alias}_val"] = \Doctrine\DBAL\ArrayParameterType::STRING;
+                    }
                 }
             }
 
@@ -346,7 +415,6 @@
         JOIN configs mc ON m.metric_config_id = mc.id
         WHERE m.metric_date >= :startDate
         AND m.metric_date <= :endDate
-        AND mc.dimension_set_id IN (SELECT DISTINCT dimension_set_id FROM configs)
         GROUP BY m.metric_date, mc.dimension_set_id, mc.page_id, mc.query_id, mc.country_id, mc.device_id $baseGroupByFields
     ),
     paired AS (
@@ -390,7 +458,7 @@
     $orderSql";
 
             $queryStart = $debugSqlEnabled ? microtime(true) : null;
-            $rows = $connection->fetchAllAssociative($sql, $sqlParams);
+            $rows = $connection->fetchAllAssociative($sql, $sqlParams, $sqlTypes);
 
             if ($debugSqlEnabled) {
                 $elapsedMs = $queryStart !== null ? (int)round((microtime(true) - $queryStart) * 1000) : -1;

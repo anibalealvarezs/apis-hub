@@ -54,6 +54,7 @@
     "anibalealvarezs/tiktok-hub-driver": "^0.1.0",
     "anibalealvarezs/x-hub-driver": "^0.1.0",
     "anibalealvarezs/triple-whale-hub-driver": "^0.1.0",
+    "anibalealvarezs/analytics-api": "*@dev",
     "php": ">=8.3"
   },
   "conflict": {
@@ -101,12 +102,12 @@
     "mikey179/vfsstream": "2.0.x-dev",
     "phpunit/phpunit": "^9"
   },
-  "repositories": [
-    {
+  "repositories": {
+    "0": {
       "type": "composer",
       "url": "https://satis.anibalalvarez.com/"
     }
-  ],
+  },
   "minimum-stability": "dev",
   "config": {
     "platform": {

@@ -111,6 +111,8 @@
                 'm.metric_date >= :startDate',
                 'm.metric_date <= :endDate',
                 'LOWER(ca.type) = LOWER(:accountType)',
+                'mc.post_id IS NULL',
+                'mc.dimension_set_id IS NULL',
                 "{$pagePlatformExpr} = :pagePlatformId",
             ];
             if (isset($filtersArr['channel'])) {
@@ -205,6 +207,8 @@
             $whereClauses = [
                 'm.metric_date >= :startDate',
                 'm.metric_date <= :endDate',
+                'mc.post_id IS NULL',
+                'mc.dimension_set_id IS NULL',
             ];
 
             $filterResolver = new FilterConditionResolver();
@@ -213,13 +217,11 @@
             if (!empty($filtersArr['channeledAccount'])) {
                 $condition = $filterResolver->resolve($filtersArr['channeledAccount']);
                 $whereClauses[] = $this->buildFilterClause('mc.channeled_account_id', $condition, 'channeledAccount');
-                if ($condition['value'] !== null) $sqlParams['channeledAccount'] = (int)$condition['value'];
+                $this->bindFilterParams($sqlParams, 'channeledAccount', $condition);
             } elseif (!empty($filtersArr['page'])) {
                 $condition = $filterResolver->resolve($filtersArr['page']);
                 $whereClauses[] = $this->buildFilterClause('mc.page_id', $condition, 'pageId');
-                if ($condition['value'] !== null) $sqlParams['pageId'] = (int)$condition['value'];
-            } else {
-                return null;
+                $this->bindFilterParams($sqlParams, 'pageId', $condition);
             }
 
             // Handle Channel
@@ -231,7 +233,7 @@
                     if ($ch) $condition['value'] = $ch->getId();
                 }
                 $whereClauses[] = $this->buildFilterClause('mc.channel', $condition, 'channel');
-                if ($condition['value'] !== null) $sqlParams['channel'] = (int)$condition['value'];
+                $this->bindFilterParams($sqlParams, 'channel', $condition);
             }
 
             // Account Type
@@ -317,15 +319,25 @@
                 'timestamp'     => $timestampExpr,
             ];
 
-            if (!$this->resolveAndAppendAggregations($aggregations, $metricSqlResolver, $channelKey, $nameCol, $periodCol, 'lifetime', $plan, $selectFields, $orderMap, $quoteChar)) {
+            $isLatestSnapshot = (bool)($filtersArr['latest_snapshot'] ?? false);
+
+            if (!$this->resolveAndAppendAggregations($aggregations, $metricSqlResolver, $channelKey, $nameCol, $periodCol, 'lifetime', $plan, $selectFields, $orderMap, $quoteChar, $isLatestSnapshot)) {
                 return null;
             }
 
             $sqlParams = [];
             $whereClauses = [];
 
-            $isLatestSnapshot = (bool)($filtersArr['latest_snapshot'] ?? false);
-            if (!$isLatestSnapshot) {
+            if ($isLatestSnapshot) {
+                if ($startDate !== null) {
+                    $sqlParams['startDate'] = $startDate;
+                    $whereClauses[] = 'm.metric_date >= :startDate';
+                }
+                if ($endDate !== null) {
+                    $sqlParams['endDate'] = $endDate;
+                    $whereClauses[] = 'm.metric_date <= :endDate';
+                }
+            } else {
                 $sqlParams['startDate'] = $startDate;
                 $sqlParams['endDate']   = $endDate;
                 $whereClauses[] = 'm.metric_date >= :startDate';
@@ -337,11 +349,11 @@
             if (!empty($filtersArr['channeledAccount'])) {
                 $condition = $filterResolver->resolve($filtersArr['channeledAccount']);
                 $whereClauses[] = $this->buildFilterClause('mc.channeled_account_id', $condition, 'channeledAccount');
-                if ($condition['value'] !== null) $sqlParams['channeledAccount'] = (int)$condition['value'];
+                $this->bindFilterParams($sqlParams, 'channeledAccount', $condition);
             } elseif (!empty($filtersArr['page'])) {
                 $condition = $filterResolver->resolve($filtersArr['page']);
                 $whereClauses[] = $this->buildFilterClause('mc.page_id', $condition, 'pageId');
-                if ($condition['value'] !== null) $sqlParams['pageId'] = (int)$condition['value'];
+                $this->bindFilterParams($sqlParams, 'pageId', $condition);
             } else {
                 return null;
             }
@@ -354,13 +366,18 @@
                     if ($ch) $condition['value'] = $ch->getId();
                 }
                 $whereClauses[] = $this->buildFilterClause('mc.channel', $condition, 'channel');
-                if ($condition['value'] !== null) $sqlParams['channel'] = (int)$condition['value'];
+                $this->bindFilterParams($sqlParams, 'channel', $condition);
             }
 
             if (isset($filtersArr['post'])) {
                 $condition = $filterResolver->resolve($filtersArr['post']);
-                $whereClauses[] = $this->buildFilterClause('mc.post_id', $condition, 'postId');
-                if ($condition['value'] !== null) $sqlParams['postId'] = (int)$condition['value'];
+                $postFilterColumn = $this->shouldFilterPostByPlatformId($condition) ? 'ps.post_id' : 'mc.post_id';
+                $whereClauses[] = $this->buildFilterClause($postFilterColumn, $condition, 'postId');
+                if ($postFilterColumn === 'ps.post_id') {
+                    $this->bindFilterParamsAsString($sqlParams, 'postId', $condition);
+                } else {
+                    $this->bindFilterParams($sqlParams, 'postId', $condition);
+                }
             }
 
             $orderSql = '';
@@ -401,7 +418,8 @@
             AggregationPlan            $plan,
             array                      &$selectFields,
             array                      &$orderMap,
-            string                     $quoteChar
+            string                     $quoteChar,
+            bool                       $useMaxForSnapshot = false
         ): bool
         {
             $resolvedMetrics = [];
@@ -415,6 +433,10 @@
                     period: $period
                 );
                 $metricSql = is_string($resolvedMetric['sql_expression']) ? $resolvedMetric['sql_expression'] : null;
+
+                if ($useMaxForSnapshot && $metricSql !== null) {
+                    $metricSql = preg_replace('/^SUM\((.+)\s+ELSE\s+0\s+END\)$/i', 'MAX($1 ELSE 0 END)', $metricSql);
+                }
                 if ($metricSql === null) {
                     $repository = $plan->getContextValue('repository');
                     if ($repository instanceof BaseRepository) {
@@ -471,6 +493,14 @@
 
         private function buildFilterClause(string $col, array $condition, string $alias): string
         {
+            if ($condition['operator'] === 'in' && is_array($condition['value'])) {
+                $placeholders = [];
+                foreach (array_keys($condition['value']) as $i) {
+                    $placeholders[] = ":{$alias}_{$i}";
+                }
+                return "$col IN (" . implode(', ', $placeholders) . ")";
+            }
+
             return match ($condition['operator']) {
                 'neq'         => "$col <> :$alias",
                 'is_null'     => "$col IS NULL",
@@ -479,6 +509,84 @@
                 'eq'          => "$col = :$alias",
                 default       => "$col = :$alias",
             };
+        }
+
+        private function bindFilterParams(array &$sqlParams, string $alias, array $condition): void
+        {
+            if ($condition['value'] !== null) {
+                if ($condition['operator'] === 'in' && is_array($condition['value'])) {
+                    foreach ($condition['value'] as $i => $v) {
+                        $sqlParams["{$alias}_{$i}"] = is_numeric($v) ? (int)$v : (string)$v;
+                    }
+                } else {
+                    $sqlParams[$alias] = is_numeric($condition['value']) ? (int)$condition['value'] : (string)$condition['value'];
+                }
+            }
+        }
+
+        private function bindFilterParamsAsString(array &$sqlParams, string $alias, array $condition): void
+        {
+            if ($condition['value'] !== null) {
+                if ($condition['operator'] === 'in' && is_array($condition['value'])) {
+                    foreach ($condition['value'] as $i => $v) {
+                        $sqlParams["{$alias}_{$i}"] = (string)$v;
+                    }
+                } else {
+                    $sqlParams[$alias] = (string)$condition['value'];
+                }
+            }
+        }
+
+        private function shouldFilterPostByPlatformId(array $condition): bool
+        {
+            $operator = (string)($condition['operator'] ?? 'eq');
+            $value = $condition['value'] ?? null;
+
+            if (in_array($operator, ['is_null', 'is_not_null'], true)) {
+                return false;
+            }
+
+            if (is_array($value)) {
+                foreach ($value as $item) {
+                    if ($this->isPlatformPostIdentifier($item)) {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            return $this->isPlatformPostIdentifier($value);
+        }
+
+        private function isPlatformPostIdentifier(mixed $value): bool
+        {
+            if ($value === null) {
+                return false;
+            }
+
+            $normalized = trim((string)$value);
+            if ($normalized === '') {
+                return false;
+            }
+
+            // Non-integer-like values (e.g. page_post format with underscore) are platform IDs.
+            if (!preg_match('/^[+-]?\d+$/', $normalized)) {
+                return true;
+            }
+
+            $digits = ltrim($normalized, '+-');
+            $digits = ltrim($digits, '0');
+            if ($digits === '') {
+                return false;
+            }
+
+            // metric_configs.post_id is integer in current schema (int32), so larger numeric IDs must use posts.post_id.
+            if (strlen($digits) > 10) {
+                return true;
+            }
+
+            return strlen($digits) === 10 && strcmp($digits, '2147483647') > 0;
         }
 
         /**

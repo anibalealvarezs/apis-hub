@@ -6,7 +6,7 @@ mkdir -p /app/logs /app/storage
 
 # Export environment variables for cron
 # We exclude proxy variables and other sensitive/volatile ones if needed
-printenv | grep -v "no_proxy" >> /etc/environment
+printenv | grep -v "no_proxy" >> /etc/environment || true
 
 # Set Instance Name with uniqueness if it's a worker
 if [[ "$INSTANCE_NAME" == *"worker"* ]] || [[ -z "$INSTANCE_NAME" ]]; then
@@ -65,8 +65,11 @@ if [[ "$INSTANCE_NAME" != *"master"* ]] || [[ "$INSTANCE_TYPE" == "waiting-maste
     # We use Throwable to catch fatal errors as well.
     CHECK_CMD="require 'app/bootstrap.php'; try { \Helpers\Helpers::getManager()->getConnection()->executeQuery('SELECT 1 FROM jobs LIMIT 1'); echo 'READY'; } catch (\Throwable \$e) { echo 'NOT_READY: ' . \$e->getMessage(); }"
     
+    RETRY_COUNT=0
+    MAX_RETRIES=30
+    
     while true; do
-        CHECK_RESULT=$(php -r "$CHECK_CMD" 2>&1)
+        CHECK_RESULT=$(php -r "$CHECK_CMD" 2>&1) || true
         if [[ "$CHECK_RESULT" == *"READY"* ]]; then
             break
         fi
@@ -195,11 +198,11 @@ else
     while true; do
         php bin/cli.php jobs:process &
         CHILD_PID=$!
-        wait "$CHILD_PID"
+        wait "$CHILD_PID" || true
         
         echo "Worker Instance ($INSTANCE_NAME): Queue empty or process finished. Sleeping 5s..."
         sleep 5 &
         CHILD_PID=$!
-        wait "$CHILD_PID"
+        wait "$CHILD_PID" || true
     done
 fi

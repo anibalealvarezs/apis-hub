@@ -175,6 +175,10 @@
                         $sql .= " AND $payloadField LIKE :instance_pattern";
                         $sqlParams['instance_pattern'] = '%instance_name%'.$params['instance_name'].'%';
                     }
+                    if ($params && isset($params['account_id'])) {
+                        $sql .= " AND $payloadField LIKE :account_pattern";
+                        $sqlParams['account_pattern'] = '%account_id%'.$params['account_id'].'%';
+                    }
 
                     $sqlTypes = [
                         'entities' => ArrayParameterType::STRING,
@@ -205,6 +209,10 @@
                     if ($params && isset($params['instance_name'])) {
                         $qb->andWhere("{$payloadField} LIKE :instance_pattern")
                             ->setParameter('instance_pattern', '%instance_name%'.$params['instance_name'].'%');
+                    }
+                    if ($params && isset($params['account_id'])) {
+                        $qb->andWhere("{$payloadField} LIKE :account_pattern")
+                            ->setParameter('account_pattern', '%account_id%'.$params['account_id'].'%');
                     }
                     $existingJobs = $qb->getQuery()->getResult();
                 }
@@ -437,5 +445,20 @@
                     httpStatus: Response::HTTP_BAD_REQUEST
                 );
             }
+        }
+
+        public function triggerHistoricalResync(?string $channel = null): Response
+        {
+            $cliPath = realpath(dirname(__DIR__, 2) . '/bin/cli.php');
+            $channelArg = ($channel && $channel !== 'all') ? '--channel=' . escapeshellarg($channel) : '';
+            $command = "nohup php \"$cliPath\" app:nuclear-resync $channelArg > /dev/null 2>&1 &";
+            exec($command);
+
+            return $this->createResponse(
+                data: ['status' => 'initiated', 'message' => 'Nuclear resync is running in the background.'],
+                status: 'success',
+                error: null,
+                httpStatus: Response::HTTP_OK
+            );
         }
     }

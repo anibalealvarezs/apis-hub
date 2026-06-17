@@ -660,6 +660,32 @@ class JobRepository extends BaseRepository
     }
 
     /**
+     * Resets failed jobs for a specific channel caused by permanent authentication errors.
+     *
+     * @param string $channel
+     * @return int Number of jobs rescheduled
+     */
+    public function resetAuthFailedJobs(string $channel): int
+    {
+        $qb = $this->_em->createQueryBuilder();
+        $updatedRows = $qb->update($this->getEntityName(), 'e')
+            ->set('e.status', ':scheduled')
+            ->set('e.updatedAt', ':now')
+            ->where('e.channel = :channel')
+            ->andWhere('e.status = :failed')
+            ->andWhere('e.message LIKE :message')
+            ->setParameter('scheduled', JobStatus::scheduled->value)
+            ->setParameter('now', new DateTime())
+            ->setParameter('channel', $channel)
+            ->setParameter('failed', JobStatus::failed->value)
+            ->setParameter('message', '%Permanent Auth Error%')
+            ->getQuery()
+            ->execute();
+
+        return (int)$updatedRows;
+    }
+
+    /**
      * Marks a job as delayed (e.g. for rate limiting).
      *
      * @param int $id
@@ -696,19 +722,25 @@ class JobRepository extends BaseRepository
      * @throws Exception
      * @throws \DateMalformedStringException
      */
-    public function hasSuccessfulRecentJob(string $instanceName, int $withinHours = 24): bool
+    public function hasSuccessfulRecentJob(string $instanceName, int $withinHours = 24, ?string $accountId = null): bool
     {
         if (Helpers::isPostgres()) {
             $since = new DateTime();
             $since->modify("-$withinHours hours");
 
             $sql = "SELECT count(j.id) FROM jobs j WHERE CAST(j.payload AS text) LIKE :instance_name_pattern AND j.status = :completed AND j.updated_at >= :since";
-
-            $result = $this->_em->getConnection()->executeQuery($sql, [
+            $sqlParams = [
                 'instance_name_pattern' => '%instance_name%'.$instanceName.'%',
                 'completed' => JobStatus::completed->value,
                 'since' => $since->format('Y-m-d H:i:s'),
-            ]);
+            ];
+
+            if ($accountId !== null) {
+                $sql .= " AND (CAST(j.payload AS JSONB)->'params'->>'account_id' = :account_id OR CAST(j.payload AS JSONB)->>'account_id' = :account_id)";
+                $sqlParams['account_id'] = $accountId;
+            }
+
+            $result = $this->_em->getConnection()->executeQuery($sql, $sqlParams);
 
             return (int)$result->fetchOne() > 0;
         }
@@ -719,16 +751,21 @@ class JobRepository extends BaseRepository
 
         $payloadField = 'e.payload';
 
-        $count = $qb->select('count(e.id)')
+        $qb->select('count(e.id)')
             ->from($this->getEntityName(), 'e')
             ->where("$payloadField LIKE :instance_name_pattern")
             ->andWhere('e.status = :completed')
             ->andWhere('e.updatedAt >= :since')
             ->setParameter('instance_name_pattern', '%instance_name%'.$instanceName.'%')
             ->setParameter('completed', JobStatus::completed->value)
-            ->setParameter('since', $since)
-            ->getQuery()
-            ->getSingleScalarResult();
+            ->setParameter('since', $since);
+
+        if ($accountId !== null) {
+            $qb->andWhere("$payloadField LIKE :account_pattern")
+               ->setParameter('account_pattern', '%account_id%'.$accountId.'%');
+        }
+
+        $count = $qb->getQuery()->getSingleScalarResult();
 
         return (int)$count > 0;
     }
@@ -861,11 +898,16 @@ class JobRepository extends BaseRepository
                         3
                     ))")."
                 ),
+                ProcessingAccounts AS (
+                    SELECT DISTINCT channel, entity, 
+                           COALESCE(payload->>'account_id', payload->'params'->>'account_id') as account_id,
+                           COALESCE(payload->>'instance_name', '') as instance_name
+                    FROM jobs
+                    WHERE status = {$processingStatus}
+                ),
                 ChannelSlots AS (
                     -- Acquire a channel-level advisory lock to prevent concurrent workers from
                     -- racing past BusyChannels before any of them has updated updated_at.
-                    -- pg_try_advisory_xact_lock returns false if another transaction holds the lock,
-                    -- meaning only one worker per channel can enter this CTE at a time.
                     SELECT DISTINCT j.channel,
                            pg_try_advisory_xact_lock(hashtext('channel_slot|' || j.channel)) as slot_acquired
                     FROM jobs j
@@ -891,29 +933,22 @@ class JobRepository extends BaseRepository
                     ".($workerTier !== null ? " AND COALESCE(c.tier, 2) = :worker_tier" : "")."
                     -- Mutual Exclusion
                     AND NOT EXISTS (
-                        SELECT 1 FROM jobs p 
-                        WHERE p.status = $processingStatus 
-                        AND p.id != j.id
+                        SELECT 1 FROM ProcessingAccounts p 
+                        WHERE p.channel = j.channel AND p.entity = j.entity
                         AND (
-                            (COALESCE(p.payload->>'account_id', p.payload->'params'->>'account_id') = COALESCE(j.payload->>'account_id', j.payload->'params'->>'account_id')
-                             AND p.channel = j.channel 
-                             AND p.entity = j.entity
-                             AND COALESCE(j.payload->>'account_id', j.payload->'params'->>'account_id') IS NOT NULL)
+                            (p.account_id = COALESCE(j.payload->>'account_id', j.payload->'params'->>'account_id') AND COALESCE(j.payload->>'account_id', j.payload->'params'->>'account_id') IS NOT NULL)
                             OR 
-                            (COALESCE(p.payload->>'instance_name', '') = COALESCE(j.payload->>'instance_name', '') 
-                             AND p.channel = j.channel 
-                             AND p.entity = j.entity
-                             AND COALESCE(j.payload->>'account_id', j.payload->'params'->>'account_id') IS NULL)
+                            (p.instance_name = COALESCE(j.payload->>'instance_name', '') AND COALESCE(j.payload->>'account_id', j.payload->'params'->>'account_id') IS NULL)
                         )
                     )
-                    -- Job-level advisory lock (prevents two workers claiming the exact same job)
-                    AND pg_try_advisory_xact_lock(hashtext(j.channel || '|' || j.entity || '|' || COALESCE(j.payload->>'account_id', j.payload->'params'->>'account_id', j.payload->>'instance_name', 'global')))
                     ORDER BY j.priority DESC, j.id ASC
                     LIMIT 1
                     FOR UPDATE OF j SKIP LOCKED
                 )
                 UPDATE jobs SET status = {$processingStatus}, worker_id = :worker_id, updated_at = NOW()
                 WHERE id = (SELECT id FROM RankedJobs)
+                -- Job-level advisory lock (prevents two workers claiming the exact same job)
+                AND pg_try_advisory_xact_lock(hashtext(channel || '|' || entity || '|' || COALESCE(payload->>'account_id', payload->'params'->>'account_id', payload->>'instance_name', 'global')))
                 RETURNING id";
 
             $params = [
@@ -1007,13 +1042,15 @@ class JobRepository extends BaseRepository
         $qb = $this->_em->createQueryBuilder();
 
         return $qb->update($this->getEntityName(), 'e')
-            ->set('e.status', ':failed')
+            ->set('e.status', ':scheduled')
             ->set('e.message', ':message')
+            ->set('e.workerId', ':null')
             ->set('e.updatedAt', ':now')
             ->where('e.status = :processing')
             ->andWhere('e.updatedAt <= :since')
-            ->setParameter('failed', JobStatus::failed->value)
-            ->setParameter('message', "Job timed out after ".$minutes." minutes")
+            ->setParameter('scheduled', JobStatus::scheduled->value)
+            ->setParameter('message', "Job timed out after ".$minutes." minutes, rescheduled automatically")
+            ->setParameter('null', null)
             ->setParameter('now', new DateTime())
             ->setParameter('processing', JobStatus::processing->value)
             ->setParameter('since', $since)

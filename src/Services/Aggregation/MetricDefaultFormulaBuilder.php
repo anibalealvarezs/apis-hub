@@ -57,6 +57,7 @@
                 'post_engagement'                => "SUM(CASE WHEN {$getNameExpr('total_interactions')} AND $periodCondition THEN $valCol ELSE 0 END)",
                 'likes'                          => "SUM(CASE WHEN {$getNameExpr('likes')} AND $periodCondition THEN $valCol ELSE 0 END)",
                 'comments'                       => "SUM(CASE WHEN {$getNameExpr('comments')} AND $periodCondition THEN $valCol ELSE 0 END)",
+                'content_views'                  => "SUM(CASE WHEN {$getNameExpr('content_views')} AND $periodCondition THEN $valCol ELSE 0 END)",
                 'shares'                         => "SUM(CASE WHEN {$getNameExpr('shares')} AND $periodCondition THEN $valCol ELSE 0 END)",
                 'saves'                          => "SUM(CASE WHEN {$getNameExpr('saves')} AND $periodCondition THEN $valCol ELSE 0 END)",
                 'saved'                          => "SUM(CASE WHEN {$getNameExpr('saves')} AND $periodCondition THEN $valCol ELSE 0 END)",

@@ -55,9 +55,9 @@ class RetryFailedJobsCommand extends Command
             foreach ($failedJobs as $job) {
                 // Use a direct update via connection for speed if there are many, 
                 // but let's use the repository for safety.
-                $job->setStatus(JobStatus::scheduled->value);
-                $job->setUpdatedAt(new \DateTime());
-                $job->setMessage('Manually rescheduled for retry.');
+                $job->addStatus(JobStatus::scheduled->value);
+                $job->addUpdatedAt(new \DateTime());
+                $job->addMessage('Manually rescheduled for retry.');
                 $this->em->persist($job);
             }
 

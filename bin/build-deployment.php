@@ -118,7 +118,7 @@
             'command'        => null,
             'environment'    => $buildEnv($masterName),
             'networks'       => ['default', 'gateway'],
-            'stop_grace_period' => '60m',
+            'stop_grace_period' => '30m',
             'ports'          => [
                     "$externalPort:8080"
             ],
@@ -126,7 +126,6 @@
             'depends_on'     => [
                     'db'    => ['condition' => 'service_started'],
                     'redis' => ['condition' => 'service_started'],
-                    'mcp'   => ['condition' => 'service_started'],
             ],
             'extra_hosts'    => ['host.docker.internal:host-gateway'],
             'deploy'         => [
@@ -221,7 +220,7 @@
                 'command'     => null,
                 'environment' => $buildEnv(null, 'none', 'none', $tierValue),
                 'networks'    => ['default'],
-                'stop_grace_period' => '60m',
+                'stop_grace_period' => '30m',
                 'volumes'     => $workerVolumes,
                 'depends_on'  => [
                         'master' => ['condition' => 'service_started'],
@@ -245,42 +244,46 @@
 
 
     // ─── Phase 2.5: Create Dedicated MCP Service ─────────────────────────────────────
-    $services['mcp'] = [
-            'container_name' => "$deploymentName-mcp",
-            'build'          => [
-                    'context'    => '.',
-                    'dockerfile' => 'Dockerfile',
-            ],
-            'restart'        => 'always',
-            'command'        => 'node mcp-server/index.js',
-            'environment'    => [
-                    'MCP_MODE=sse',
-                    'MCP_PORT=3000',
-                    'INSTANCE_NAME=mcp-server',
-                    'PHP_HOST=master'
-            ],
-            'networks'       => ['default', 'gateway'],
-            'ports'          => [
-                    "$mcpPort:3000"
-            ],
-            'volumes'        => $isLocal ? [
-                    "$projectPathHost:/app",
-                    '/app/mcp-server/node_modules'
-            ] : [
-                    '/app/mcp-server/node_modules'
-            ],
-            'deploy'         => [
-                    'resources' => [
-                            'limits'       => [
-                                    'cpus'   => $tiersConfig[InstanceTier::MINIMAL->value]['cpu'],
-                                    'memory' => $tiersConfig[InstanceTier::MINIMAL->value]['memory']
-                            ],
-                            'reservations' => [
-                                    'memory' => $tiersConfig[InstanceTier::RESERVATION->value]['memory']
-                            ]
-                    ]
-            ]
-    ];
+    $deployMcp = filter_var(getenv('DEPLOY_MCP_SERVER'), FILTER_VALIDATE_BOOLEAN);
+    if ($deployMcp) {
+        $services['master']['depends_on']['mcp'] = ['condition' => 'service_started'];
+        $services['mcp'] = [
+                'container_name' => "$deploymentName-mcp",
+                'build'          => [
+                        'context'    => '.',
+                        'dockerfile' => 'Dockerfile',
+                ],
+                'restart'        => 'always',
+                'command'        => 'node mcp-server/index.js',
+                'environment'    => [
+                        'MCP_MODE=sse',
+                        'MCP_PORT=3000',
+                        'INSTANCE_NAME=mcp-server',
+                        'PHP_HOST=master'
+                ],
+                'networks'       => ['default', 'gateway'],
+                'ports'          => [
+                        "$mcpPort:3000"
+                ],
+                'volumes'        => $isLocal ? [
+                        "$projectPathHost:/app",
+                        '/app/mcp-server/node_modules'
+                ] : [
+                        '/app/mcp-server/node_modules'
+                ],
+                'deploy'         => [
+                        'resources' => [
+                                'limits'       => [
+                                        'cpus'   => $tiersConfig[InstanceTier::MINIMAL->value]['cpu'],
+                                        'memory' => $tiersConfig[InstanceTier::MINIMAL->value]['memory']
+                                ],
+                                'reservations' => [
+                                        'memory' => $tiersConfig[InstanceTier::RESERVATION->value]['memory']
+                                ]
+                        ]
+                ]
+        ];
+    }
 
     // ─── Phase 3: Infrastructure (DB & Redis) ────────────────────────────────────────
     $dbHost = (($env === 'production' || $env === 'testing') ? 'db' : ($db['host'] ?? 'db'));

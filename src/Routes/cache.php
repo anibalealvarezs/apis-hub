@@ -20,6 +20,21 @@ return [
         },
         'admin' => true
     ],
+    '/cache/reset-historical' => [
+        'httpMethod' => 'POST',
+        'callable' => function (?string $body = null, ?array $params = null) {
+            $logger = \Helpers\Helpers::setLogger('nuclear_resync.log');
+            $logger->warning("ROUTE: callable invoked");
+            $input = (array) \Helpers\Helpers::bodyToObject(data: $body);
+            $logger->warning("ROUTE: body parsed, channel=" . ($input['channel'] ?? 'none'));
+            $channel = $input['channel'] ?? $params['channel'] ?? null;
+            $logger->warning("ROUTE: instantiating CacheController");
+            $ctrl = new CacheController();
+            $logger->warning("ROUTE: calling triggerHistoricalResync");
+            return $ctrl->triggerHistoricalResync($channel);
+        },
+        'admin' => true
+    ],
     '/cache/reset/{entity}' => [
         'httpMethod' => 'POST',
         'callable' => function (string $entity, ?array $ids = null, bool $includeListAndCount = true, ?string $channel = null, ?string $body = null, ?array $params = null) {

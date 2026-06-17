@@ -69,6 +69,13 @@
                 $controller = $attributes['controller'];
                 $isHtml = $attributes['html'] ?? false;
 
+                // Feature: Disable non-api (HTML) routes if configured
+                $enableNonApi = filter_var(getenv('ENABLE_NON_API_ROUTES') ?: 'false', FILTER_VALIDATE_BOOLEAN);
+                if (!$enableNonApi && $isHtml) {
+                    $html = file_get_contents(__DIR__.'/../views/404.html');
+                    return new Response($html, Response::HTTP_NOT_FOUND, ['Content-Type' => 'text/html']);
+                }
+
                 // Security Check
                 // API calls are always protected. HTML pages let the frontend Ghost Guard handle it.
                 if (!$isPublic && !$isHtml && !$this->isAuthorized($request, $isAdminOnly)) {
@@ -190,6 +197,12 @@
                 }
             }
 
+            // 2. Admin API Key Bypass
+            // Internal communication between Facade and Nodes usually uses the Admin API Key.
+            if ($this->isAuthorized($request, true)) {
+                return false;
+            }
+
             $whiteList = [
                 '/monitoring',
                 '/api/monitoring',
@@ -199,6 +212,8 @@
                 '/api/monitoring/logs',
                 '/docs',
                 '/api/spec',
+                '/assets',
+                '/driver-assets',
             ];
 
             // Dynamically load whitelists from drivers
@@ -228,8 +243,20 @@
                 $ip = $request->headers->get('CF-Connecting-IP') ?: $request->getClientIp();
                 $isAdmin = $this->isAuthorized($request, true);
 
-                // Tiered Limits: Admin gets 1000/min, others 500/min
-                $limit = $isAdmin ? 1000 : 500;
+                $envLimit = getenv('API_RATE_LIMIT_PER_MINUTE');
+                $limit = $envLimit !== false ? (int)$envLimit : 500;
+                
+                if ($isAdmin) {
+                    $limit = 1000; // Admin bypasses standard rate limits
+                }
+
+                if ($limit === 0 && !$isAdmin) {
+                    return new Response(json_encode([
+                        'status'  => 'error',
+                        'error'   => 'Forbidden',
+                        'message' => 'API access is not included in your current subscription tier.'
+                    ]), Response::HTTP_FORBIDDEN, ['Content-Type' => 'application/json']);
+                }
                 $window = 60; // 1 minute
 
                 $key = "rate_limit:$ip";
