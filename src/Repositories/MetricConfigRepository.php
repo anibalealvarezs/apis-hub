@@ -358,7 +358,10 @@ class MetricConfigRepository extends BaseRepository
             order: $entity->getOrder(),
             country: $entity->getCountry(),
             device: $entity->getDevice(),
-            dimensionSet: $entity->getDimensionSet()
+            dimensionSet: $entity->getDimensionSet(),
+            location: $entity->getLocation(),
+            state: $entity->getState(),
+            city: $entity->getCity()
         ));
     }
 }

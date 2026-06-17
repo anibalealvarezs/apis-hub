@@ -847,7 +847,10 @@
                     order: (self::extractMetricLookupKey($mObj, 'order', $logger)) ?: null,
                     country: $mObj->countryCode ?? ($mObj->country ?? null),
                     device: $mObj->deviceType ?? ($mObj->device ?? null),
-                    dimensionSet: $mObj->dimensionsHash ?? (isset($mObj->dimensions) ? KeyGenerator::generateDimensionsHash((array)$mObj->dimensions) : null)
+                    dimensionSet: $mObj->dimensionsHash ?? (isset($mObj->dimensions) ? KeyGenerator::generateDimensionsHash((array)$mObj->dimensions) : null),
+                    location: $mObj->location ?? null,
+                    state: $mObj->state ?? null,
+                    city: $mObj->city ?? null
                 );
                 $metric->metricConfigKey = $metricConfigKey;
 

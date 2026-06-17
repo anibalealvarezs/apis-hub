@@ -30,12 +30,16 @@ class Account extends Entity
     #[ORM\OneToMany(mappedBy: 'account', targetEntity: Post::class, orphanRemoval: true)]
     protected Collection $posts;
 
+    #[ORM\OneToMany(mappedBy: 'account', targetEntity: Location::class)]
+    protected Collection $locations;
+
     public function __construct()
     {
         $this->channeledAccounts = new ArrayCollection();
         $this->metricConfigs = new ArrayCollection();
         $this->pages = new ArrayCollection();
         $this->posts = new ArrayCollection();
+        $this->locations = new ArrayCollection();
     }
 
     /**
@@ -240,6 +244,45 @@ class Account extends Entity
             $this->pages->removeElement($page);
             if ($page->getAccount() === $this) {
                 $page->addAccount(null);
+            }
+        }
+        return $this;
+    }
+
+    /**
+     * Gets the collection of locations.
+     * @return Collection
+     */
+    public function getLocations(): Collection
+    {
+        return $this->locations;
+    }
+
+    /**
+     * Adds a location.
+     * @param Location $location
+     * @return self
+     */
+    public function addLocation(Location $location): self
+    {
+        if (!$this->locations->contains($location)) {
+            $this->locations->add($location);
+            $location->addAccount($this);
+        }
+        return $this;
+    }
+
+    /**
+     * Removes a location.
+     * @param Location $location
+     * @return self
+     */
+    public function removeLocation(Location $location): self
+    {
+        if ($this->locations->contains($location)) {
+            $this->locations->removeElement($location);
+            if ($location->getAccount() === $this) {
+                $location->addAccount(null);
             }
         }
         return $this;

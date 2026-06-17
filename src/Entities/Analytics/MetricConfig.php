@@ -16,10 +16,10 @@
     #[ORM\Entity(repositoryClass: MetricConfigRepository::class)]
     #[ORM\Table(name: 'metric_configs')]
     #[ORM\Index(columns: ['channel', 'name', 'period'], name: 'idx_metric_configs_base_idx')]
-    #[ORM\Index(
-        columns: ['channel', 'name', 'period', 'page_id', 'query_id', 'country_id', 'device_id', 'dimension_set_id'],
-        name: 'idx_metric_configs_lookup_full_idx'
-    )]
+        #[ORM\Index(
+            columns: ['channel', 'name', 'period', 'page_id', 'query_id', 'country_id', 'device_id', 'dimension_set_id'],
+            name: 'idx_metric_configs_lookup_full_idx'
+        )]
     #[ORM\Index(
         columns: ['channel', 'name', 'period', 'channeled_account_id'],
         name: 'idx_metric_configs_lookup_channeled_idx'
@@ -35,10 +35,11 @@
     #[ORM\Index(columns: ['page_id'], name: 'idx_metric_configs_page_idx')]
     #[ORM\Index(columns: ['account_id'], name: 'idx_metric_configs_account_idx')]
     #[ORM\Index(columns: ['channeled_account_id'], name: 'idx_metric_configs_channeled_account_idx')]
+    #[ORM\Index(columns: ['location_id'], name: 'idx_metric_configs_location_idx')]
     #[ORM\Index(
-        columns: ['channel', 'page_id', 'query_id', 'dimension_set_id', 'name', 'id'],
-        name: 'idx_metric_configs_position_lookup_idx'
-    )]
+            columns: ['channel', 'page_id', 'query_id', 'dimension_set_id', 'name', 'id'],
+            name: 'idx_metric_configs_position_lookup_idx'
+        )]
     #[ORM\Index(
         columns: ['channel', 'page_id', 'dimension_set_id', 'name', 'id'],
         name: 'idx_metric_configs_page_dimension_lookup_idx'
@@ -137,6 +138,18 @@
         #[ORM\ManyToOne(targetEntity: \Entities\Analytics\Channeled\DimensionSet::class)]
         #[ORM\JoinColumn(name: 'dimension_set_id', onDelete: 'SET NULL')]
         protected ?\Entities\Analytics\Channeled\DimensionSet $dimensionSet = null;
+
+        #[ORM\ManyToOne(targetEntity: Location::class, inversedBy: 'metricConfigs')]
+        #[ORM\JoinColumn(name: 'location_id', onDelete: 'SET NULL')]
+        protected ?Location $location = null;
+
+        #[ORM\ManyToOne(targetEntity: State::class)]
+        #[ORM\JoinColumn(name: 'state_id', onDelete: 'SET NULL')]
+        protected ?State $state = null;
+
+        #[ORM\ManyToOne(targetEntity: City::class)]
+        #[ORM\JoinColumn(name: 'city_id', onDelete: 'SET NULL')]
+        protected ?City $city = null;
 
         #[ORM\Column(name: 'config_signature', type: 'string', length: 32, unique: true)]
         protected string $configSignature;
@@ -552,6 +565,63 @@
         public function addDimensionSet(?\Entities\Analytics\Channeled\DimensionSet $dimensionSet): self
         {
             $this->dimensionSet = $dimensionSet;
+
+            return $this;
+        }
+
+        /**
+         * @return Location|null
+         */
+        public function getLocation(): ?Location
+        {
+            return $this->location;
+        }
+
+        /**
+         * @param Location|null $location
+         * @return self
+         */
+        public function addLocation(?Location $location): self
+        {
+            $this->location = $location;
+
+            return $this;
+        }
+
+        /**
+         * @return State|null
+         */
+        public function getState(): ?State
+        {
+            return $this->state;
+        }
+
+        /**
+         * @param State|null $state
+         * @return self
+         */
+        public function addState(?State $state): self
+        {
+            $this->state = $state;
+
+            return $this;
+        }
+
+        /**
+         * @return City|null
+         */
+        public function getCity(): ?City
+        {
+            return $this->city;
+        }
+
+        /**
+         * @param City|null $city
+         * @return self
+         */
+        public function addCity(?City $city): self
+        {
+            $this->city = $city;
 
             return $this;
         }
