@@ -251,9 +251,9 @@ class RecalculateMetricConfigSignaturesCommand extends Command
         $params = [];
         $i = 0;
         foreach ($updates as $update) {
-            $sigParam = ":sig_{$i}";
-            $idParam = ":id_{$i}";
-            $cases[] = "WHEN {$idParam} THEN {$sigParam}";
+            $sigParam = "sig_{$i}";
+            $idParam = "id_{$i}";
+            $cases[] = "WHEN :{$idParam} THEN :{$sigParam}";
             $params[$sigParam] = $update['signature'];
             $params[$idParam] = $update['id'];
             $ids[] = $update['id'];
