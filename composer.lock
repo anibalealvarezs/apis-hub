@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "635b1c3cdadcb3a8f526b706c003930b",
+    "content-hash": "6e11ed7f065f221c458e5d806e5a7a6d",
     "packages": [
         {
             "name": "anibalealvarezs/amazon-api",
@@ -201,17 +201,17 @@
         },
         {
             "name": "anibalealvarezs/api-driver-core",
-            "version": "v1.0.0",
+            "version": "v1.1.0",
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/api-driver-core.git",
-                "reference": "bca155bdb80255373b1836af67631ae007591544"
+                "reference": "1c16d791858f0ae7373a7336762bf71e0853cc5a"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/api-driver-core/anibalealvarezs-api-driver-core-bca155bdb80255373b1836af67631ae007591544-zip-b0cf5b.zip",
-                "reference": "bca155bdb80255373b1836af67631ae007591544",
-                "shasum": "422aefc8a6fab826cb0c6a688a23725613b189d2"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/api-driver-core/anibalealvarezs-api-driver-core-1c16d791858f0ae7373a7336762bf71e0853cc5a-zip-ede394.zip",
+                "reference": "1c16d791858f0ae7373a7336762bf71e0853cc5a",
+                "shasum": "bf85e07763ab4586db34514ca857fa4fdd7c6e79"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "^1.0.0",
@@ -245,7 +245,7 @@
                 }
             ],
             "description": "Core interfaces and orchestration logic for APIs Hub drivers.",
-            "time": "2026-06-09T12:12:37+00:00"
+            "time": "2026-06-17T15:15:52+00:00"
         },
         {
             "name": "anibalealvarezs/bigcommerce-hub-driver",
@@ -362,13 +362,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/google-api.git",
-                "reference": "310f8c4270c7188fcd2cc3ccc667a28a930fb476"
+                "reference": "556797826658795a0fc4dc9625ad512c9d8817a9"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/google-api/anibalealvarezs-google-api-310f8c4270c7188fcd2cc3ccc667a28a930fb476-zip-8d9c40.zip",
-                "reference": "310f8c4270c7188fcd2cc3ccc667a28a930fb476",
-                "shasum": "33f8edc0b21d70b415a72a4d6334aed0b1bb058c"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/google-api/anibalealvarezs-google-api-556797826658795a0fc4dc9625ad512c9d8817a9-zip-4699de.zip",
+                "reference": "556797826658795a0fc4dc9625ad512c9d8817a9",
+                "shasum": "a2168818acee73eb31323bcc0d5f9dd04d800757"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "^1.0.0",
@@ -425,25 +425,25 @@
             "support": {
                 "issues": "https://github.com/anibalealvarezs/google-api/issues"
             },
-            "time": "2026-05-27T21:08:51+00:00"
+            "time": "2026-06-17T15:08:40+00:00"
         },
         {
             "name": "anibalealvarezs/google-hub-driver",
-            "version": "v1.0.0",
+            "version": "v1.1.0",
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/google-hub-driver.git",
-                "reference": "3d28c804f5ebbc4926697660a4492cf12cef51b5"
+                "reference": "801a094e775b8559ea44d52e3070a3f5584a6875"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/google-hub-driver/anibalealvarezs-google-hub-driver-3d28c804f5ebbc4926697660a4492cf12cef51b5-zip-901f82.zip",
-                "reference": "3d28c804f5ebbc4926697660a4492cf12cef51b5",
-                "shasum": "e725856e8f70e8de57a9f82a97144db368925ea7"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/google-hub-driver/anibalealvarezs-google-hub-driver-801a094e775b8559ea44d52e3070a3f5584a6875-zip-54b2b1.zip",
+                "reference": "801a094e775b8559ea44d52e3070a3f5584a6875",
+                "shasum": "e4eff5d1591aaa68f6461dac70c378a2e2385aa6"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "^1.0.0",
-                "anibalealvarezs/api-driver-core": "^1.0.0",
+                "anibalealvarezs/api-driver-core": "^1.1.0",
                 "anibalealvarezs/google-api": "^1.0.0",
                 "doctrine/orm": "^2.12.3 || ^3.0",
                 "fakerphp/faker": "^1.20",
@@ -472,7 +472,7 @@
                 }
             ],
             "description": "APIs-Hub driver for Google (Search Console & Analytics) integration.",
-            "time": "2026-06-14T01:44:06+00:00"
+            "time": "2026-06-17T23:25:11+00:00"
         },
         {
             "name": "anibalealvarezs/klaviyo-api",
@@ -2046,22 +2046,22 @@
         },
         {
             "name": "guzzlehttp/guzzle",
-            "version": "7.11.1",
+            "version": "7.12.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/guzzle/guzzle.git",
-                "reference": "5af96f374e0ab4ebd747b8310888c99d3adb0a8c"
+                "reference": "eaa81598031cf57a9e36258c8546defffc994cba"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/guzzle/guzzle/zipball/5af96f374e0ab4ebd747b8310888c99d3adb0a8c",
-                "reference": "5af96f374e0ab4ebd747b8310888c99d3adb0a8c",
+                "url": "https://api.github.com/repos/guzzle/guzzle/zipball/eaa81598031cf57a9e36258c8546defffc994cba",
+                "reference": "eaa81598031cf57a9e36258c8546defffc994cba",
                 "shasum": ""
             },
             "require": {
                 "ext-json": "*",
                 "guzzlehttp/promises": "^2.5",
-                "guzzlehttp/psr7": "^2.11",
+                "guzzlehttp/psr7": "^2.12",
                 "php": "^7.2.5 || ^8.0",
                 "psr/http-client": "^1.0",
                 "symfony/deprecation-contracts": "^2.5 || ^3.0",
@@ -2154,7 +2154,7 @@
             ],
             "support": {
                 "issues": "https://github.com/guzzle/guzzle/issues",
-                "source": "https://github.com/guzzle/guzzle/tree/7.11.1"
+                "source": "https://github.com/guzzle/guzzle/tree/7.12.0"
             },
             "funding": [
                 {
@@ -2170,7 +2170,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-06-07T22:54:06+00:00"
+            "time": "2026-06-16T22:11:48+00:00"
         },
         {
             "name": "guzzlehttp/promises",
@@ -2258,16 +2258,16 @@
         },
         {
             "name": "guzzlehttp/psr7",
-            "version": "2.11.0",
+            "version": "2.12.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/guzzle/psr7.git",
-                "reference": "bbb5e61349fa5cb822b3e87842b951088b76b81f"
+                "reference": "9b38012e7b54f594707e6db52c684dc0a74b3a43"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/guzzle/psr7/zipball/bbb5e61349fa5cb822b3e87842b951088b76b81f",
-                "reference": "bbb5e61349fa5cb822b3e87842b951088b76b81f",
+                "url": "https://api.github.com/repos/guzzle/psr7/zipball/9b38012e7b54f594707e6db52c684dc0a74b3a43",
+                "reference": "9b38012e7b54f594707e6db52c684dc0a74b3a43",
                 "shasum": ""
             },
             "require": {
@@ -2357,7 +2357,7 @@
             ],
             "support": {
                 "issues": "https://github.com/guzzle/psr7/issues",
-                "source": "https://github.com/guzzle/psr7/tree/2.11.0"
+                "source": "https://github.com/guzzle/psr7/tree/2.12.0"
             },
             "funding": [
                 {
@@ -2373,7 +2373,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-06-02T12:30:48+00:00"
+            "time": "2026-06-16T21:50:11+00:00"
         },
         {
             "name": "monolog/monolog",
@@ -2480,16 +2480,16 @@
         },
         {
             "name": "nesbot/carbon",
-            "version": "3.11.4",
+            "version": "3.12.3",
             "source": {
                 "type": "git",
                 "url": "https://github.com/CarbonPHP/carbon.git",
-                "reference": "e890471a3494740f7d9326d72ce6a8c559ffee60"
+                "reference": "6e7853a668c3107294aff38d42bf760ec02126b6"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/CarbonPHP/carbon/zipball/e890471a3494740f7d9326d72ce6a8c559ffee60",
-                "reference": "e890471a3494740f7d9326d72ce6a8c559ffee60",
+                "url": "https://api.github.com/repos/CarbonPHP/carbon/zipball/6e7853a668c3107294aff38d42bf760ec02126b6",
+                "reference": "6e7853a668c3107294aff38d42bf760ec02126b6",
                 "shasum": ""
             },
             "require": {
@@ -2581,7 +2581,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-04-07T09:57:54+00:00"
+            "time": "2026-06-14T20:41:42+00:00"
         },
         {
             "name": "predis/predis",

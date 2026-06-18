@@ -25,7 +25,7 @@
   "require": {
     "ext-json": "*",
     "anibalealvarezs/api-client-skeleton": "^1.0.0",
-    "anibalealvarezs/api-driver-core": "^1.0.0",
+    "anibalealvarezs/api-driver-core": "^1.1.0",
     "anibalealvarezs/facebook-graph-api": "^1.0.0",
     "anibalealvarezs/google-api": "^1.0.0",
     "doctrine/orm": "^2.12.3 || ^3.0",
@@ -42,7 +42,7 @@
     "symfony/redis-messenger": "^6.4 || ^7.0",
     "symfony/cache-contracts": "^3.0",
     "predis/predis": "^2.0",
-    "anibalealvarezs/google-hub-driver": "^1.0.0",
+    "anibalealvarezs/google-hub-driver": "^1.1.0",
     "anibalealvarezs/meta-hub-driver": "^1.0.0",
     "anibalealvarezs/klaviyo-hub-driver": "^0.1.0",
     "anibalealvarezs/shopify-hub-driver": "^0.1.0",

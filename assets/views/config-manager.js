@@ -84,13 +84,14 @@ function renderDynamicTabs(channels) {
     channels.forEach(chan => {
         const tab = document.createElement('div');
         tab.className = 'tab';
-        tab.dataset.tab = (chan === 'google_search_console' ? 'google' : (chan === 'facebook_organic' ? 'facebook' : (chan === 'facebook_marketing' ? 'facebook-marketing' : chan)));
+        tab.dataset.tab = (chan === 'google_search_console' ? 'google' : (chan === 'google_business_profile' ? 'google-business-profile' : (chan === 'facebook_organic' ? 'facebook' : (chan === 'facebook_marketing' ? 'facebook-marketing' : chan))));
         
         let icon = 'layers';
         let label = chan;
         
         const map = {
             'google_search_console': { icon: 'search', label: 'Google Search Console' },
+            'google_business_profile': { icon: 'store', label: 'Google Business Profile' },
             'google_analytics': { icon: 'bar-chart', label: 'Google Analytics' },
             'facebook_organic': { icon: 'facebook', label: 'Meta Organic' },
             'facebook_marketing': { icon: 'trending-up', label: 'Meta Marketing' },
@@ -235,6 +236,12 @@ function populateGlobalFields() {
         const fbMarketingGranular = document.getElementById('fb-marketing-granular-sync');
         if (fbMarketingGranular) fbMarketingGranular.checked = !!currentConfig.fb_marketing_granular_sync;
 
+        const gbpStatus = document.getElementById('gbp-channel-enabled');
+        if (gbpStatus) gbpStatus.checked = !!currentConfig.gbp_enabled;
+
+        const gbpGranular = document.getElementById('gbp-granular-sync');
+        if (gbpGranular) gbpGranular.checked = !!currentConfig.gbp_granular_sync;
+
         // Windows & Ranges
         const gscRange = document.getElementById('gsc-history-range');
         if (gscRange) gscRange.value = currentConfig.gsc_cache_history_range || '16 months';
@@ -244,6 +251,9 @@ function populateGlobalFields() {
         
         const fbMarkRange = document.getElementById('fb-marketing-history-range');
         if (fbMarkRange) fbMarkRange.value = currentConfig.fb_marketing_history_range || '2 years';
+
+        const gbpRange = document.getElementById('gbp-history-range');
+        if (gbpRange) gbpRange.value = currentConfig.gbp_cache_history_range || '30 months';
 
         // Job & Analytics Settings
         const timeoutEl = document.getElementById('jobs-timeout-hours');
@@ -269,6 +279,9 @@ function populateGlobalFields() {
             fbMarkMaxWorkers.value = val;
             console.log("DEBUG: Setting fb-marketing-max-workers value to:", val);
         }
+
+        const gbpMaxWorkers = document.getElementById('gbp-max-workers');
+        if (gbpMaxWorkers) gbpMaxWorkers.value = (currentConfig.gbp_max_workers !== undefined && currentConfig.gbp_max_workers !== null) ? currentConfig.gbp_max_workers : 3;
 
         // Extraction Granularity (Conceptual Separation)
         const fbLevelEl = document.getElementById('fb-marketing-level');
@@ -375,6 +388,11 @@ function populateGlobalFields() {
         const fbMarkRecMinEl = document.getElementById('fb-marketing-recent-cron-minute');
         if (fbMarkRecMinEl) fbMarkRecMinEl.value = (currentConfig.fb_marketing_cron_recent_minute !== undefined && currentConfig.fb_marketing_cron_recent_minute !== null) ? currentConfig.fb_marketing_cron_recent_minute : 0;
 
+        const gbpCronHourEl = document.getElementById('gbp-cron-hour');
+        if (gbpCronHourEl) gbpCronHourEl.value = (currentConfig.gbp_cron_recent_hour !== undefined && currentConfig.gbp_cron_recent_hour !== null) ? currentConfig.gbp_cron_recent_hour : 10;
+        const gbpCronMinEl = document.getElementById('gbp-cron-minute');
+        if (gbpCronMinEl) gbpCronMinEl.value = (currentConfig.gbp_cron_recent_minute !== undefined && currentConfig.gbp_cron_recent_minute !== null) ? currentConfig.gbp_cron_recent_minute : 0;
+
         updateCronStatusIndicators();
         
         handleFbLevelChange();
@@ -444,6 +462,7 @@ function updateCronStatusIndicators() {
     check('fb-organic-recent-cron-hour', 'fb-organic-recent-cron-minute', 'fb-organic-recent-cron-status', 'fb-organic-cron-sync-warning', 'facebook-organic-recent');
     check('fb-marketing-entities-cron-hour', 'fb-marketing-entities-cron-minute', 'fb-marketing-entities-cron-status', 'fb-marketing-cron-sync-warning', 'facebook-marketing-entities');
     check('fb-marketing-recent-cron-hour', 'fb-marketing-recent-cron-minute', 'fb-marketing-recent-cron-status', 'fb-marketing-cron-sync-warning', 'facebook-marketing-recent');
+    check('gbp-cron-hour', 'gbp-cron-minute', 'gbp-cron-sync-status', 'gbp-cron-sync-warning', 'google-business-profile-recent');
 }
 
 function handleFbLevelChange() {
@@ -739,6 +758,7 @@ function renderAssets(assets) {
     const fbPages = [...getAssetArray('facebook_pages'), ...getAssetArray('pages'), ...getAssetArray('fb_pages_full_config')];
     const fbAdAccounts = [...getAssetArray('facebook_ad_accounts'), ...getAssetArray('ad_accounts'), ...getAssetArray('fb_ad_accounts_full_config')];
     const gscAssets = [...getAssetArray('gsc'), ...getAssetArray('sites')];
+    const gbpAssets = [...getAssetArray('locations'), ...getAssetArray('gbp')];
 
     fbPages.forEach(p => { if (p && p.id) availableAssetsMaps.pages[String(p.id).trim()] = p; });
     fbAdAccounts.forEach(a => { if (a && a.id) availableAssetsMaps.ad_accounts[String(a.id).trim()] = a; });
@@ -974,6 +994,83 @@ function renderAssets(assets) {
                 </div>
             `;
             fbMarketingList.appendChild(div);
+        });
+    }
+
+    const gbpList = document.getElementById('gbp-locations-list');
+    if (gbpList) {
+        gbpList.innerHTML = '';
+        const accounts = gbpAssets;
+        accounts.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+        
+        if (accounts.length === 0) gbpList.innerHTML = '<div class="empty-state">No Locations found.</div>';
+        
+        accounts.forEach(a => {
+            if (!a || !a.platformId) return;
+            const rawAccs = currentConfig.gbp || currentConfig.google_business_profile?.locations || {};
+            const savedAccs = Array.isArray(rawAccs) ? rawAccs : Object.values(rawAccs);
+            const saved = savedAccs.find(acc => String(acc.location_id).trim() === String(a.platformId).trim());
+            const isInConfig = !!saved;
+            const isSynced = isInConfig && saved.enabled !== false;
+            
+            const div = document.createElement('div');
+            let itemClass = 'asset-item gbp-location-config-card';
+            if (isSynced) itemClass += ' synced';
+            if (isInConfig) itemClass += ' in-config';
+
+            div.className = itemClass;
+            div.dataset.locationId = a.platformId;
+            // Store raw location data so we can pass it back
+            div.dataset.rawData = JSON.stringify(a);
+            
+            // Build metrics UI
+            const metrics = [
+                { id: 'impressions', label: 'Impressions' },
+                { id: 'website_clicks', label: 'Website Clicks' },
+                { id: 'calls', label: 'Calls' },
+                { id: 'directions', label: 'Directions' },
+                { id: 'conversations', label: 'Conversations' },
+                { id: 'bookings', label: 'Bookings' },
+                { id: 'food_orders', label: 'Food Orders' },
+                { id: 'menu_clicks', label: 'Menu Clicks' }
+            ];
+            
+            let metricsHtml = '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.05);">';
+            
+            metrics.forEach(m => {
+                let mEnabled = true; // default true in schema
+                if (saved && saved[m.id] && saved[m.id].enabled !== undefined) {
+                    mEnabled = !!saved[m.id].enabled;
+                }
+                
+                metricsHtml += `
+                    <div style="display:flex; justify-content:space-between; align-items:center; background: rgba(0,0,0,0.2); padding: 5px 8px; border-radius: 4px;">
+                        <span style="font-size: 0.65rem; color: #ccc;">${m.label}</span>
+                        <label class="switch-mini">
+                            <input type="checkbox" class="gbp-metric-toggle" data-metric="${m.id}" ${mEnabled ? 'checked' : ''}>
+                            <span class="slider-mini"></span>
+                        </label>
+                    </div>
+                `;
+            });
+            metricsHtml += '</div>';
+
+            div.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                   <div>
+                       <div style="font-size:0.75rem; font-weight:600; color:#fff;">${a.title}</div>
+                       <div style="display:flex; gap:8px; align-items:center;">
+                           <div style="font-size:0.6rem; color:var(--text-dim); font-family:'Fira Code';">${a.platformId}</div>
+                       </div>
+                   </div>
+                   <label class="switch-mini">
+                       <input type="checkbox" class="gbp-location-main-toggle" value="${a.platformId}" ${isSynced ? 'checked' : ''} onchange="this.closest('.asset-item').classList.toggle('synced', this.checked)">
+                       <span class="slider-mini"></span>
+                   </label>
+                </div>
+                ${metricsHtml}
+            `;
+            gbpList.appendChild(div);
         });
     }
 }

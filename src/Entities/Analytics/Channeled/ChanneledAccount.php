@@ -55,6 +55,9 @@
         #[ORM\OneToMany(mappedBy: 'channeledAccount', targetEntity: ChanneledAd::class, orphanRemoval: true)]
         protected Collection $channeledAds;
 
+        #[ORM\OneToMany(mappedBy: 'channeledAccount', targetEntity: \Entities\Analytics\Location::class)]
+        protected Collection $locations;
+
         public function __construct()
         {
             $this->channeledCampaigns = new ArrayCollection();
@@ -62,6 +65,7 @@
             $this->metricConfigs = new ArrayCollection();
             $this->posts = new ArrayCollection();
             $this->channeledAds = new ArrayCollection();
+            $this->locations = new ArrayCollection();
         }
 
         /**
@@ -332,6 +336,47 @@
                 $this->channeledAds->removeElement($channeledAd);
                 if ($channeledAd->getChanneledAccount() === $this) {
                     $channeledAd->addChanneledAccount(null);
+                }
+            }
+
+            return $this;
+        }
+
+        /**
+         * Gets the collection of locations.
+         * @return Collection
+         */
+        public function getLocations(): Collection
+        {
+            return $this->locations;
+        }
+
+        /**
+         * Adds a location.
+         * @param \Entities\Analytics\Location $location
+         * @return self
+         */
+        public function addLocation(\Entities\Analytics\Location $location): self
+        {
+            if (!$this->locations->contains($location)) {
+                $this->locations->add($location);
+                $location->addChanneledAccount($this);
+            }
+
+            return $this;
+        }
+
+        /**
+         * Removes a location.
+         * @param \Entities\Analytics\Location $location
+         * @return self
+         */
+        public function removeLocation(\Entities\Analytics\Location $location): self
+        {
+            if ($this->locations->contains($location)) {
+                $this->locations->removeElement($location);
+                if ($location->getChanneledAccount() === $this) {
+                    $location->addChanneledAccount(null);
                 }
             }
 

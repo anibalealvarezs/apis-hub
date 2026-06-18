@@ -31,6 +31,7 @@
     use Commands\Infrastructure\ScaleWorkersCommand;
     use Commands\InitializeDefaultEntitiesCommand;
     use Commands\InitializeEntitiesCommand;
+    use Commands\RecalculateMetricConfigSignaturesCommand;
     use Commands\RefreshInstancesCommand;
     use Commands\SetupDatabaseCommand;
     use Commands\SeedDemoDataCommand;
@@ -101,6 +102,7 @@
             new AggregateEntityCommand(),
             new RefreshInstancesCommand(),
             new SetupDatabaseCommand(),
+            new RecalculateMetricConfigSignaturesCommand(Helpers::getManager()),
             new SeedDemoDataCommand(Helpers::getManager()),
             new ResetMetricsCommand($entityManager),
             new ResetEntitiesCommand($entityManager),

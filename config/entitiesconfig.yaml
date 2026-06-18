@@ -2018,6 +2018,123 @@ channeled_vendor:
     matching:
       parameters:
         - criteria
+city:
+  class: Entities\Analytics\City
+  crud_enabled: true
+  repository_class: Repositories\CityRepository
+  repository_methods:
+    findByNameAndCountry:
+      parameters:
+        - name
+        - countryId
+      return_type: ?object
+    findByState:
+      parameters:
+        - stateId
+      return_type: array
+    findByCountry:
+      parameters:
+        - countryId
+      return_type: array
+    setHideFields:
+      parameters:
+        - fields
+      return_type: static
+    aggregate:
+      parameters:
+        - aggregations
+        - groupBy
+        - filters
+        - startDate
+        - endDate
+      return_type: array
+    create:
+      parameters:
+        - data
+        - returnEntity
+      return_type: Entities\Entity|array|null
+    read:
+      parameters:
+        - id
+        - returnEntity
+        - filters
+      return_type: Entities\Entity|array|null
+    getCount:
+      parameters: {  }
+      return_type: int
+    countElements:
+      parameters:
+        - filters
+        - startDate
+        - endDate
+      return_type: int
+    readMultiple:
+      parameters:
+        - limit
+        - pagination
+        - ids
+        - filters
+        - orderBy
+        - orderDir
+        - startDate
+        - endDate
+        - extra
+      return_type: Doctrine\Common\Collections\ArrayCollection
+    update:
+      parameters:
+        - id
+        - data
+        - returnEntity
+      return_type: Entities\Entity|array|bool|null
+    delete:
+      parameters:
+        - id
+      return_type: bool
+    createQueryBuilder:
+      parameters:
+        - alias
+        - indexBy
+    createResultSetMappingBuilder:
+      parameters:
+        - alias
+    createNamedQuery:
+      parameters:
+        - queryName
+    createNativeNamedQuery:
+      parameters:
+        - queryName
+    clear:
+      parameters: {  }
+    find:
+      parameters:
+        - id
+        - lockMode
+        - lockVersion
+    findAll:
+      parameters: {  }
+    findBy:
+      parameters:
+        - criteria
+        - orderBy
+        - limit
+        - offset
+    findOneBy:
+      parameters:
+        - criteria
+        - orderBy
+    count:
+      parameters:
+        - criteria
+    __call:
+      parameters:
+        - method
+        - arguments
+    getClassName:
+      parameters: {  }
+    matching:
+      parameters:
+        - criteria
+
 country:
   class: Entities\Analytics\Country
   crud_enabled: true
@@ -3829,6 +3946,120 @@ query:
     matching:
       parameters:
         - criteria
+
+state:
+  class: Entities\Analytics\State
+  crud_enabled: true
+  repository_class: Repositories\StateRepository
+  repository_methods:
+    findByNameAndCountry:
+      parameters:
+        - name
+        - countryId
+      return_type: ?object
+    findByCountry:
+      parameters:
+        - countryId
+      return_type: array
+    setHideFields:
+      parameters:
+        - fields
+      return_type: static
+    aggregate:
+      parameters:
+        - aggregations
+        - groupBy
+        - filters
+        - startDate
+        - endDate
+      return_type: array
+    create:
+      parameters:
+        - data
+        - returnEntity
+      return_type: Entities\Entity|array|null
+    read:
+      parameters:
+        - id
+        - returnEntity
+        - filters
+      return_type: Entities\Entity|array|null
+    getCount:
+      parameters: {  }
+      return_type: int
+    countElements:
+      parameters:
+        - filters
+        - startDate
+        - endDate
+      return_type: int
+    readMultiple:
+      parameters:
+        - limit
+        - pagination
+        - ids
+        - filters
+        - orderBy
+        - orderDir
+        - startDate
+        - endDate
+        - extra
+      return_type: Doctrine\Common\Collections\ArrayCollection
+    update:
+      parameters:
+        - id
+        - data
+        - returnEntity
+      return_type: Entities\Entity|array|bool|null
+    delete:
+      parameters:
+        - id
+      return_type: bool
+    createQueryBuilder:
+      parameters:
+        - alias
+        - indexBy
+    createResultSetMappingBuilder:
+      parameters:
+        - alias
+    createNamedQuery:
+      parameters:
+        - queryName
+    createNativeNamedQuery:
+      parameters:
+        - queryName
+    clear:
+      parameters: {  }
+    find:
+      parameters:
+        - id
+        - lockMode
+        - lockVersion
+    findAll:
+      parameters: {  }
+    findBy:
+      parameters:
+        - criteria
+        - orderBy
+        - limit
+        - offset
+    findOneBy:
+      parameters:
+        - criteria
+        - orderBy
+    count:
+      parameters:
+        - criteria
+    __call:
+      parameters:
+        - method
+        - arguments
+    getClassName:
+      parameters: {  }
+    matching:
+      parameters:
+        - criteria
+
 vendor:
   class: Entities\Analytics\Vendor
   channeled_class: Entities\Analytics\Channeled\ChanneledVendor
@@ -4015,6 +4246,130 @@ job:
         - endDate
         - extra
       return_type: Doctrine\Common\Collections\ArrayCollection
+    delete:
+      parameters:
+        - id
+      return_type: bool
+    createQueryBuilder:
+      parameters:
+        - alias
+        - indexBy
+    createResultSetMappingBuilder:
+      parameters:
+        - alias
+    createNamedQuery:
+      parameters:
+        - queryName
+    createNativeNamedQuery:
+      parameters:
+        - queryName
+    clear:
+      parameters: {  }
+    find:
+      parameters:
+        - id
+        - lockMode
+        - lockVersion
+    findAll:
+      parameters: {  }
+    findBy:
+      parameters:
+        - criteria
+        - orderBy
+        - limit
+        - offset
+    findOneBy:
+      parameters:
+        - criteria
+        - orderBy
+    count:
+      parameters:
+        - criteria
+    __call:
+      parameters:
+        - method
+        - arguments
+    getClassName:
+      parameters: {  }
+    matching:
+      parameters:
+        - criteria
+
+location:
+  class: Entities\Analytics\Location
+  crud_enabled: true
+  repository_class: Repositories\LocationRepository
+  repository_methods:
+    findByPlatformId:
+      parameters:
+        - platformId
+      return_type: ?object
+    findByCity:
+      parameters:
+        - cityId
+      return_type: array
+    findByState:
+      parameters:
+        - stateId
+      return_type: array
+    findByCountry:
+      parameters:
+        - countryId
+      return_type: array
+    findByChanneledAccount:
+      parameters:
+        - channeledAccountId
+      return_type: array
+    setHideFields:
+      parameters:
+        - fields
+      return_type: static
+    aggregate:
+      parameters:
+        - aggregations
+        - groupBy
+        - filters
+        - startDate
+        - endDate
+      return_type: array
+    create:
+      parameters:
+        - data
+        - returnEntity
+      return_type: Entities\Entity|array|null
+    read:
+      parameters:
+        - id
+        - returnEntity
+        - filters
+      return_type: Entities\Entity|array|null
+    getCount:
+      parameters: {  }
+      return_type: int
+    countElements:
+      parameters:
+        - filters
+        - startDate
+        - endDate
+      return_type: int
+    readMultiple:
+      parameters:
+        - limit
+        - pagination
+        - ids
+        - filters
+        - orderBy
+        - orderDir
+        - startDate
+        - endDate
+        - extra
+      return_type: Doctrine\Common\Collections\ArrayCollection
+    update:
+      parameters:
+        - id
+        - data
+        - returnEntity
+      return_type: Entities\Entity|array|bool|null
     delete:
       parameters:
         - id

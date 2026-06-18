@@ -107,6 +107,9 @@
                             'dimensionSet' => $dimensionsHash,
                             'country'      => $row['country'] ?? ($row['country_code'] ?? null),
                             'device'       => $row['device'] ?? null,
+                            'location'     => $row['location'] ?? null,
+                            'state'        => $row['state'] ?? null,
+                            'city'         => $row['city'] ?? null,
                         ]);
 
                         $keyParams = array_filter($keyParams, function ($v, $k) {
@@ -114,7 +117,7 @@
                                     'channel', 'name', 'period', 'account', 'channeledAccount', 'campaign',
                                     'channeledCampaign', 'channeledAdGroup', 'channeledAd', 'creative',
                                     'page', 'query', 'post', 'product', 'customer', 'order', 'country',
-                                    'device', 'dimensionSet',
+                                    'device', 'dimensionSet', 'location', 'state', 'city',
                                 ]);
                         }, ARRAY_FILTER_USE_BOTH);
 

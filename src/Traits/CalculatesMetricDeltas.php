@@ -61,6 +61,9 @@ trait CalculatesMetricDeltas
                 device: $metric->deviceType ?? $metric->device ?? null,
                 creative: ($rowCre = $metric->creative ?? $metric->creativePlatformId ?? null) ? (is_object($rowCre) ? $rowCre->getCreativeId() : (string)$rowCre) : null,
                 dimensionSet: $metric->dimensionsHash ?? null,
+                location: $metric->location ?? null,
+                state: $metric->state ?? null,
+                city: $metric->city ?? null,
             );
 
             $metric->atemporalSignature = $signature;
@@ -140,6 +143,9 @@ trait CalculatesMetricDeltas
                 device: $virtual->deviceType ?? $virtual->device ?? null,
                 creative: ($rowCre = $virtual->creative ?? $virtual->creativePlatformId ?? null) ? (is_object($rowCre) ? $rowCre->getCreativeId() : (string)$rowCre) : null,
                 dimensionSet: $virtual->dimensionsHash ?? null,
+                location: $virtual->location ?? null,
+                state: $virtual->state ?? null,
+                city: $virtual->city ?? null,
             );
 
             $metrics->add($virtual);
