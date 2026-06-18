@@ -396,3 +396,8 @@
     display: none;
     margin-top: 10px;
 }
+
+/* Filter section description spacing */
+.cfg-filter-description {
+    margin-bottom: 20px;
+}
