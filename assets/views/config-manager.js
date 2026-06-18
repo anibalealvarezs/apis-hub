@@ -155,6 +155,11 @@ function renderGenericChannelUI(chan, label, icon) {
             </div>
         </div>
 
+        <div class="card" id="${chan}-metrics-card" style="display: none;">
+            <div class="section-title small"><i data-lucide="activity"></i> Custom Metrics Definition</div>
+            <div class="metric-config-grid" id="${chan}-metrics-custom-grid"></div>
+        </div>
+
         <div class="card">
             <div class="section-title small" style="display:flex; justify-content:space-between; align-items:center;">
                 <span><i data-lucide="${icon}"></i> ${label} assets</span>
@@ -433,7 +438,16 @@ function populateGlobalFields() {
         handleFbLevelChange();
         handleFbOrganicLevelChange();
         handleFbStrategyChange();
-        renderCustomMetricsGrid();
+        
+        // Render Custom Metrics Grids
+        const fbMetrics = ["spend", "clicks", "impressions", "reach", "frequency", "ctr", "cpc", "cpm", "results", "cost_per_result", "result_rate", "purchase_roas"];
+        renderMetricsGrid('fb-metrics-custom-grid', fbMetrics, 'fb_metrics_config', currentConfig);
+
+        const gadsMetrics = ["spend", "clicks", "impressions", "conversions", "conversions_value", "cost_per_conversion"];
+        renderMetricsGrid('google_ads-metrics-custom-grid', gadsMetrics, 'gads_metrics_config', currentConfig);
+
+        const gaMetrics = ["sessions", "totalUsers", "activeUsers", "newUsers", "screenPageViews", "bounceRate", "averageSessionDuration", "conversions", "totalRevenue"];
+        renderMetricsGrid('google_analytics-metrics-custom-grid', gaMetrics, 'ga_metrics_config', currentConfig);
 
         // Dynamic Channel Settings
         if (currentConfig.available_channels) {
@@ -635,18 +649,18 @@ function setMetricLevel(lvl) {
     }
 }
 
-function renderCustomMetricsGrid() {
-    const container = document.getElementById('fb-metrics-custom-grid');
+function renderMetricsGrid(containerId, metricsArray, configKey, configObject) {
+    const container = document.getElementById(containerId);
     if (!container) return;
+    
+    // Only display the card if metrics are provided
+    const cardEl = document.getElementById(containerId.replace('-custom-grid', '-card'));
+    if (cardEl) cardEl.style.display = 'block';
+
     container.innerHTML = '';
 
-    const metrics = [
-        "spend", "clicks", "impressions", "reach", "frequency", "ctr", "cpc", "cpm", 
-        "results", "cost_per_result", "result_rate", "purchase_roas"
-    ];
-
-    metrics.forEach(m => {
-        const cfg = currentConfig.fb_metrics_config?.[m] || { enabled: false, format: 'number', sparkline: false, sparkline_direction: 'standard' };
+    metricsArray.forEach(m => {
+        const cfg = configObject?.[configKey]?.[m] || configObject?.[m] || { enabled: false, format: 'number', sparkline: false, sparkline_direction: 'standard' };
         const card = document.createElement('div');
         card.className = 'metric-config-card ' + (cfg.enabled ? 'active' : '');
         card.style.cursor = 'default';
