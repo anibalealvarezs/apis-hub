@@ -1039,7 +1039,6 @@ function renderAssets(assets) {
         });
     }
 
-    const gbpList = document.getElementById('gbp-locations-list');
     if (gbpList) {
         gbpList.innerHTML = '';
         const accounts = gbpAssets;
