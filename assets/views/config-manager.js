@@ -805,10 +805,10 @@ function renderAssets(assets) {
         return Array.isArray(data) ? data : Object.values(data);
     };
 
-    // Standardize assets for indexing (channel-scoped keys only — no generic fallbacks to prevent cross-channel contamination)
-    const fbPages = [...getAssetArray('facebook_pages'), ...getAssetArray('fb_pages_full_config')];
-    const fbAdAccounts = [...getAssetArray('facebook_ad_accounts'), ...getAssetArray('fb_ad_accounts_full_config')];
-    const gscAssets = getAssetArray('gsc');
+    // Standardize assets for indexing (channel-scoped keys only)
+    const fbPages = [...getAssetArray('facebook_organic_pages'), ...getAssetArray('facebook_organic_fb_pages_full_config')];
+    const fbAdAccounts = [...getAssetArray('facebook_marketing_ad_accounts'), ...getAssetArray('facebook_marketing_fb_ad_accounts_full_config')];
+    const gscAssets = getAssetArray('google_search_console_sites');
     const gbpAssets = getAssetArray('google_business_profile_locations');
     const gaAssets = getAssetArray('google_analytics_properties');
     const gadsAssets = getAssetArray('google_ads_ad_accounts');
@@ -830,7 +830,7 @@ function renderAssets(assets) {
         if (props.length === 0) gscList.innerHTML = '<div class="empty-state">No GSC properties found.</div>';
         props.forEach(p => {
             if (!p || !p.url) return;
-            const cfgGsc = currentConfig?.gsc || currentConfig?.sites || currentConfig?.google_search_console?.sites || {};
+            const cfgGsc = currentConfig?.google_search_console?.sites || {};
             // Convert to map if it's an array for faster lookup
             const gscMap = Array.isArray(cfgGsc) ? Object.fromEntries(cfgGsc.map(s => [s.url, s])) : cfgGsc;
             const savedItem = gscMap[p.url];
@@ -1062,7 +1062,7 @@ function renderAssets(assets) {
         
         accounts.forEach(a => {
             if (!a || !a.platformId) return;
-            const rawAccs = currentConfig.gbp || currentConfig.google_business_profile?.locations || {};
+            const rawAccs = currentConfig.google_business_profile?.locations || {};
             const savedAccs = Array.isArray(rawAccs) ? rawAccs : Object.values(rawAccs);
             const saved = savedAccs.find(acc => String(acc.location_id).trim() === String(a.platformId).trim());
             const isInConfig = !!saved;
