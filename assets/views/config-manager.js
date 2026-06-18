@@ -809,9 +809,9 @@ function renderAssets(assets) {
     const fbPages = [...getAssetArray('facebook_pages'), ...getAssetArray('pages'), ...getAssetArray('fb_pages_full_config')];
     const fbAdAccounts = [...getAssetArray('facebook_ad_accounts'), ...getAssetArray('ad_accounts'), ...getAssetArray('fb_ad_accounts_full_config')];
     const gscAssets = [...getAssetArray('gsc'), ...getAssetArray('sites')];
-    const gbpAssets = [...getAssetArray('locations'), ...getAssetArray('gbp')];
-    const gaAssets = [...getAssetArray('properties'), ...getAssetArray('google_analytics')];
-    const gadsAssets = [...getAssetArray('ad_accounts'), ...getAssetArray('google_ads')];
+    const gbpAssets = [...getAssetArray('google_business_profile_locations'), ...getAssetArray('gbp'), ...getAssetArray('locations')];
+    const gaAssets = [...getAssetArray('google_analytics_properties'), ...getAssetArray('google_analytics'), ...getAssetArray('properties')];
+    const gadsAssets = [...getAssetArray('google_ads_ad_accounts'), ...getAssetArray('google_ads'), ...getAssetArray('ad_accounts')];
 
     fbPages.forEach(p => { if (p && p.id) availableAssetsMaps.pages[String(p.id).trim()] = p; });
     fbAdAccounts.forEach(a => { if (a && a.id) availableAssetsMaps.ad_accounts[String(a.id).trim()] = a; });

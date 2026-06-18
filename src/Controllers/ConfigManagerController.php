@@ -215,15 +215,19 @@
                             $currentConfig = array_replace_recursive($currentConfig, $uiConfig);
                         }
 
+                        $resourceKey = $systemConfig[$chan]['resource_key'] ?? null;
+
                         // Fast Load Logic for Assets: Populate basic asset lists from config without full discovery
                         if (!$forceRefresh || !$isRequestedType) {
-                            $resourceKey = $systemConfig[$chan]['resource_key'] ?? null;
                             if ($resourceKey && isset($chanConfig[$resourceKey])) {
-                                // Merge with existing assets if the key is already present (e.g. across multiple social channels)
+                                $assetValues = array_values($chanConfig[$resourceKey]);
+                                // Backward-compatible generic key
                                 $allAssets[$resourceKey] = array_merge(
                                     $allAssets[$resourceKey] ?? [],
-                                    array_values($chanConfig[$resourceKey])
+                                    $assetValues
                                 );
+                                // Channel-scoped key to prevent cross-channel contamination
+                                $allAssets[$chan . '_' . $resourceKey] = $assetValues;
                             }
                         }
 
@@ -260,6 +264,7 @@
                                 }
 
                                 $allAssets[$assetKey] = $assetList;
+                                $allAssets[$chan . '_' . $assetKey] = $assetList;
                             }
                         }
                     } catch (Exception $e) {

@@ -7,6 +7,7 @@ google_search_console:
   entities: ["metrics", "queries", "entities"]
 google_analytics:
   parent: google
+  resource_key: properties
   driver: 'Anibalealvarezs\GoogleHubDriver\Drivers\GoogleAnalyticsDriver'
   auth: 'Anibalealvarezs\GoogleHubDriver\Auth\GoogleAuthProvider'
   entities: ["metrics", "customers"]
@@ -134,6 +135,7 @@ facebook_leads:
   entities: ["customers", "entities"]
 google_business_profile:
   parent: google
+  resource_key: locations
   driver: 'Anibalealvarezs\GoogleHubDriver\Drivers\GoogleBusinessProfileDriver'
   auth: 'Anibalealvarezs\GoogleHubDriver\Auth\GoogleAuthProvider'
   entities: ["metrics", "entities"]

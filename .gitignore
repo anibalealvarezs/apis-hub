@@ -148,3 +148,7 @@ test.php
 .env-gbs-socialads-prod
 
 test_gbp.php
+
+config/channels/google_ads.yaml-test
+
+config/channels/google_analytics.yaml-test
