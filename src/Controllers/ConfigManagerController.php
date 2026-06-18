@@ -105,9 +105,9 @@
                             // Fallback to driver method
                             $driver = DriverFactory::get($channel);
                             if (method_exists($driver, 'getConfigurationHtml')) {
-                                $html = $driver->getConfigurationHtml();
-                                if ($html) {
-                                    $driverHtml .= $html."\n";
+                                $channelHtml = $driver->getConfigurationHtml();
+                                if ($channelHtml) {
+                                    $driverHtml .= $channelHtml."\n";
                                     $logger->debug("Loaded HTML for $channel from driver method");
                                 }
                             }
