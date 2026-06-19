@@ -152,3 +152,5 @@ test_gbp.php
 config/channels/google_ads.yaml-test
 
 config/channels/google_analytics.yaml-test
+
+tmp_debug_hash.php

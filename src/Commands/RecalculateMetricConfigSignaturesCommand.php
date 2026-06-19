@@ -107,18 +107,111 @@ class RecalculateMetricConfigSignaturesCommand extends Command
             }
 
             $updates = [];
+            $deletes = [];
+            $merges = [];
+            $targetIdsBySignature = [];
+
+            // 1. Calculate new signatures
+            $newSignaturesMap = [];
+            $uniqueNewSigs = [];
             foreach ($rows as $row) {
-                $newSignature = $this->generateSignatureFromRow($row);
-                if ($force || $newSignature !== $row['config_signature']) {
-                    $updates[] = [
-                        'id' => (int) $row['id'],
-                        'signature' => $newSignature,
-                    ];
+                $sig = $this->generateSignatureFromRow($row);
+                $id = (int) $row['id'];
+                $newSignaturesMap[$id] = $sig;
+                $uniqueNewSigs[$sig] = true;
+            }
+            $uniqueNewSigs = array_keys($uniqueNewSigs);
+
+            // 2. Fetch existing targets for these signatures from DB
+            if (!empty($uniqueNewSigs)) {
+                $existingTargets = $conn->fetchAllAssociative(
+                    'SELECT id, config_signature FROM metric_configs WHERE config_signature IN (?)',
+                    [$uniqueNewSigs],
+                    [\Doctrine\DBAL\ArrayParameterType::STRING]
+                );
+                foreach ($existingTargets as $et) {
+                    $targetIdsBySignature[$et['config_signature']] = (int) $et['id'];
                 }
             }
 
-            if (!empty($updates) && !$dryRun) {
-                $this->batchUpdateSignatures($conn, $updates);
+            // 3. Process each row
+            foreach ($rows as $row) {
+                $id = (int) $row['id'];
+                $newSignature = $newSignaturesMap[$id];
+                
+                if (isset($targetIdsBySignature[$newSignature])) {
+                    $existingId = $targetIdsBySignature[$newSignature];
+                    if ($existingId !== $id) {
+                        // Collision! Preserve the oldest ID
+                        $targetId = min($existingId, $id);
+                        $duplicateId = max($existingId, $id);
+                        
+                        $merges[$duplicateId] = $targetId;
+                        $deletes[] = $duplicateId;
+                        
+                        // Update the map so subsequent rows point to the oldest ID
+                        $targetIdsBySignature[$newSignature] = $targetId;
+                        
+                        // If the current row became the target, it still needs its signature updated
+                        if ($targetId === $id) {
+                            $updates[] = [
+                                'id' => $id,
+                                'signature' => $newSignature,
+                            ];
+                        }
+                    } else {
+                        // This row IS the target already
+                        if ($force && $newSignature === $row['config_signature']) {
+                            $updates[] = [
+                                'id' => $id,
+                                'signature' => $newSignature,
+                            ];
+                        }
+                    }
+                } else {
+                    // Claim this signature
+                    $targetIdsBySignature[$newSignature] = $id;
+                    if ($force || $newSignature !== $row['config_signature']) {
+                        $updates[] = [
+                            'id' => $id,
+                            'signature' => $newSignature,
+                        ];
+                    }
+                }
+            }
+
+            if (!$dryRun) {
+                // Execute deduplication merges
+                foreach ($merges as $oldId => $targetId) {
+                    // a) Delete colliding metrics from the OLD row (Duplicate) that already exist in Target
+                    $conn->executeStatement('
+                        DELETE FROM metrics m1
+                        USING metrics m2
+                        WHERE m1.metric_config_id = ? 
+                          AND m2.metric_config_id = ?
+                          AND m1.metric_date = m2.metric_date 
+                          AND m1.dimensions_hash = m2.dimensions_hash
+                    ', [$oldId, $targetId]);
+
+                    // b) Migrate remaining non-colliding historical metrics to Target
+                    $conn->executeStatement('
+                        UPDATE metrics SET metric_config_id = ? WHERE metric_config_id = ?
+                    ', [$targetId, $oldId]);
+                }
+
+                // Delete duplicate configs
+                if (!empty($deletes)) {
+                    $conn->executeStatement(
+                        'DELETE FROM metric_configs WHERE id IN (?)',
+                        [$deletes],
+                        [\Doctrine\DBAL\ArrayParameterType::INTEGER]
+                    );
+                }
+
+                // Update signatures of non-duplicate configs
+                if (!empty($updates)) {
+                    $this->batchUpdateSignatures($conn, $updates);
+                }
             }
 
             $updatedCount += count($updates);
