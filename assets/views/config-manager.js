@@ -830,8 +830,8 @@ function renderAssets(assets) {
         if (props.length === 0) gscList.innerHTML = '<div class="empty-state">No GSC properties found.</div>';
         props.forEach(p => {
             if (!p || !p.url) return;
-            const cfgGsc = currentConfig?.google_search_console?.sites || {};
-            // Convert to map if it's an array for faster lookup
+            const cfgGsc = currentConfig?.gsc || {};
+            // If it's an object with URLs as keys (from prepareUiConfig), we don't need to map it
             const gscMap = Array.isArray(cfgGsc) ? Object.fromEntries(cfgGsc.map(s => [s.url, s])) : cfgGsc;
             const savedItem = gscMap[p.url];
             const isInConfig = savedItem !== undefined;
@@ -1062,7 +1062,7 @@ function renderAssets(assets) {
         
         accounts.forEach(a => {
             if (!a || !a.platformId) return;
-            const rawAccs = currentConfig.google_business_profile?.locations || {};
+            const rawAccs = currentConfig.gbp || currentConfig.google_business_profile?.locations || {};
             const savedAccs = Array.isArray(rawAccs) ? rawAccs : Object.values(rawAccs);
             const saved = savedAccs.find(acc => String(acc.location_id).trim() === String(a.platformId).trim());
             const isInConfig = !!saved;
