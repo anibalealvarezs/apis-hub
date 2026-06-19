@@ -621,13 +621,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/meta-hub-driver.git",
-                "reference": "fb68b7846b4f92e0dc9e514745f988e971daa6f3"
+                "reference": "df9b3000306f0d9f23b843a0fcb2f7e7a4c60373"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/meta-hub-driver/anibalealvarezs-meta-hub-driver-fb68b7846b4f92e0dc9e514745f988e971daa6f3-zip-155a46.zip",
-                "reference": "fb68b7846b4f92e0dc9e514745f988e971daa6f3",
-                "shasum": "19e73738dd2708fa05d8b8feb1ea25343617ea9d"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/meta-hub-driver/anibalealvarezs-meta-hub-driver-df9b3000306f0d9f23b843a0fcb2f7e7a4c60373-zip-a1e162.zip",
+                "reference": "df9b3000306f0d9f23b843a0fcb2f7e7a4c60373",
+                "shasum": "c8e8528e41f54d04cbbafa06db398c36765251c9"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "^1.0.0",
@@ -660,7 +660,7 @@
                 }
             ],
             "description": "APIs-Hub driver for Meta (Facebook & Instagram) integration.",
-            "time": "2026-06-19T01:33:44+00:00"
+            "time": "2026-06-19T01:43:54+00:00"
         },
         {
             "name": "anibalealvarezs/netsuite-api",
