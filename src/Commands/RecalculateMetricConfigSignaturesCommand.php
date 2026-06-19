@@ -191,7 +191,11 @@ class RecalculateMetricConfigSignaturesCommand extends Command
                 mc.state_id,
                 s.name AS state_name,
                 mc.city_id,
-                ci.name AS city_name
+                ci.name AS city_name,
+                mc.event_id,
+                e.name AS event_name,
+                mc.channeled_event_id,
+                ce.platform_id AS channeled_event_platform_id
             FROM metric_configs mc
             LEFT JOIN accounts a ON mc.account_id = a.id
             LEFT JOIN channeled_accounts ca ON mc.channeled_account_id = ca.id
@@ -212,6 +216,8 @@ class RecalculateMetricConfigSignaturesCommand extends Command
             LEFT JOIN locations l ON mc.location_id = l.id
             LEFT JOIN states s ON mc.state_id = s.id
             LEFT JOIN cities ci ON mc.city_id = ci.id
+            LEFT JOIN events e ON mc.event_id = e.id
+            LEFT JOIN channeled_events ce ON mc.channeled_event_id = ce.id
             ORDER BY mc.id ASC
         ";
     }
@@ -240,7 +246,9 @@ class RecalculateMetricConfigSignaturesCommand extends Command
             dimensionSet: $row['dimension_set_hash'],
             location: $row['location_platform_id'],
             state: $row['state_name'],
-            city: $row['city_name']
+            city: $row['city_name'],
+            event: $row['event_name'],
+            channeledEvent: $row['channeled_event_platform_id']
         );
     }
 

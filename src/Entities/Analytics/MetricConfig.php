@@ -11,6 +11,8 @@
     use Entities\Analytics\Channeled\ChanneledAdGroup;
     use Entities\Analytics\Channeled\ChanneledCampaign;
     use Entities\Entity;
+    use Entities\Analytics\Event;
+    use Entities\Analytics\Channeled\ChanneledEvent;
     use Repositories\MetricConfigRepository;
 
     #[ORM\Entity(repositoryClass: MetricConfigRepository::class)]
@@ -36,6 +38,16 @@
     #[ORM\Index(columns: ['account_id'], name: 'idx_metric_configs_account_idx')]
     #[ORM\Index(columns: ['channeled_account_id'], name: 'idx_metric_configs_channeled_account_idx')]
     #[ORM\Index(columns: ['location_id'], name: 'idx_metric_configs_location_idx')]
+    #[ORM\Index(
+        columns: ['channel', 'name', 'period', 'event_id'],
+        name: 'idx_metric_configs_lookup_event_idx'
+    )]
+    #[ORM\Index(
+        columns: ['channel', 'name', 'period', 'channeled_event_id'],
+        name: 'idx_metric_configs_lookup_channeled_event_idx'
+    )]
+    #[ORM\Index(columns: ['event_id'], name: 'idx_metric_configs_event_idx')]
+    #[ORM\Index(columns: ['channeled_event_id'], name: 'idx_metric_configs_channeled_event_idx')]
     #[ORM\Index(
             columns: ['channel', 'page_id', 'query_id', 'dimension_set_id', 'name', 'id'],
             name: 'idx_metric_configs_position_lookup_idx'
@@ -102,6 +114,14 @@
         #[ORM\ManyToOne(targetEntity: Creative::class, inversedBy: 'metricConfigs')]
         #[ORM\JoinColumn(name: 'creative_id', onDelete: 'SET NULL')]
         protected ?Creative $creative = null;
+
+        #[ORM\ManyToOne(targetEntity: Event::class, inversedBy: 'metricConfigs')]
+        #[ORM\JoinColumn(name: 'event_id', onDelete: 'SET NULL')]
+        protected ?Event $event = null;
+
+        #[ORM\ManyToOne(targetEntity: ChanneledEvent::class, inversedBy: 'metricConfigs')]
+        #[ORM\JoinColumn(name: 'channeled_event_id', onDelete: 'SET NULL')]
+        protected ?ChanneledEvent $channeledEvent = null;
 
         #[ORM\ManyToOne(targetEntity: Page::class, inversedBy: 'metricConfigs')]
         #[ORM\JoinColumn(name: 'page_id', onDelete: 'SET NULL')]
@@ -501,6 +521,44 @@
         public function addCreative(?Creative $creative): self
         {
             $this->creative = $creative;
+
+            return $this;
+        }
+
+        /**
+         * @return Event|null
+         */
+        public function getEvent(): ?Event
+        {
+            return $this->event;
+        }
+
+        /**
+         * @param Event|null $event
+         * @return self
+         */
+        public function addEvent(?Event $event): self
+        {
+            $this->event = $event;
+
+            return $this;
+        }
+
+        /**
+         * @return ChanneledEvent|null
+         */
+        public function getChanneledEvent(): ?ChanneledEvent
+        {
+            return $this->channeledEvent;
+        }
+
+        /**
+         * @param ChanneledEvent|null $channeledEvent
+         * @return self
+         */
+        public function addChanneledEvent(?ChanneledEvent $channeledEvent): self
+        {
+            $this->channeledEvent = $channeledEvent;
 
             return $this;
         }

@@ -20,6 +20,8 @@
     use Entities\Analytics\Channeled\ChanneledCampaign;
     use Entities\Analytics\Page;
     use Entities\Analytics\Post;
+    use Entities\Analytics\Event;
+    use Entities\Analytics\Channeled\ChanneledEvent;
     use Exception;
     use Helpers\Helpers;
     use Psr\Log\LoggerInterface;
@@ -173,6 +175,8 @@
                         'channeled_ads'       => ChanneledAd::class,
                         'posts'               => Post::class,
                         'accounts'            => Account::class,
+                        'events'              => Event::class,
+                        'channeled_events'    => ChanneledEvent::class,
                     ];
 
                     if (!isset($repoMap[$type])) {
@@ -193,6 +197,7 @@
                         'channeled_campaigns' => AssetCategory::CAMPAIGN,
                         'channeled_ad_groups' => AssetCategory::GROUPING,
                         'channeled_ads', 'posts' => AssetCategory::UNIT,
+                        'channeled_events', 'events' => AssetCategory::EVENT,
                         default => null
                     };
 
@@ -409,6 +414,11 @@
                 case 'customers':
                 case 'channeled_customer':
                     \Classes\CustomerProcessor::processCustomers($collection, $manager);
+                    break;
+                case 'event':
+                case 'events':
+                case 'channeled_event':
+                    \Classes\EventProcessor::processEvents($collection, $manager);
                     break;
             }
         }
