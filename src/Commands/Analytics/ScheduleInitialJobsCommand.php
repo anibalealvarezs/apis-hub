@@ -183,7 +183,7 @@
                         if ($account instanceof ChanneledAccount) {
                             $accountId = $account->getPlatformId();
                         } elseif (is_array($account)) {
-                            $accountId = $account['id'] ?? $account['identifier'] ?? $account['url'] ?? null;
+                            $accountId = $account['id'] ?? $account['identifier'] ?? $account['url'] ?? $account['platformId'] ?? $account['location_id'] ?? null;
                         } else {
                             $accountId = $account;
                         }
