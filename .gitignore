@@ -160,3 +160,5 @@ scripts/patch_google_metrics.php
 test_conn.php
 
 test_profiles.php
+
+test_ga_sync_scratch.php
