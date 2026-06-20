@@ -459,7 +459,7 @@
                 $list = is_array($rawNames) ? $rawNames : [$rawNames];
                 $normalized = [];
                 foreach ($list as $name) {
-                    $value = strtolower(trim((string)$name));
+                    $value = trim((string)$name);
                     if ($value !== '' && !in_array($value, $normalized, true)) {
                         $normalized[] = $value;
                     }
@@ -511,7 +511,7 @@
                 $list = is_array($rawNames) ? $rawNames : [$rawNames];
                 $normalized = [];
                 foreach ($list as $name) {
-                    $value = strtolower(trim((string)$name));
+                    $value = trim((string)$name);
                     if ($value !== '' && !in_array($value, $normalized, true)) {
                         $normalized[] = $value;
                     }
@@ -564,7 +564,7 @@
                 $list = is_array($rawNames) ? $rawNames : [$rawNames];
                 $normalized = [];
                 foreach ($list as $name) {
-                    $value = strtolower(trim((string)$name));
+                    $value = trim((string)$name);
                     if ($value !== '' && !in_array($value, $normalized, true)) {
                         $normalized[] = $value;
                     }
