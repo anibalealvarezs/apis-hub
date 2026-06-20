@@ -94,6 +94,18 @@ class NuclearResyncCommand extends Command
             }
         }
 
+        // 2.75. Refresh Instances Configurations to guarantee up-to-date end dates
+        $output->writeln("<info>Refreshing instance configurations...</info>");
+        try {
+            $refreshCmd = new \Commands\RefreshInstancesCommand();
+            $refreshInput = new ArrayInput([]);
+            $refreshCmd->run($refreshInput, $output);
+            $output->writeln("<info>✓ Instances configuration refreshed.</info>");
+        } catch (\Throwable $e) {
+            $output->writeln("<error>✗ Refresh instances error: " . $e->getMessage() . "</error>");
+            return Command::FAILURE;
+        }
+
         // 3. Schedule initial jobs
         $output->writeln("<info>Scheduling initial jobs...</info>");
 
