@@ -17,6 +17,7 @@
          */
         private const array SUPPORTED_CANONICAL_METRICS = [
             'spend', 'clicks', 'impressions', 'reach', 'conversions',
+            'sessions', 'new_users',
             'frequency', 'ctr', 'cpc', 'cpm', 'cost_per_conversion', 'conversion_rate', 'roas_purchase',
         ];
 
@@ -165,7 +166,7 @@
             $resolvedNames = $this->resolveRawMetricNames($resolutionMetric, $channel);
 
             $sqlExpression = match ($resolutionMetric) {
-                'spend', 'clicks', 'impressions', 'reach', 'conversions', 'actions' =>
+                'spend', 'clicks', 'impressions', 'reach', 'conversions', 'actions', 'sessions', 'new_users' =>
                 $this->buildSumExpression($resolvedNames['raw_names'], $nameCol, $periodCol),
                 'frequency', 'roas_purchase' =>
                 $this->buildAverageExpression($resolvedNames['raw_names'], $nameCol, $periodCol),
