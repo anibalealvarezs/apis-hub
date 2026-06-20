@@ -433,13 +433,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/google-hub-driver.git",
-                "reference": "91ae251d0c0aaff51a5f4b43b9d5d89289443da9"
+                "reference": "0b6d94aa368a43cc65dbe70e807935860c50b969"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/google-hub-driver/anibalealvarezs-google-hub-driver-91ae251d0c0aaff51a5f4b43b9d5d89289443da9-zip-ce8999.zip",
-                "reference": "91ae251d0c0aaff51a5f4b43b9d5d89289443da9",
-                "shasum": "61f516ca5bf9f3ca010f959e648cdfbab0d45f4d"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/google-hub-driver/anibalealvarezs-google-hub-driver-0b6d94aa368a43cc65dbe70e807935860c50b969-zip-b90a9b.zip",
+                "reference": "0b6d94aa368a43cc65dbe70e807935860c50b969",
+                "shasum": "dfad9e2872a05159e2b9d197c0b91a42c32e12ec"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "^1.0.0",
@@ -472,7 +472,7 @@
                 }
             ],
             "description": "APIs-Hub driver for Google (Search Console & Analytics) integration.",
-            "time": "2026-06-20T20:56:10+00:00"
+            "time": "2026-06-20T21:32:45+00:00"
         },
         {
             "name": "anibalealvarezs/klaviyo-api",
