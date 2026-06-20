@@ -827,9 +827,6 @@
                     continue;
                 }
                 $mObj = $metric;
-                if ($logger && ($mObj->channel ?? $channel) === 'google_analytics') {
-                    $logger->info('DEBUG GA4 - DeviceType: ' . ($mObj->deviceType ?? 'NULL') . ' | CountryCode: ' . ($mObj->countryCode ?? 'NULL') . ' | PageId: ' . (self::extractMetricLookupKey($mObj, 'page', null) ?: 'NULL'));
-                }
 
                 $metricConfigKey = KeyGenerator::generateMetricConfigKey(
                     channel: $mObj->channel ?? null,
