@@ -10,7 +10,6 @@ use Classes\MetricsProcessor;
 use Core\Services\SyncService;
 use Doctrine\Common\Collections\ArrayCollection;
 use Entities\Analytics\Channel as ChannelEntity;
-use Exception;
 use Exceptions\ConfigurationException;
 use Helpers\Helpers;
 use Interfaces\RequestInterface;
@@ -20,8 +19,6 @@ use Throwable;
 
 class MetricRequests implements RequestInterface
 {
-
-
     /**
      * @param ChannelEntity|string $channel
      * @param string|null $startDate
@@ -145,7 +142,7 @@ class MetricRequests implements RequestInterface
             }
             $logger->error("Error in MetricRequests::persist: " . $e->getMessage(), [
                 'exception' => $e,
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             throw $e;
@@ -170,7 +167,6 @@ class MetricRequests implements RequestInterface
             'processed' => $result['metrics'],
         ]));
     }
-
 
     public static function getRetentionRange(array $config): Carbon
     {

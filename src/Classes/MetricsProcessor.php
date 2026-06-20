@@ -291,7 +291,7 @@
                 }
             }
 
-            $map = [];
+            $map = ['global' => []];
             $mapReverse = [];
             foreach ($results as $row) {
                 if ($row['platform_id']) {
@@ -387,7 +387,7 @@
             $sql = "SELECT id, platform_id, campaign_id, channeled_account_id FROM channeled_campaigns WHERE platform_id IN ($placeholders)";
             $results = $manager->getConnection()->executeQuery($sql, $platformIds)->fetchAllAssociative();
 
-            $map = [];
+            $map = ['global' => [], 'account' => []];
             $mapReverse = [];
             foreach ($results as $row) {
                 $map[$row['platform_id']] = (int)$row['id'];
@@ -434,7 +434,7 @@
             $sql = "SELECT id, platform_id, campaign_id, channeled_campaign_id, channeled_account_id FROM channeled_ad_groups WHERE platform_id IN ($placeholders)";
             $results = $manager->getConnection()->executeQuery($sql, $platformIds)->fetchAllAssociative();
 
-            $map = [];
+            $map = ['global' => [], 'campaign' => [], 'account' => []];
             $mapReverse = [];
             foreach ($results as $row) {
                 $map[$row['platform_id']] = (int)$row['id'];
@@ -482,7 +482,7 @@
             $sql = "SELECT id, platform_id, channeled_ad_group_id, channeled_campaign_id, channeled_account_id FROM channeled_ads WHERE platform_id IN ($placeholders)";
             $results = $manager->getConnection()->executeQuery($sql, $platformIds)->fetchAllAssociative();
 
-            $map = [];
+            $map = ['ad_group' => [], 'campaign' => [], 'account' => []];
             $mapReverse = [];
             foreach ($results as $row) {
                 $map[$row['platform_id']] = (int)$row['id'];
