@@ -154,3 +154,9 @@ config/channels/google_ads.yaml-test
 config/channels/google_analytics.yaml-test
 
 tmp_debug_hash.php
+
+scripts/patch_google_metrics.php
+
+test_conn.php
+
+test_profiles.php
