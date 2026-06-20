@@ -130,8 +130,15 @@
             $mapReverse = [];
             /** @var Country $country */
             foreach ($countries as $country) {
-                $map[$country->getCode()->value] = $country;
+                $alpha3 = $country->getCode()->value;
+                $map[$alpha3] = $country;
                 $mapReverse[$country->getId()] = $country;
+
+                // Automatically map Alpha-2 codes (e.g. 'US') for GA4 compatibility
+                $alpha2 = array_search($alpha3, \Helpers\CountryCodeConverter::$alpha2ToAlpha3, true);
+                if ($alpha2) {
+                    $map[$alpha2] = $country;
+                }
             }
 
             return ['map' => $map, 'mapReverse' => $mapReverse];
