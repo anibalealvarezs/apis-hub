@@ -281,21 +281,53 @@
                             if ($oldStart === $newStart && $oldEnd === $newEnd) {
                                 $shouldSchedule = false;
                             } else {
-                                // Dates changed! If old job is still pending (status 1), soft-delete it.
-                                if ((int)$lastJob['status'] === JobStatus::scheduled->value) {
-                                    if (Helpers::isPostgres()) {
-                                        $this->entityManager->getConnection()->executeStatement(
-                                            "UPDATE jobs SET status = :status WHERE id = :id",
-                                            ['status' => JobStatus::cancelled->value, 'id' => $lastJob['id']]
-                                        );
-                                    } else {
-                                        $qbUpdate = $this->entityManager->createQueryBuilder();
-                                        $qbUpdate->update(Job::class, 'j')
-                                            ->set('j.status', ':status')
-                                            ->where('j.id = :id')
-                                            ->setParameter('status', JobStatus::cancelled->value)
-                                            ->setParameter('id', $lastJob['id'])
-                                            ->getQuery()->execute();
+                                $jobStatus = (int)$lastJob['status'];
+                                
+                                // Detect if this new job represents a fully closed quarter
+                                $isQuarterEnd = false;
+                                if ($newStart && $newEnd) {
+                                    try {
+                                        $startDateObj = new DateTimeImmutable($newStart);
+                                        $month = (int)$startDateObj->format('n');
+                                        $year = (int)$startDateObj->format('Y');
+                                        $currentQuarter = (int)ceil($month / 3);
+                                        $endMonth = $currentQuarter * 3;
+                                        $quarterEndObj = $startDateObj->setDate($year, $endMonth, 1)->modify('last day of this month');
+                                        if ($newEnd === $quarterEndObj->format('Y-m-d')) {
+                                            $isQuarterEnd = true;
+                                        }
+                                    } catch (Exception $e) {}
+                                }
+
+                                // Prevent redundant rescheduling when end dates naturally shift for the current ONGOING chunk.
+                                // If a job already exists for this exact instance/account in a valid state, we preserve it.
+                                // HOWEVER, if $isQuarterEnd is true, we DO schedule it to ensure a final, consolidated
+                                // capstone sync is performed when a quarter officially closes.
+                                if (!$isQuarterEnd && in_array($jobStatus, [
+                                    JobStatus::scheduled->value,
+                                    JobStatus::processing->value,
+                                    JobStatus::completed->value,
+                                    JobStatus::delayed->value
+                                ])) {
+                                    $shouldSchedule = false;
+                                } else {
+                                    // If it was cancelled or failed, OR if it's the final quarter close, allow scheduling.
+                                    // Soft-delete the old job if it's somehow still scheduled (fallback).
+                                    if ($jobStatus === JobStatus::scheduled->value) {
+                                        if (Helpers::isPostgres()) {
+                                            $this->entityManager->getConnection()->executeStatement(
+                                                "UPDATE jobs SET status = :status WHERE id = :id",
+                                                ['status' => JobStatus::cancelled->value, 'id' => $lastJob['id']]
+                                            );
+                                        } else {
+                                            $qbUpdate = $this->entityManager->createQueryBuilder();
+                                            $qbUpdate->update(Job::class, 'j')
+                                                ->set('j.status', ':status')
+                                                ->where('j.id = :id')
+                                                ->setParameter('status', JobStatus::cancelled->value)
+                                                ->setParameter('id', $lastJob['id'])
+                                                ->getQuery()->execute();
+                                        }
                                     }
                                 }
                             }
