@@ -759,6 +759,7 @@
         {
             $quoted = [];
             foreach ($values as $value) {
+                $value = strtolower($value);
                 $quoted[] = "'".str_replace("'", "''", $value)."'";
             }
 
