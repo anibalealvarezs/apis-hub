@@ -941,7 +941,7 @@ class JobRepository extends BaseRepository
                             (p.instance_name = COALESCE(j.payload->>'instance_name', '') AND COALESCE(j.payload->>'account_id', j.payload->'params'->>'account_id') IS NULL)
                         )
                     )
-                    ORDER BY j.priority DESC, j.id ASC
+                    ORDER BY j.priority DESC, j.updated_at ASC, j.id ASC
                     LIMIT 1
                     FOR UPDATE OF j SKIP LOCKED
                 )
