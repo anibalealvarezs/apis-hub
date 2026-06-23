@@ -46,6 +46,7 @@ class Event extends Entity
     public function addName(string $name): self
     {
         $this->name = $name;
+
         return $this;
     }
 
@@ -65,10 +66,11 @@ class Event extends Entity
      */
     public function addChanneledEvent(ChanneledEvent $channeledEvent): self
     {
-        if (!$this->channeledEvents->contains($channeledEvent)) {
+        if (! $this->channeledEvents->contains($channeledEvent)) {
             $this->channeledEvents->add($channeledEvent);
             $channeledEvent->addEvent($this);
         }
+
         return $this;
     }
 
@@ -85,6 +87,7 @@ class Event extends Entity
                 $channeledEvent->addEvent(null);
             }
         }
+
         return $this;
     }
 
@@ -104,10 +107,11 @@ class Event extends Entity
      */
     public function addMetricConfig(MetricConfig $metricConfig): self
     {
-        if (!$this->metricConfigs->contains($metricConfig)) {
+        if (! $this->metricConfigs->contains($metricConfig)) {
             $this->metricConfigs->add($metricConfig);
             $metricConfig->addEvent($this);
         }
+
         return $this;
     }
 
@@ -124,6 +128,7 @@ class Event extends Entity
                 $metricConfig->addEvent(null);
             }
         }
+
         return $this;
     }
 }

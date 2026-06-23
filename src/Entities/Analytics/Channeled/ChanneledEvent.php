@@ -95,7 +95,7 @@ class ChanneledEvent extends ChanneledEntity
      */
     public function addMetricConfig(MetricConfig $metricConfig): self
     {
-        if (!$this->metricConfigs->contains($metricConfig)) {
+        if (! $this->metricConfigs->contains($metricConfig)) {
             $this->metricConfigs->add($metricConfig);
             $metricConfig->addChanneledEvent($this);
         }

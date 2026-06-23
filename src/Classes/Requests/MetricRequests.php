@@ -103,9 +103,14 @@ class MetricRequests implements RequestInterface
                 processCustomers: true,
                 processOrders: true,
                 processCountries: true,
+                processLocations: true,
+                processStates: true,
+                processCities: true,
                 processDevices: true,
                 processDimensions: true,
                 processCreatives: true,
+                processEvents: true,
+                processChanneledEvents: true,
                 logger: $logger,
                 channel: (string)$channel
             );

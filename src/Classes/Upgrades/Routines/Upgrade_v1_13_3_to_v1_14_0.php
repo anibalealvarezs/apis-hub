@@ -23,7 +23,7 @@ class Upgrade_v1_13_3_to_v1_14_0 implements UpgradeRoutineInterface
 
     public function getDescription(): string
     {
-        return 'Adds geo location fields (location, state, city) to metric_configs and recalculates signatures.';
+        return 'Adds geo location fields (location, state, city) and event entities (events, channeled_events) to metric_configs and recalculates signatures.';
     }
 
     public function requiresNuclearResync(): bool
@@ -36,16 +36,21 @@ class Upgrade_v1_13_3_to_v1_14_0 implements UpgradeRoutineInterface
     {
         $conn = $em->getConnection();
         
-        // 1. Run the raw SQL migration
-        $sqlPath = __DIR__ . '/../../../../migrations/Version20260617000001_add_location_geo_entities.sql';
-        if (file_exists($sqlPath)) {
-            $output->writeln("   <info>[1/3]</info> Executing raw SQL migration...");
-            $sql = file_get_contents($sqlPath);
-            if (!empty(trim($sql))) {
-                $conn->executeStatement($sql);
+        // 1. Run the raw SQL migrations
+        $sqlPaths = [
+            __DIR__ . '/../../../../migrations/Version20260617000001_add_location_geo_entities.sql',
+            __DIR__ . '/../../../../migrations/Version20260623000001_add_event_entities.sql'
+        ];
+        foreach ($sqlPaths as $sqlPath) {
+            if (file_exists($sqlPath)) {
+                $output->writeln("   <info>[1/3]</info> Executing raw SQL migration: " . basename($sqlPath) . "...");
+                $sql = file_get_contents($sqlPath);
+                if (!empty(trim($sql))) {
+                    $conn->executeStatement($sql);
+                }
+            } else {
+                $output->writeln("   <comment>[1/3]</comment> SQL migration file not found. Skipping: " . basename($sqlPath));
             }
-        } else {
-            $output->writeln("   <comment>[1/3]</comment> SQL migration file not found. Skipping.");
         }
 
         // 2. Sync schema using Doctrine (orm:schema-tool:update)
@@ -80,6 +85,24 @@ class Upgrade_v1_13_3_to_v1_14_0 implements UpgradeRoutineInterface
             $conn->executeStatement('ALTER TABLE metric_configs DROP COLUMN IF EXISTS location_id;');
             $conn->executeStatement('ALTER TABLE metric_configs DROP COLUMN IF EXISTS state_id;');
             $conn->executeStatement('ALTER TABLE metric_configs DROP COLUMN IF EXISTS city_id;');
+            
+            // Revert GA4 and GBP optimized indexes
+            $conn->executeStatement('DROP INDEX IF EXISTS idx_metric_configs_event_matrix_idx;');
+            $conn->executeStatement('DROP INDEX IF EXISTS idx_metric_configs_traffic_matrix_idx;');
+            $conn->executeStatement('DROP INDEX IF EXISTS idx_metric_configs_acquisition_matrix_idx;');
+            $conn->executeStatement('DROP INDEX IF EXISTS idx_metric_configs_gbp_lookup_idx;');
+            
+            // Revert event entities
+            $conn->executeStatement('ALTER TABLE metric_configs DROP CONSTRAINT IF EXISTS FK_METRIC_CONFIGS_EVENT;');
+            $conn->executeStatement('ALTER TABLE metric_configs DROP CONSTRAINT IF EXISTS FK_METRIC_CONFIGS_CHANNELED_EVENT;');
+            $conn->executeStatement('DROP INDEX IF EXISTS idx_metric_configs_lookup_event_idx;');
+            $conn->executeStatement('DROP INDEX IF EXISTS idx_metric_configs_lookup_channeled_event_idx;');
+            $conn->executeStatement('DROP INDEX IF EXISTS idx_metric_configs_event_idx;');
+            $conn->executeStatement('DROP INDEX IF EXISTS idx_metric_configs_channeled_event_idx;');
+            $conn->executeStatement('ALTER TABLE metric_configs DROP COLUMN IF EXISTS event_id;');
+            $conn->executeStatement('ALTER TABLE metric_configs DROP COLUMN IF EXISTS channeled_event_id;');
+            $conn->executeStatement('DROP TABLE IF EXISTS channeled_events CASCADE;');
+            $conn->executeStatement('DROP TABLE IF EXISTS events CASCADE;');
         } catch (\Exception $e) {
             $output->writeln("   <comment>Schema revert warning: " . $e->getMessage() . "</comment>");
         }
