@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS events (
     version     INT NOT NULL DEFAULT 1
 );
 
-CREATE UNIQUE INDEX UNIQ_EVENT_NAME ON events (name);
+CREATE UNIQUE INDEX IF NOT EXISTS UNIQ_EVENT_NAME ON events (name);
 
 -- ============================================================
 -- Table: channeled_events
@@ -30,13 +30,13 @@ CREATE TABLE IF NOT EXISTS channeled_events (
     version                 INT NOT NULL DEFAULT 1
 );
 
-CREATE INDEX idx_channeled_events_platform_id_idx ON channeled_events (platform_id);
-CREATE INDEX idx_channeled_events_channel_idx ON channeled_events (channel);
-CREATE INDEX idx_channeled_events_platform_channel_idx ON channeled_events (platform_id, channel);
-CREATE INDEX idx_channeled_events_channeled_account_id_idx ON channeled_events (channeled_account_id);
-CREATE INDEX idx_channeled_events_event_idx ON channeled_events (event_id);
-CREATE INDEX idx_channeled_events_channeled_account_id_event_id_idx ON channeled_events (channeled_account_id, event_id);
-CREATE UNIQUE INDEX channeled_events_platform_id_account_id_uidx ON channeled_events (platform_id, channeled_account_id);
+CREATE INDEX IF NOT EXISTS idx_channeled_events_platform_id_idx ON channeled_events (platform_id);
+CREATE INDEX IF NOT EXISTS idx_channeled_events_channel_idx ON channeled_events (channel);
+CREATE INDEX IF NOT EXISTS idx_channeled_events_platform_channel_idx ON channeled_events (platform_id, channel);
+CREATE INDEX IF NOT EXISTS idx_channeled_events_channeled_account_id_idx ON channeled_events (channeled_account_id);
+CREATE INDEX IF NOT EXISTS idx_channeled_events_event_idx ON channeled_events (event_id);
+CREATE INDEX IF NOT EXISTS idx_channeled_events_channeled_account_id_event_id_idx ON channeled_events (channeled_account_id, event_id);
+CREATE UNIQUE INDEX IF NOT EXISTS channeled_events_platform_id_account_id_uidx ON channeled_events (platform_id, channeled_account_id);
 
 ALTER TABLE channeled_events
     ADD CONSTRAINT FK_CHANNELED_EVENTS_EVENT
