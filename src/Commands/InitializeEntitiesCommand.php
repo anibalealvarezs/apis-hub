@@ -1,460 +1,562 @@
 <?php
 
-    declare(strict_types=1);
+declare(strict_types=1);
 
-    namespace Commands;
+namespace Commands;
 
-    use Anibalealvarezs\ApiDriverCore\Classes\UniversalEntity;
-    use Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory;
-    use Anibalealvarezs\ApiDriverCore\Enums\AssetCategory;
-    use Anibalealvarezs\ApiSkeleton\Enums\Country as CountryEnum;
-    use Anibalealvarezs\ApiSkeleton\Enums\Device as DeviceEnum;
-    use Classes\SocialProcessor;
-    use Doctrine\Common\Collections\ArrayCollection;
-    use Doctrine\ORM\EntityManagerInterface;
-    use Entities\Analytics\Account;
-    use Entities\Analytics\Channel;
-    use Entities\Analytics\Channeled\ChanneledAccount;
-    use Entities\Analytics\Country;
-    use Entities\Analytics\Device;
-    use Entities\Analytics\Page;
-    use Exception;
-    use Exceptions\ConfigurationException;
-    use Helpers\Helpers;
-    use Psr\Log\LoggerInterface;
-    use Repositories\Channeled\ChanneledAccountRepository;
-    use Repositories\PageRepository;
-    use RuntimeException;
-    use Symfony\Component\Console\Attribute\AsCommand;
-    use Symfony\Component\Console\Command\Command;
-    use Symfony\Component\Console\Input\InputInterface;
-    use Symfony\Component\Console\Logger\ConsoleLogger;
-    use Symfony\Component\Console\Output\OutputInterface;
+use Anibalealvarezs\ApiDriverCore\Classes\UniversalEntity;
+use Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory;
+use Anibalealvarezs\ApiDriverCore\Enums\AssetCategory;
+use Anibalealvarezs\ApiSkeleton\Enums\Country as CountryEnum;
+use Anibalealvarezs\ApiSkeleton\Enums\Device as DeviceEnum;
+use Classes\SocialProcessor;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\ORM\EntityManagerInterface;
+use Entities\Analytics\Account;
+use Entities\Analytics\Channel;
+use Entities\Analytics\Channeled\ChanneledAccount;
+use Entities\Analytics\Country;
+use Entities\Analytics\Device;
+use Entities\Analytics\Page;
+use Exception;
+use Exceptions\ConfigurationException;
+use Helpers\Helpers;
+use Psr\Log\LoggerInterface;
+use Repositories\Channeled\ChanneledAccountRepository;
+use Repositories\PageRepository;
+use RuntimeException;
+use Symfony\Component\Console\Attribute\AsCommand;
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Logger\ConsoleLogger;
+use Symfony\Component\Console\Output\OutputInterface;
 
-    #[AsCommand(
-        name: 'app:initialize-entities',
-        description: 'Initializes Core and Channel-specific entities in the database'
-    )]
-    class InitializeEntitiesCommand extends Command
+#[AsCommand(
+    name: 'app:initialize-entities',
+    description: 'Initializes Core and Channel-specific entities in the database'
+)]
+class InitializeEntitiesCommand extends Command
+{
+    protected EntityManagerInterface $entityManager;
+    private ?LoggerInterface $logger = null;
+
+    public function __construct(EntityManagerInterface $entityManager)
     {
-        protected EntityManagerInterface $entityManager;
-        private ?LoggerInterface $logger = null;
+        $this->entityManager = $entityManager;
+        parent::__construct();
+    }
 
-        public function __construct(EntityManagerInterface $entityManager)
-        {
-            $this->entityManager = $entityManager;
-            parent::__construct();
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
+        $this->logger = new ConsoleLogger($output);
+        $this->logger->info("Starting dynamic entity initialization...");
+
+        try {
+            // 1. Initialize Core Entities
+            $this->initializeCoreEntities();
+
+            // 2. Initialize Channel-specific Entities via Drivers
+            $exitCode = $this->initializeChannelEntities($output);
+            if ($exitCode !== Command::SUCCESS) {
+                return $exitCode;
+            }
+
+            $this->logger->info("Initialization complete.");
+
+            return Command::SUCCESS;
+
+        } catch (Exception $e) {
+            $this->logger?->error("Initialization failed: ".$e->getMessage());
+
+            return Command::FAILURE;
+        }
+    }
+
+    /**
+     * @throws \Doctrine\DBAL\Exception
+     */
+    private function initializeCoreEntities(): void
+    {
+        $this->logger->info("Initializing Core Entities (Countries, Devices)...");
+
+        $countryRepository = $this->entityManager->getRepository(Country::class);
+        $added = 0;
+        foreach (CountryEnum::cases() as $countryEnum) {
+            $country = $countryRepository->getByCode($countryEnum->value);
+            if (! $country) {
+                $country = new Country();
+                $country->addCode($countryEnum)
+                    ->addName($countryEnum->getFullName());
+                $this->entityManager->persist($country);
+                $added++;
+            }
+        }
+        $this->entityManager->flush();
+        $this->logger->info("  - Countries: $added added.");
+
+        $deviceRepository = $this->entityManager->getRepository(Device::class);
+        // Normalize legacy deployments that persisted UNKNOWN instead of enum-backed unknown.
+        $normalizedUnknown = $this->entityManager->getConnection()->executeStatement(
+            'UPDATE devices SET type = :normalized WHERE LOWER(type) = :unknown AND type <> :normalized',
+            [
+                'normalized' => DeviceEnum::UNKNOWN->value,
+                'unknown' => strtolower(DeviceEnum::UNKNOWN->value),
+            ]
+        );
+        if ($normalizedUnknown > 0) {
+            $this->logger->info("  - Devices: normalized $normalizedUnknown legacy UNKNOWN values.");
         }
 
-        protected function execute(InputInterface $input, OutputInterface $output): int
-        {
-            $this->logger = new ConsoleLogger($output);
-            $this->logger->info("Starting dynamic entity initialization...");
+        $added = 0;
+        foreach (DeviceEnum::cases() as $deviceCase) {
+            $device = $deviceRepository->getByType($deviceCase->value);
+            if (! $device) {
+                $device = new Device();
+                $device->addType($deviceCase);
+                $this->entityManager->persist($device);
+                $added++;
+            }
+        }
+
+        $this->entityManager->flush();
+        $this->logger->info("  - Devices: $added added.");
+        $this->logger->info("Core entities initialization complete.");
+    }
+
+    /**
+     * @throws ConfigurationException
+     */
+    protected function initializeChannelEntities(OutputInterface $output): int
+    {
+        $output->writeln("<info>TRACE: Fetching registry...</info>");
+        $registry = DriverFactory::getRegistry();
+        $output->writeln("<info>TRACE: Fetching channels config...</info>");
+        $channelsConfig = Helpers::getChannelsConfig();
+
+        foreach ($registry as $channel => $driverCfg) {
+            // Determine if specifically enabled for this channel
+            $chanConfig = $channelsConfig[$channel] ?? [];
+
+            $driverClass = $driverCfg['driver'] ?? null;
+            if (! $driverClass || ! class_exists($driverClass)) {
+                continue;
+            }
+
+            // Merge common configurations if specified by the driver
+            $commonKey = $driverClass::getCommonConfigKey();
+            if ($commonKey && isset($channelsConfig[$commonKey])) {
+                $chanConfig = array_replace_recursive($channelsConfig[$commonKey], $chanConfig);
+            }
+
+            if (! ($chanConfig['enabled'] ?? false)) {
+                continue;
+            }
+
+            $output->writeln("<info>TRACE: [ACTIVE] Starting initialization for $channel...</info>");
 
             try {
-                // 1. Initialize Core Entities
-                $this->initializeCoreEntities();
+                $output->writeln("<info>TRACE: [$channel] Instantiating driver (DriverFactory::get)...</info>");
+                $driver = DriverFactory::get($channel, $this->logger);
+                $output->writeln("<info>TRACE: [$channel] Driver instantiated successfully.</info>");
 
-                // 2. Initialize Channel-specific Entities via Drivers
-                $exitCode = $this->initializeChannelEntities($output);
-                if ($exitCode !== Command::SUCCESS) {
-                    return $exitCode;
-                }
-
-                $this->logger->info("Initialization complete.");
-
-                return Command::SUCCESS;
-
-            } catch (Exception $e) {
-                $this->logger?->error("Initialization failed: ".$e->getMessage());
-
-                return Command::FAILURE;
-            }
-        }
-
-        /**
-         * @throws \Doctrine\DBAL\Exception
-         */
-        private function initializeCoreEntities(): void
-        {
-            $this->logger->info("Initializing Core Entities (Countries, Devices)...");
-
-            $countryRepository = $this->entityManager->getRepository(Country::class);
-            $added = 0;
-            foreach (CountryEnum::cases() as $countryEnum) {
-                $country = $countryRepository->getByCode($countryEnum->value);
-                if (!$country) {
-                    $country = new Country();
-                    $country->addCode($countryEnum)
-                        ->addName($countryEnum->getFullName());
-                    $this->entityManager->persist($country);
-                    $added++;
-                }
-            }
-            $this->entityManager->flush();
-            $this->logger->info("  - Countries: $added added.");
-
-            $deviceRepository = $this->entityManager->getRepository(Device::class);
-            // Normalize legacy deployments that persisted UNKNOWN instead of enum-backed unknown.
-            $normalizedUnknown = $this->entityManager->getConnection()->executeStatement(
-                'UPDATE devices SET type = :normalized WHERE LOWER(type) = :unknown AND type <> :normalized',
-                [
-                    'normalized' => DeviceEnum::UNKNOWN->value,
-                    'unknown'    => strtolower(DeviceEnum::UNKNOWN->value),
-                ]
-            );
-            if ($normalizedUnknown > 0) {
-                $this->logger->info("  - Devices: normalized $normalizedUnknown legacy UNKNOWN values.");
-            }
-
-            $added = 0;
-            foreach (DeviceEnum::cases() as $deviceCase) {
-                $device = $deviceRepository->getByType($deviceCase->value);
-                if (!$device) {
-                    $device = new Device();
-                    $device->addType($deviceCase);
-                    $this->entityManager->persist($device);
-                    $added++;
-                }
-            }
-
-            $this->entityManager->flush();
-            $this->logger->info("  - Devices: $added added.");
-            $this->logger->info("Core entities initialization complete.");
-        }
-
-        /**
-         * @throws ConfigurationException
-         */
-        protected function initializeChannelEntities(OutputInterface $output): int
-        {
-            $output->writeln("<info>TRACE: Fetching registry...</info>");
-            $registry = DriverFactory::getRegistry();
-            $output->writeln("<info>TRACE: Fetching channels config...</info>");
-            $channelsConfig = Helpers::getChannelsConfig();
-
-            foreach ($registry as $channel => $driverCfg) {
-                // Determine if specifically enabled for this channel
-                $chanConfig = $channelsConfig[$channel] ?? [];
-
-                $driverClass = $driverCfg['driver'] ?? null;
-                if (!$driverClass || !class_exists($driverClass)) {
-                    continue;
-                }
-
-                // Merge common configurations if specified by the driver
-                $commonKey = $driverClass::getCommonConfigKey();
-                if ($commonKey && isset($channelsConfig[$commonKey])) {
-                    $chanConfig = array_replace_recursive($channelsConfig[$commonKey], $chanConfig);
-                }
-
-                if (!($chanConfig['enabled'] ?? false)) {
-                    continue;
-                }
-
-                $output->writeln("<info>TRACE: [ACTIVE] Starting initialization for $channel...</info>");
-
-                try {
-                    $output->writeln("<info>TRACE: [$channel] Instantiating driver (DriverFactory::get)...</info>");
-                    $driver = DriverFactory::get($channel, $this->logger);
-                    $output->writeln("<info>TRACE: [$channel] Driver instantiated successfully.</info>");
-
-                    $dataProcessor = function ($collection) {
-                        $stats = ['rows' => 0, 'metrics' => 0, 'duplicates' => 0];
-                        if ($collection instanceof ArrayCollection) {
-                            foreach ($collection as $entity) {
-                                if ($entity instanceof UniversalEntity) {
-                                    // For now, we manually map UniversalEntity to Doctrine entities in this command
-                                    // but we could make it more generic.
-                                    // Actually, for initialization, we mostly deal with Pages and ChanneledAccounts
-                                    SocialProcessor::processUniversalEntity($entity, $this->entityManager);
-                                } else {
-                                    $this->entityManager->persist($entity);
-                                }
-                                $stats['rows']++;
+                $dataProcessor = function ($collection) {
+                    $stats = ['rows' => 0, 'metrics' => 0, 'duplicates' => 0];
+                    if ($collection instanceof ArrayCollection) {
+                        foreach ($collection as $entity) {
+                            if ($entity instanceof UniversalEntity) {
+                                // For now, we manually map UniversalEntity to Doctrine entities in this command
+                                // but we could make it more generic.
+                                // Actually, for initialization, we mostly deal with Pages and ChanneledAccounts
+                                SocialProcessor::processUniversalEntity($entity, $this->entityManager);
+                            } else {
+                                $this->entityManager->persist($entity);
                             }
-
-                            try {
-                                $this->entityManager->flush();
-                            } catch (Exception $e) {
-                                error_log("ERROR during initialization flush: ".$e->getMessage());
-
-                                throw $e;
-                            }
+                            $stats['rows']++;
                         }
 
-                        return $stats;
+                        try {
+                            $this->entityManager->flush();
+                        } catch (Exception $e) {
+                            error_log("ERROR during initialization flush: ".$e->getMessage());
+
+                            throw $e;
+                        }
+                    }
+
+                    return $stats;
+                };
+
+                $output->writeln("<info>TRACE: [$channel] Fetching channel entity from DB...</info>");
+                /** @var Channel $channelEntity */
+                $channelEntity = $this->entityManager->getRepository(Channel::class)->findOneBy(['name' => $channel]);
+                $output->writeln("<info>TRACE: [$channel] Channel entity fetched.</info>");
+                if (! $channelEntity) {
+                    $this->logger->error("  - ERROR: Channel entity '$channel' NOT FOUND in database. Ensure 'app:install-drivers' ran correctly.");
+
+                    continue; // Skip this channel instead of failing the whole command
+                }
+
+                $identityMapper = function (string $type, array $params) use ($channel, $channelEntity) {
+                    $repoMap = [
+                        'channeled_accounts' => ChanneledAccount::class,
+                        'pages' => Page::class,
+                        'accounts' => Account::class,
+                    ];
+                    if (! isset($repoMap[$type])) {
+                        return [];
+                    }
+                    /** @var PageRepository|ChanneledAccountRepository $repo */
+                    $repo = $this->entityManager->getRepository($repoMap[$type]);
+                    $map = [];
+                    $category = match ($type) {
+                        'pages' => AssetCategory::PAGEABLE,
+                        'channeled_accounts' => AssetCategory::IDENTITY,
+                        default => null
                     };
 
-                    $output->writeln("<info>TRACE: [$channel] Fetching channel entity from DB...</info>");
-                    /** @var Channel $channelEntity */
-                    $channelEntity = $this->entityManager->getRepository(Channel::class)->findOneBy(['name' => $channel]);
-                    $output->writeln("<info>TRACE: [$channel] Channel entity fetched.</info>");
-                    if (!$channelEntity) {
-                        $this->logger->error("  - ERROR: Channel entity '$channel' NOT FOUND in database. Ensure 'app:install-drivers' ran correctly.");
+                    $driverClass = DriverFactory::getRegistry()[$channel]['driver'] ?? null;
+                    $context = $driverClass && $category ? $driverClass::getContextForCategory($category) : '';
 
-                        continue; // Skip this channel instead of failing the whole command
-                    }
-
-                    $identityMapper = function (string $type, array $params) use ($channel, $channelEntity) {
-                        $repoMap = [
-                            'channeled_accounts' => ChanneledAccount::class,
-                            'pages'              => Page::class,
-                            'accounts'           => Account::class,
-                        ];
-                        if (!isset($repoMap[$type])) {
-                            return [];
-                        }
-                        /** @var PageRepository|ChanneledAccountRepository $repo */
-                        $repo = $this->entityManager->getRepository($repoMap[$type]);
-                        $map = [];
-                        $category = match ($type) {
-                            'pages' => AssetCategory::PAGEABLE,
-                            'channeled_accounts' => AssetCategory::IDENTITY,
-                            default => null
-                        };
-
-                        $driverClass = DriverFactory::getRegistry()[$channel]['driver'] ?? null;
-                        $context = $driverClass && $category ? $driverClass::getContextForCategory($category) : '';
-
-                        if ($type === 'pages' && $category) {
-                            $lookupField = 'platformId';
-                            $searchValues = (array)($params['platform_ids'] ?? []);
-                            if (isset($params['canonical_ids'])) {
-                                $lookupField = 'canonicalId';
-                                $searchValues = (array)$params['canonical_ids'];
-                            } elseif (isset($params['urls'])) {
-                                $lookupField = 'canonicalId';
-                                $urls = (array)$params['urls'];
-                                $searchValues = array_map(function ($u) use ($channel, $driverClass, $category, $context) {
-                                    if ($driverClass) {
-                                        return $driverClass::getCanonicalId(['url' => $u], $category, $context);
-                                    }
-
-                                    throw new RuntimeException("Driver not found for channel: ".$channel);
-                                }, $urls);
-                            }
-                            if (!empty($searchValues)) {
-                                error_log("DEBUG: InitializeEntitiesCommand - identityMapper: Looking up 'pages' by $lookupField: ".json_encode(array_unique($searchValues)));
-                                $entities = $repo->findBy([$lookupField => array_unique($searchValues)]);
-                                $getter = 'get'.ucfirst($lookupField);
-                                foreach ($entities as $e) {
-                                    $map[(string)$e->$getter()] = $e;
+                    if ($type === 'pages' && $category) {
+                        $lookupField = 'platformId';
+                        $searchValues = (array)($params['platform_ids'] ?? []);
+                        if (isset($params['canonical_ids'])) {
+                            $lookupField = 'canonicalId';
+                            $searchValues = (array)$params['canonical_ids'];
+                        } elseif (isset($params['urls'])) {
+                            $lookupField = 'canonicalId';
+                            $urls = (array)$params['urls'];
+                            $searchValues = array_map(function ($u) use ($channel, $driverClass, $category, $context) {
+                                if ($driverClass) {
+                                    return $driverClass::getCanonicalId(['url' => $u], $category, $context);
                                 }
-                            }
-                        } elseif ($type === 'channeled_accounts' && isset($params['platform_ids']) && $category) {
-                            $ids = (array)$params['platform_ids'];
-                            $normalizedToOriginal = [];
-                            foreach ($ids as $id) {
-                                $normalized = $driverClass ? $driverClass::getPlatformId(['id' => $id], $category, $context) : (string)$id;
-                                $normalizedToOriginal[$normalized][] = (string)$id;
-                            }
-                            $searchValues = array_unique(array_keys($normalizedToOriginal));
-                            error_log("DEBUG: InitializeEntitiesCommand - identityMapper: Looking up 'channeled_accounts' by platformId (normalized): ".json_encode($searchValues));
-                            $entities = $repo->findBy(['platformId' => $searchValues, 'channel' => $channelEntity]);
+
+                                throw new RuntimeException("Driver not found for channel: ".$channel);
+                            }, $urls);
+                        }
+                        if (! empty($searchValues)) {
+                            error_log("DEBUG: InitializeEntitiesCommand - identityMapper: Looking up 'pages' by $lookupField: ".json_encode(array_unique($searchValues)));
+                            $entities = $repo->findBy([$lookupField => array_unique($searchValues)]);
+                            $getter = 'get'.ucfirst($lookupField);
                             foreach ($entities as $e) {
-                                $dbId = (string)$e->getPlatformId();
-                                foreach (($normalizedToOriginal[$dbId] ?? []) as $origId) {
-                                    $map[$origId] = $e;
-                                }
-                            }
-                        } elseif ($type === 'accounts' && isset($params['names'])) {
-                            $entities = $repo->findBy(['name' => $params['names']]);
-                            foreach ($entities as $e) {
-                                $map[(string)$e->getName()] = $e;
+                                $map[(string)$e->$getter()] = $e;
                             }
                         }
-
-                        return $map;
-                    };
-
-                    $output->writeln("<info>TRACE: [$channel] Syncing YAML assets (ConfigManagerController logic)...</info>");
-                    // 1. Sync Assets from YAML to Database (Ported from ConfigManagerController)
-                    $commonKey = $driver::getCommonConfigKey();
-                    $defaultGroupName = method_exists($driver, 'getChannelLabel') ? $driver::getChannelLabel() : "Default Group";
-                    $groupName = $chanConfig['accounts_group_name'] ?? ($channelsConfig[$commonKey]['accounts_group_name'] ?? $defaultGroupName);
-
-                    $accountRepo = $this->entityManager->getRepository(Account::class);
-                    $accountEntity = $accountRepo->findOneBy(['name' => $groupName]);
-
-                    if (!$accountEntity) {
-                        $accountEntity = new Account();
-                        $accountEntity->addName($groupName);
-                        $this->entityManager->persist($accountEntity);
-                        $this->entityManager->flush();
-                    }
-
-                    $registryPatterns = $driverClass::getAssetPatterns();
-                    $assets = [];
-                    foreach ($registryPatterns as $pattern) {
-                        $key = $pattern['key'] ?? null;
-                        if ($key && isset($chanConfig[$key])) {
-                            $rawAssets = (array)$chanConfig[$key];
-                            if (!empty($rawAssets) && !isset($rawAssets[0])) {
-                                $rawAssets = [$rawAssets];
+                    } elseif ($type === 'channeled_accounts' && isset($params['platform_ids']) && $category) {
+                        $ids = (array)$params['platform_ids'];
+                        $normalizedToOriginal = [];
+                        foreach ($ids as $id) {
+                            $normalized = $driverClass ? $driverClass::getPlatformId(['id' => $id], $category, $context) : (string)$id;
+                            $normalizedToOriginal[$normalized][] = (string)$id;
+                        }
+                        $searchValues = array_unique(array_keys($normalizedToOriginal));
+                        error_log("DEBUG: InitializeEntitiesCommand - identityMapper: Looking up 'channeled_accounts' by platformId (normalized): ".json_encode($searchValues));
+                        $entities = $repo->findBy(['platformId' => $searchValues, 'channel' => $channelEntity]);
+                        foreach ($entities as $e) {
+                            $dbId = (string)$e->getPlatformId();
+                            foreach (($normalizedToOriginal[$dbId] ?? []) as $origId) {
+                                $map[$origId] = $e;
                             }
-                            foreach ($rawAssets as $ra) {
-                                $assets[] = [
-                                    'data'     => $ra,
-                                    'category' => $pattern['category'] ?? null,
-                                ];
-                            }
+                        }
+                    } elseif ($type === 'accounts' && isset($params['names'])) {
+                        $entities = $repo->findBy(['name' => $params['names']]);
+                        foreach ($entities as $e) {
+                            $map[(string)$e->getName()] = $e;
                         }
                     }
 
-                    $output->writeln("<info>TRACE: [$channel] Persisting YAML assets...</info>");
+                    return $map;
+                };
 
-                    $pageCache = [];
-                    $channeledAccountCache = [];
+                $output->writeln("<info>TRACE: [$channel] Syncing YAML assets (ConfigManagerController logic)...</info>");
+                // 1. Sync Assets from YAML to Database (Ported from ConfigManagerController)
+                $commonKey = $driver::getCommonConfigKey();
+                $defaultGroupName = method_exists($driver, 'getChannelLabel') ? $driver::getChannelLabel() : "Default Group";
+                $groupName = $chanConfig['accounts_group_name'] ?? ($channelsConfig[$commonKey]['accounts_group_name'] ?? $defaultGroupName);
 
-                    foreach ($assets as $assetInfo) {
-                        $asset = $assetInfo['data'];
-                        $category = $assetInfo['category'];
+                $accountRepo = $this->entityManager->getRepository(Account::class);
+                $accountEntity = $accountRepo->findOneBy(['name' => $groupName]);
 
-                        $groupPages = [];
-                        $groupAccounts = [];
+                if (! $accountEntity) {
+                    $accountEntity = new Account();
+                    $accountEntity->addName($groupName);
+                    $this->entityManager->persist($accountEntity);
+                    $this->entityManager->flush();
+                }
 
-                        if ($category === AssetCategory::PAGEABLE) {
-                            $groupPages = method_exists($driver, 'getPages') ? $driver::getPages($asset) : [];
-                        } elseif ($category === AssetCategory::IDENTITY) {
-                            $groupAccounts = method_exists($driver, 'getChanneledAccounts') ? $driver::getChanneledAccounts($asset) : [];
-                        } else {
-                            // Fallback for ad accounts or other legacy assets
-                            $groupPages = method_exists($driver, 'getPages') ? $driver::getPages($asset) : [];
-                            $groupAccounts = method_exists($driver, 'getChanneledAccounts') ? $driver::getChanneledAccounts($asset) : [];
+                $registryPatterns = $driverClass::getAssetPatterns();
+                $assets = [];
+                foreach ($registryPatterns as $pattern) {
+                    $key = $pattern['key'] ?? null;
+                    if ($key && isset($chanConfig[$key])) {
+                        $rawAssets = (array)$chanConfig[$key];
+                        if (! empty($rawAssets) && ! isset($rawAssets[0])) {
+                            $rawAssets = [$rawAssets];
                         }
+                        foreach ($rawAssets as $ra) {
+                            $assets[] = [
+                                'data' => $ra,
+                                'category' => $pattern['category'] ?? null,
+                            ];
+                        }
+                    }
+                }
 
-                        $anyEnabled = false;
-                        foreach ($groupPages as $p) {
-                            if ($p['enabled'] ?? true) {
+                $output->writeln("<info>TRACE: [$channel] Persisting YAML assets...</info>");
+
+                $pageCache = [];
+                $channeledAccountCache = [];
+
+                foreach ($assets as $assetInfo) {
+                    $asset = $assetInfo['data'];
+                    $category = $assetInfo['category'];
+
+                    $groupPages = [];
+                    $groupAccounts = [];
+                    $groupLocations = [];
+
+                    if ($category === AssetCategory::PAGEABLE) {
+                        $groupPages = method_exists($driver, 'getPages') ? $driver::getPages($asset) : [];
+                    } elseif ($category === AssetCategory::IDENTITY) {
+                        $groupAccounts = method_exists($driver, 'getChanneledAccounts') ? $driver::getChanneledAccounts($asset) : [];
+                    } elseif ($category === AssetCategory::LOCATIONABLE) {
+                        $groupLocations = method_exists($driver, 'getLocations') ? $driver::getLocations($asset) : [];
+                    } else {
+                        // Fallback for ad accounts or other legacy assets
+                        $groupPages = method_exists($driver, 'getPages') ? $driver::getPages($asset) : [];
+                        $groupAccounts = method_exists($driver, 'getChanneledAccounts') ? $driver::getChanneledAccounts($asset) : [];
+                        $groupLocations = method_exists($driver, 'getLocations') ? $driver::getLocations($asset) : [];
+                    }
+
+                    $anyEnabled = false;
+                    foreach ($groupPages as $p) {
+                        if ($p['enabled'] ?? true) {
+                            $anyEnabled = true;
+
+                            break;
+                        }
+                    }
+                    if (! $anyEnabled) {
+                        foreach ($groupAccounts as $a) {
+                            if ($a['enabled'] ?? true) {
                                 $anyEnabled = true;
 
                                 break;
                             }
                         }
-                        if (!$anyEnabled) {
-                            foreach ($groupAccounts as $a) {
-                                if ($a['enabled'] ?? true) {
-                                    $anyEnabled = true;
+                    }
+                    if (! $anyEnabled) {
+                        foreach ($groupLocations as $l) {
+                            if ($l['enabled'] ?? true) {
+                                $anyEnabled = true;
 
-                                    break;
-                                }
+                                break;
                             }
-                        }
-
-                        foreach ($groupPages as $page) {
-                            $pId = $page['platformId'] ?? null;
-                            $canonicalId = $page['canonicalId'] ?? null;
-                            if (!$pId && !$canonicalId) {
-                                continue;
-                            }
-
-                            $dbPage = null;
-                            if ($canonicalId) {
-                                if (isset($pageCache[$canonicalId])) {
-                                    $dbPage = $pageCache[$canonicalId];
-                                } else {
-                                    $dbPage = $this->entityManager->getRepository(Page::class)->findOneBy(['canonicalId' => $canonicalId]);
-                                }
-                            }
-                            
-                            if (!$dbPage && !$anyEnabled) {
-                                continue;
-                            }
-                            if (!$dbPage) {
-                                $dbPage = new Page();
-                                if ($canonicalId) {
-                                    $dbPage->addCanonicalId($canonicalId);
-                                    $pageCache[$canonicalId] = $dbPage; // Save to local cache
-                                }
-                            } else {
-                                if ($canonicalId) {
-                                    $pageCache[$canonicalId] = $dbPage; // Save to local cache
-                                }
-                            }
-                            
-                            $dbPage->addUrl($page['url'] ?? null)
-                                ->addTitle($page['title'] ?? null)
-                                ->addAccount($accountEntity)
-                                ->addPlatformId($page['platformId'])
-                                ->addHostname($page['hostname'] ?? null)
-                                ->addData($page['data'] ?? []);
-                            $this->entityManager->persist($dbPage);
-                        }
-
-                        foreach ($groupAccounts as $account) {
-                            $pId = $account['platformId'] ?? null;
-                            if (!$pId) {
-                                continue;
-                            }
-
-                            $cacheKey = (string)$pId . '_' . $channelEntity->getId();
-                            $dbChanneledAccount = null;
-                            
-                            if (isset($channeledAccountCache[$cacheKey])) {
-                                $dbChanneledAccount = $channeledAccountCache[$cacheKey];
-                            } else {
-                                $dbChanneledAccount = $this->entityManager->getRepository(ChanneledAccount::class)->findOneBy([
-                                    'platformId' => (string)$pId,
-                                    'channel'    => $channelEntity,
-                                ]);
-                            }
-
-                            if (!$dbChanneledAccount && !$anyEnabled) {
-                                continue;
-                            }
-                            if (!$dbChanneledAccount) {
-                                $dbChanneledAccount = new ChanneledAccount();
-                                $dbChanneledAccount->addPlatformId($pId);
-                                $channeledAccountCache[$cacheKey] = $dbChanneledAccount;
-                            } else {
-                                $channeledAccountCache[$cacheKey] = $dbChanneledAccount;
-                            }
-                            
-                            $dbChanneledAccount->addAccount($accountEntity)
-                                ->addType($account['type'])
-                                ->addChannel($channelEntity)
-                                ->addName($account['name'] ?? null)
-                                ->addPlatformCreatedAt(is_string($account['platformCreatedAt'] ?? null) ? new \DateTime($account['platformCreatedAt']) : null)
-                                ->addData($account['data'] ?? [])
-                                ->setEnabled($account['enabled'] ?? true);
-                            $this->entityManager->persist($dbChanneledAccount);
                         }
                     }
-                    $this->entityManager->flush();
-                    $this->entityManager->flush();
 
-                    $output->writeln("<info>TRACE: [$channel] Executing Driver->initializeEntities() hook...</info>");
-                    // 2. Initialize Channel-specific Entities via Driver hook
-                    $results = $driver->initializeEntities(array_merge($chanConfig, [
-                        'manager'        => $this->entityManager,
-                        'identityMapper' => $identityMapper,
-                        'dataProcessor'  => $dataProcessor,
-                    ]));
+                    foreach ($groupPages as $page) {
+                        $pId = $page['platformId'] ?? null;
+                        $canonicalId = $page['canonicalId'] ?? null;
+                        if (! $pId && ! $canonicalId) {
+                            continue;
+                        }
 
-                    $init = $results['initialized'] ?? 0;
-                    $skip = $results['skipped'] ?? 0;
+                        $dbPage = null;
+                        if ($canonicalId) {
+                            if (isset($pageCache[$canonicalId])) {
+                                $dbPage = $pageCache[$canonicalId];
+                            } else {
+                                $dbPage = $this->entityManager->getRepository(Page::class)->findOneBy(['canonicalId' => $canonicalId]);
+                            }
+                        }
 
-                    $this->logger->info("  - $channel results: $init initialized, $skip skipped.");
-                } catch (\Throwable $e) {
-                    $output->writeln("<error>  - FATAL ERROR initializing channel '$channel': ".$e->getMessage()."</error>");
-                    error_log("FATAL ERROR initializing channel '$channel': ".$e->getMessage());
-                    error_log($e->getTraceAsString());
+                        if (! $dbPage && ! $anyEnabled) {
+                            continue;
+                        }
+                        if (! $dbPage) {
+                            $dbPage = new Page();
+                            if ($canonicalId) {
+                                $dbPage->addCanonicalId($canonicalId);
+                                $pageCache[$canonicalId] = $dbPage; // Save to local cache
+                            }
+                        } else {
+                            if ($canonicalId) {
+                                $pageCache[$canonicalId] = $dbPage; // Save to local cache
+                            }
+                        }
 
-                    return Command::FAILURE;
+                        $dbPage->addUrl($page['url'] ?? null)
+                            ->addTitle($page['title'] ?? null)
+                            ->addAccount($accountEntity)
+                            ->addPlatformId($page['platformId'])
+                            ->addHostname($page['hostname'] ?? null)
+                            ->addData($page['data'] ?? []);
+                        $this->entityManager->persist($dbPage);
+                    }
+
+                    foreach ($groupAccounts as $account) {
+                        $pId = $account['platformId'] ?? null;
+                        if (! $pId) {
+                            continue;
+                        }
+
+                        $cacheKey = (string)$pId . '_' . $channelEntity->getId();
+                        $dbChanneledAccount = null;
+
+                        if (isset($channeledAccountCache[$cacheKey])) {
+                            $dbChanneledAccount = $channeledAccountCache[$cacheKey];
+                        } else {
+                            $dbChanneledAccount = $this->entityManager->getRepository(ChanneledAccount::class)->findOneBy([
+                                'platformId' => (string)$pId,
+                                'channel' => $channelEntity,
+                            ]);
+                        }
+
+                        if (! $dbChanneledAccount && ! $anyEnabled) {
+                            continue;
+                        }
+                        if (! $dbChanneledAccount) {
+                            $dbChanneledAccount = new ChanneledAccount();
+                            $dbChanneledAccount->addPlatformId($pId);
+                            $channeledAccountCache[$cacheKey] = $dbChanneledAccount;
+                        } else {
+                            $channeledAccountCache[$cacheKey] = $dbChanneledAccount;
+                        }
+
+                        $dbChanneledAccount->addAccount($accountEntity)
+                            ->addType($account['type'])
+                            ->addChannel($channelEntity)
+                            ->addName($account['name'] ?? null)
+                            ->addPlatformCreatedAt(is_string($account['platformCreatedAt'] ?? null) ? new \DateTime($account['platformCreatedAt']) : null)
+                            ->addData($account['data'] ?? [])
+                            ->setEnabled($account['enabled'] ?? true);
+                        $this->entityManager->persist($dbChanneledAccount);
+                    }
+
+                    foreach ($groupLocations as $loc) {
+                        $pId = $loc['platformId'] ?? null;
+                        if (! $pId) {
+                            continue;
+                        }
+
+                        // A Location maps strictly to a ChanneledAccount identity
+                        $cacheKey = (string)$pId . '_' . $channelEntity->getId();
+                        $dbChanneledAccount = $channeledAccountCache[$cacheKey] ?? $this->entityManager->getRepository(\Entities\Analytics\Channeled\ChanneledAccount::class)->findOneBy([
+                            'platformId' => (string)$pId,
+                            'channel' => $channelEntity,
+                        ]);
+
+                        $dbLocation = $this->entityManager->getRepository(\Entities\Analytics\Location::class)->findOneBy([
+                            'channeledAccount' => $dbChanneledAccount,
+                        ]);
+
+                        if (! $dbLocation && ! $anyEnabled) {
+                            continue;
+                        }
+
+                        if (! $dbLocation) {
+                            $dbLocation = new \Entities\Analytics\Location();
+                        }
+
+                        $dbLocation->addChanneledAccount($dbChanneledAccount);
+                        if ($accountEntity) {
+                            $dbLocation->addAccount($accountEntity);
+                        }
+
+                        $dbLocation->addStoreCode($loc['storeCode'] ?? null);
+                        $dbLocation->addLat($loc['lat'] ?? null);
+                        $dbLocation->addLng($loc['lng'] ?? null);
+                        $dbLocation->addZipCode($loc['zipCode'] ?? null);
+
+                        // Geographic Relationships
+                        $countryName = $loc['country'] ?? null;
+                        if ($countryName) {
+                            $countryEnum = \Anibalealvarezs\ApiSkeleton\Enums\Country::tryFrom(strtoupper($countryName));
+
+                            $country = null;
+                            if ($countryEnum) {
+                                $country = $this->entityManager->getRepository(\Entities\Analytics\Country::class)->findOneBy(['code' => $countryEnum]);
+                            }
+
+                            if (! $country) {
+                                $country = $this->entityManager->getRepository(\Entities\Analytics\Country::class)->findOneBy(['name' => $countryName]);
+                            }
+
+                            if ($country) {
+                                $dbLocation->addCountry($country);
+                            }
+                        }
+
+                        $stateName = $loc['state'] ?? null;
+                        if ($stateName && isset($country)) {
+                            $state = $this->entityManager->getRepository(\Entities\Analytics\State::class)->findOneBy([
+                                'name' => $stateName,
+                                'country' => $country,
+                            ]);
+                            if (! $state) {
+                                $state = new \Entities\Analytics\State();
+                                $state->addName($stateName);
+                                $state->addCountry($country);
+                                $this->entityManager->persist($state);
+                                $this->entityManager->flush();
+                            }
+                            $dbLocation->addState($state);
+                        }
+
+                        $cityName = $loc['city'] ?? null;
+                        if ($cityName && isset($state)) {
+                            $city = $this->entityManager->getRepository(\Entities\Analytics\City::class)->findOneBy([
+                                'name' => $cityName,
+                                'state' => $state,
+                            ]);
+                            if (! $city) {
+                                $city = new \Entities\Analytics\City();
+                                $city->addName($cityName);
+                                $city->addState($state);
+                                $this->entityManager->persist($city);
+                                $this->entityManager->flush();
+                            }
+                            $dbLocation->addCity($city);
+                        }
+
+                        $this->entityManager->persist($dbLocation);
+                    }
                 }
-            }
-
-            try {
                 $this->entityManager->flush();
-            } catch (Exception $e) {
-                $output->writeln("<error>  - Final flush failed: ".$e->getMessage()."</error>");
+                $this->entityManager->flush();
+
+                $output->writeln("<info>TRACE: [$channel] Executing Driver->initializeEntities() hook...</info>");
+                // 2. Initialize Channel-specific Entities via Driver hook
+                $results = $driver->initializeEntities(array_merge($chanConfig, [
+                    'manager' => $this->entityManager,
+                    'identityMapper' => $identityMapper,
+                    'dataProcessor' => $dataProcessor,
+                ]));
+
+                $init = $results['initialized'] ?? 0;
+                $skip = $results['skipped'] ?? 0;
+
+                $this->logger->info("  - $channel results: $init initialized, $skip skipped.");
+            } catch (\Throwable $e) {
+                $output->writeln("<error>  - FATAL ERROR initializing channel '$channel': ".$e->getMessage()."</error>");
+                error_log("FATAL ERROR initializing channel '$channel': ".$e->getMessage());
+                error_log($e->getTraceAsString());
 
                 return Command::FAILURE;
             }
-
-            $output->writeln("<info>  - All channels initialized successfully.</info>");
-
-            return Command::SUCCESS;
         }
+
+        try {
+            $this->entityManager->flush();
+        } catch (Exception $e) {
+            $output->writeln("<error>  - Final flush failed: ".$e->getMessage()."</error>");
+
+            return Command::FAILURE;
+        }
+
+        $output->writeln("<info>  - All channels initialized successfully.</info>");
+
+        return Command::SUCCESS;
     }
+}

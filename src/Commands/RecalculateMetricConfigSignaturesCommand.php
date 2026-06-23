@@ -107,18 +107,112 @@ class RecalculateMetricConfigSignaturesCommand extends Command
             }
 
             $updates = [];
+            $deletes = [];
+            $merges = [];
+            $targetIdsBySignature = [];
+
+            // 1. Calculate new signatures
+            $newSignaturesMap = [];
+            $uniqueNewSigs = [];
             foreach ($rows as $row) {
-                $newSignature = $this->generateSignatureFromRow($row);
-                if ($force || $newSignature !== $row['config_signature']) {
-                    $updates[] = [
-                        'id' => (int) $row['id'],
-                        'signature' => $newSignature,
-                    ];
+                $sig = $this->generateSignatureFromRow($row);
+                $id = (int) $row['id'];
+                $newSignaturesMap[$id] = $sig;
+                $uniqueNewSigs[$sig] = true;
+            }
+            $uniqueNewSigs = array_keys($uniqueNewSigs);
+
+            // 2. Fetch existing targets for these signatures from DB
+            if (!empty($uniqueNewSigs)) {
+                $existingTargets = $conn->fetchAllAssociative(
+                    'SELECT id, config_signature FROM metric_configs WHERE config_signature IN (?)',
+                    [$uniqueNewSigs],
+                    [\Doctrine\DBAL\ArrayParameterType::STRING]
+                );
+                foreach ($existingTargets as $et) {
+                    $targetIdsBySignature[$et['config_signature']] = (int) $et['id'];
                 }
             }
 
-            if (!empty($updates) && !$dryRun) {
-                $this->batchUpdateSignatures($conn, $updates);
+            // 3. Process each row
+            foreach ($rows as $row) {
+                $id = (int) $row['id'];
+                $newSignature = $newSignaturesMap[$id];
+                
+                if (isset($targetIdsBySignature[$newSignature])) {
+                    $existingId = $targetIdsBySignature[$newSignature];
+                    if ($existingId !== $id) {
+                        // Collision! Preserve the oldest ID
+                        $targetId = min($existingId, $id);
+                        $duplicateId = max($existingId, $id);
+                        
+                        $merges[$duplicateId] = $targetId;
+                        $deletes[] = $duplicateId;
+                        
+                        // Update the map so subsequent rows point to the oldest ID
+                        $targetIdsBySignature[$newSignature] = $targetId;
+                        
+                        // If the current row became the target, it still needs its signature updated
+                        if ($targetId === $id) {
+                            $updates[] = [
+                                'id' => $id,
+                                'signature' => $newSignature,
+                            ];
+                        }
+                    } else {
+                        // This row IS the target already
+                        if ($force && $newSignature === $row['config_signature']) {
+                            $updates[] = [
+                                'id' => $id,
+                                'signature' => $newSignature,
+                            ];
+                        }
+                    }
+                } else {
+                    // Claim this signature
+                    $targetIdsBySignature[$newSignature] = $id;
+                    if ($force || $newSignature !== $row['config_signature']) {
+                        $updates[] = [
+                            'id' => $id,
+                            'signature' => $newSignature,
+                        ];
+                    }
+                }
+            }
+
+            if (!$dryRun) {
+                // Execute deduplication merges
+                foreach ($merges as $oldId => $targetId) {
+                    // a) Delete colliding metrics from the TARGET row (Historical) that already exist in the DUPLICATE row (New)
+                    // This ensures we keep the freshest synced data from the newly duplicated configs.
+                    $conn->executeStatement('
+                        DELETE FROM metrics m1
+                        USING metrics m2
+                        WHERE m1.metric_config_id = ? 
+                          AND m2.metric_config_id = ?
+                          AND m1.metric_date = m2.metric_date 
+                          AND m1.dimensions_hash = m2.dimensions_hash
+                    ', [$targetId, $oldId]);
+
+                    // b) Migrate remaining non-colliding historical metrics to Target
+                    $conn->executeStatement('
+                        UPDATE metrics SET metric_config_id = ? WHERE metric_config_id = ?
+                    ', [$targetId, $oldId]);
+                }
+
+                // Delete duplicate configs
+                if (!empty($deletes)) {
+                    $conn->executeStatement(
+                        'DELETE FROM metric_configs WHERE id IN (?)',
+                        [$deletes],
+                        [\Doctrine\DBAL\ArrayParameterType::INTEGER]
+                    );
+                }
+
+                // Update signatures of non-duplicate configs
+                if (!empty($updates)) {
+                    $this->batchUpdateSignatures($conn, $updates);
+                }
             }
 
             $updatedCount += count($updates);
@@ -191,7 +285,11 @@ class RecalculateMetricConfigSignaturesCommand extends Command
                 mc.state_id,
                 s.name AS state_name,
                 mc.city_id,
-                ci.name AS city_name
+                ci.name AS city_name,
+                mc.event_id,
+                e.name AS event_name,
+                mc.channeled_event_id,
+                ce.platform_id AS channeled_event_platform_id
             FROM metric_configs mc
             LEFT JOIN accounts a ON mc.account_id = a.id
             LEFT JOIN channeled_accounts ca ON mc.channeled_account_id = ca.id
@@ -212,6 +310,8 @@ class RecalculateMetricConfigSignaturesCommand extends Command
             LEFT JOIN locations l ON mc.location_id = l.id
             LEFT JOIN states s ON mc.state_id = s.id
             LEFT JOIN cities ci ON mc.city_id = ci.id
+            LEFT JOIN events e ON mc.event_id = e.id
+            LEFT JOIN channeled_events ce ON mc.channeled_event_id = ce.id
             ORDER BY mc.id ASC
         ";
     }
@@ -240,7 +340,9 @@ class RecalculateMetricConfigSignaturesCommand extends Command
             dimensionSet: $row['dimension_set_hash'],
             location: $row['location_platform_id'],
             state: $row['state_name'],
-            city: $row['city_name']
+            city: $row['city_name'],
+            event: $row['event_name'],
+            channeledEvent: $row['channeled_event_platform_id']
         );
     }
 

@@ -84,7 +84,7 @@ function renderDynamicTabs(channels) {
     channels.forEach(chan => {
         const tab = document.createElement('div');
         tab.className = 'tab';
-        tab.dataset.tab = (chan === 'google_search_console' ? 'google' : (chan === 'google_business_profile' ? 'google-business-profile' : (chan === 'facebook_organic' ? 'facebook' : (chan === 'facebook_marketing' ? 'facebook-marketing' : chan))));
+        tab.dataset.tab = (chan === 'google_search_console' ? 'google' : (chan === 'google_business_profile' ? 'google-business-profile' : (chan === 'google_analytics' ? 'google-analytics' : (chan === 'google_ads' ? 'google-ads' : (chan === 'facebook_organic' ? 'facebook' : (chan === 'facebook_marketing' ? 'facebook-marketing' : chan))))));
         
         let icon = 'layers';
         let label = chan;
@@ -93,6 +93,7 @@ function renderDynamicTabs(channels) {
             'google_search_console': { icon: 'search', label: 'Google Search Console' },
             'google_business_profile': { icon: 'store', label: 'Google Business Profile' },
             'google_analytics': { icon: 'bar-chart', label: 'Google Analytics' },
+            'google_ads': { icon: 'trending-up', label: 'Google Ads' },
             'facebook_organic': { icon: 'facebook', label: 'Meta Organic' },
             'facebook_marketing': { icon: 'trending-up', label: 'Meta Marketing' },
             'shopify': { icon: 'shopping-bag', label: 'Shopify' },
@@ -152,6 +153,11 @@ function renderGenericChannelUI(chan, label, icon) {
                     </select>
                 </div>
             </div>
+        </div>
+
+        <div class="card" id="${chan}-metrics-card" style="display: none;">
+            <div class="section-title small"><i data-lucide="activity"></i> Custom Metrics Definition</div>
+            <div class="metric-config-grid" id="${chan}-metrics-custom-grid"></div>
         </div>
 
         <div class="card">
@@ -242,6 +248,18 @@ function populateGlobalFields() {
         const gbpGranular = document.getElementById('gbp-granular-sync');
         if (gbpGranular) gbpGranular.checked = !!currentConfig.gbp_granular_sync;
 
+        const gaStatus = document.getElementById('ga-channel-enabled');
+        if (gaStatus) gaStatus.checked = !!currentConfig.ga_enabled;
+
+        const gaGranular = document.getElementById('ga-granular-sync');
+        if (gaGranular) gaGranular.checked = !!currentConfig.ga_granular_sync;
+
+        const gadsStatus = document.getElementById('gads-channel-enabled');
+        if (gadsStatus) gadsStatus.checked = !!currentConfig.gads_enabled;
+
+        const gadsGranular = document.getElementById('gads-granular-sync');
+        if (gadsGranular) gadsGranular.checked = !!currentConfig.gads_granular_sync;
+
         // Windows & Ranges
         const gscRange = document.getElementById('gsc-history-range');
         if (gscRange) gscRange.value = currentConfig.gsc_cache_history_range || '16 months';
@@ -254,6 +272,12 @@ function populateGlobalFields() {
 
         const gbpRange = document.getElementById('gbp-history-range');
         if (gbpRange) gbpRange.value = currentConfig.gbp_cache_history_range || '30 months';
+
+        const gaRange = document.getElementById('ga-history-range');
+        if (gaRange) gaRange.value = currentConfig.ga_cache_history_range || '30 days';
+
+        const gadsRange = document.getElementById('gads-history-range');
+        if (gadsRange) gadsRange.value = currentConfig.gads_cache_history_range || '2 years';
 
         // Job & Analytics Settings
         const timeoutEl = document.getElementById('jobs-timeout-hours');
@@ -393,12 +417,37 @@ function populateGlobalFields() {
         const gbpCronMinEl = document.getElementById('gbp-cron-minute');
         if (gbpCronMinEl) gbpCronMinEl.value = (currentConfig.gbp_cron_recent_minute !== undefined && currentConfig.gbp_cron_recent_minute !== null) ? currentConfig.gbp_cron_recent_minute : 0;
 
+        const gaCronHourEl = document.getElementById('ga-cron-hour');
+        if (gaCronHourEl) gaCronHourEl.value = (currentConfig.ga_cron_recent_hour !== undefined && currentConfig.ga_cron_recent_hour !== null) ? currentConfig.ga_cron_recent_hour : 10;
+        const gaCronMinEl = document.getElementById('ga-cron-minute');
+        if (gaCronMinEl) gaCronMinEl.value = (currentConfig.ga_cron_recent_minute !== undefined && currentConfig.ga_cron_recent_minute !== null) ? currentConfig.ga_cron_recent_minute : 0;
+
+        const gaWorkersEl = document.getElementById('ga-max-workers');
+        if (gaWorkersEl) gaWorkersEl.value = currentConfig.ga_max_workers || 3;
+
+        const gadsCronHourEl = document.getElementById('gads-cron-hour');
+        if (gadsCronHourEl) gadsCronHourEl.value = (currentConfig.gads_cron_recent_hour !== undefined && currentConfig.gads_cron_recent_hour !== null) ? currentConfig.gads_cron_recent_hour : 5;
+        const gadsCronMinEl = document.getElementById('gads-cron-minute');
+        if (gadsCronMinEl) gadsCronMinEl.value = (currentConfig.gads_cron_recent_minute !== undefined && currentConfig.gads_cron_recent_minute !== null) ? currentConfig.gads_cron_recent_minute : 30;
+
+        const gadsWorkersEl = document.getElementById('gads-max-workers');
+        if (gadsWorkersEl) gadsWorkersEl.value = currentConfig.gads_max_workers || 2;
+
         updateCronStatusIndicators();
         
         handleFbLevelChange();
         handleFbOrganicLevelChange();
         handleFbStrategyChange();
-        renderCustomMetricsGrid();
+        
+        // Render Custom Metrics Grids
+        const fbMetrics = ["spend", "clicks", "impressions", "reach", "frequency", "ctr", "cpc", "cpm", "results", "cost_per_result", "result_rate", "purchase_roas"];
+        renderMetricsGrid('fb-metrics-custom-grid', fbMetrics, 'fb_metrics_config', currentConfig);
+
+        const gadsMetrics = ["spend", "clicks", "impressions", "conversions", "conversions_value", "cost_per_conversion"];
+        renderMetricsGrid('google_ads-metrics-custom-grid', gadsMetrics, 'gads_metrics_config', currentConfig);
+
+        const gaMetrics = ["sessions", "totalUsers", "activeUsers", "newUsers", "screenPageViews", "bounceRate", "averageSessionDuration", "conversions", "totalRevenue"];
+        renderMetricsGrid('google_analytics-metrics-custom-grid', gaMetrics, 'ga_metrics_config', currentConfig);
 
         // Dynamic Channel Settings
         if (currentConfig.available_channels) {
@@ -463,6 +512,8 @@ function updateCronStatusIndicators() {
     check('fb-marketing-entities-cron-hour', 'fb-marketing-entities-cron-minute', 'fb-marketing-entities-cron-status', 'fb-marketing-cron-sync-warning', 'facebook-marketing-entities');
     check('fb-marketing-recent-cron-hour', 'fb-marketing-recent-cron-minute', 'fb-marketing-recent-cron-status', 'fb-marketing-cron-sync-warning', 'facebook-marketing-recent');
     check('gbp-cron-hour', 'gbp-cron-minute', 'gbp-cron-sync-status', 'gbp-cron-sync-warning', 'google-business-profile-recent');
+    check('ga-cron-hour', 'ga-cron-minute', 'ga-cron-sync-status', 'ga-cron-sync-warning', 'google-analytics-recent');
+    check('gads-cron-hour', 'gads-cron-minute', 'gads-cron-sync-status', 'gads-cron-sync-warning', 'google-ads-recent');
 }
 
 function handleFbLevelChange() {
@@ -598,18 +649,18 @@ function setMetricLevel(lvl) {
     }
 }
 
-function renderCustomMetricsGrid() {
-    const container = document.getElementById('fb-metrics-custom-grid');
+function renderMetricsGrid(containerId, metricsArray, configKey, configObject) {
+    const container = document.getElementById(containerId);
     if (!container) return;
+    
+    // Only display the card if metrics are provided
+    const cardEl = document.getElementById(containerId.replace('-custom-grid', '-card'));
+    if (cardEl) cardEl.style.display = 'block';
+
     container.innerHTML = '';
 
-    const metrics = [
-        "spend", "clicks", "impressions", "reach", "frequency", "ctr", "cpc", "cpm", 
-        "results", "cost_per_result", "result_rate", "purchase_roas"
-    ];
-
-    metrics.forEach(m => {
-        const cfg = currentConfig.fb_metrics_config?.[m] || { enabled: false, format: 'number', sparkline: false, sparkline_direction: 'standard' };
+    metricsArray.forEach(m => {
+        const cfg = configObject?.[configKey]?.[m] || configObject?.[m] || { enabled: false, format: 'number', sparkline: false, sparkline_direction: 'standard' };
         const card = document.createElement('div');
         card.className = 'metric-config-card ' + (cfg.enabled ? 'active' : '');
         card.style.cursor = 'default';
@@ -754,11 +805,13 @@ function renderAssets(assets) {
         return Array.isArray(data) ? data : Object.values(data);
     };
 
-    // Standardize assets for indexing
-    const fbPages = [...getAssetArray('facebook_pages'), ...getAssetArray('pages'), ...getAssetArray('fb_pages_full_config')];
-    const fbAdAccounts = [...getAssetArray('facebook_ad_accounts'), ...getAssetArray('ad_accounts'), ...getAssetArray('fb_ad_accounts_full_config')];
-    const gscAssets = [...getAssetArray('gsc'), ...getAssetArray('sites')];
-    const gbpAssets = [...getAssetArray('locations'), ...getAssetArray('gbp')];
+    // Standardize assets for indexing (channel-scoped keys only)
+    const fbPages = [...getAssetArray('facebook_organic_pages'), ...getAssetArray('facebook_organic_fb_pages_full_config')];
+    const fbAdAccounts = [...getAssetArray('facebook_marketing_ad_accounts'), ...getAssetArray('facebook_marketing_fb_ad_accounts_full_config')];
+    const gscAssets = getAssetArray('google_search_console_sites');
+    const gbpAssets = getAssetArray('google_business_profile_locations');
+    const gaAssets = getAssetArray('google_analytics_properties');
+    const gadsAssets = getAssetArray('google_ads_ad_accounts');
 
     fbPages.forEach(p => { if (p && p.id) availableAssetsMaps.pages[String(p.id).trim()] = p; });
     fbAdAccounts.forEach(a => { if (a && a.id) availableAssetsMaps.ad_accounts[String(a.id).trim()] = a; });
@@ -767,6 +820,9 @@ function renderAssets(assets) {
     const gscList = document.getElementById('gsc-list');
     const fbOrganicList = document.getElementById('fb-pages-list');
     const fbMarketingList = document.getElementById('fb-ad-accounts-list');
+    const gbpList = document.getElementById('gbp-locations-list');
+    const gaList = document.getElementById('ga-properties-list');
+    const gadsList = document.getElementById('gads-accounts-list');
     
     if (gscList) {
         gscList.innerHTML = '';
@@ -774,8 +830,8 @@ function renderAssets(assets) {
         if (props.length === 0) gscList.innerHTML = '<div class="empty-state">No GSC properties found.</div>';
         props.forEach(p => {
             if (!p || !p.url) return;
-            const cfgGsc = currentConfig?.gsc || currentConfig?.sites || currentConfig?.google_search_console?.sites || {};
-            // Convert to map if it's an array for faster lookup
+            const cfgGsc = currentConfig?.gsc || {};
+            // If it's an object with URLs as keys (from prepareUiConfig), we don't need to map it
             const gscMap = Array.isArray(cfgGsc) ? Object.fromEntries(cfgGsc.map(s => [s.url, s])) : cfgGsc;
             const savedItem = gscMap[p.url];
             const isInConfig = savedItem !== undefined;
@@ -816,7 +872,7 @@ function renderAssets(assets) {
         pages.forEach(p => {
             if (!p || !p.id) return;
             const getCfg = (key, def = true) => {
-                const rawSaved = currentConfig.fb_pages_full_config || currentConfig.pages || [];
+                const rawSaved = currentConfig.fb_pages_full_config || [];
                 const savedPages = Array.isArray(rawSaved) ? rawSaved : Object.values(rawSaved);
                 const pId = String(p.id).trim();
                 const saved = savedPages.find(pg => String(pg.id).trim() === pId);
@@ -961,7 +1017,7 @@ function renderAssets(assets) {
         if (accounts.length === 0) fbMarketingList.innerHTML = '<div class="empty-state">No Ad accounts found.</div>';
         accounts.forEach(a => {
             if (!a || !a.id) return;
-            const rawAccs = currentConfig.fb_ad_accounts_full_config || currentConfig.ad_accounts || currentConfig.facebook_marketing?.ad_accounts || [];
+            const rawAccs = currentConfig.fb_ad_accounts_full_config || currentConfig.facebook_marketing?.ad_accounts || [];
             const savedAccs = Array.isArray(rawAccs) ? rawAccs : Object.values(rawAccs);
             const cleanId = id => String(id).replace(/^act_/, '').trim();
             const saved = savedAccs.find(acc => cleanId(acc.id) === cleanId(a.id));
@@ -997,7 +1053,6 @@ function renderAssets(assets) {
         });
     }
 
-    const gbpList = document.getElementById('gbp-locations-list');
     if (gbpList) {
         gbpList.innerHTML = '';
         const accounts = gbpAssets;
@@ -1071,6 +1126,90 @@ function renderAssets(assets) {
                 ${metricsHtml}
             `;
             gbpList.appendChild(div);
+        });
+    }
+
+    if (gaList) {
+        gaList.innerHTML = '';
+        const properties = gaAssets;
+        properties.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        
+        if (properties.length === 0) gaList.innerHTML = '<div class="empty-state">No Properties found.</div>';
+        
+        properties.forEach(p => {
+            if (!p || !p.platformId) return;
+            const rawProps = currentConfig.ga_properties || currentConfig.google_analytics?.properties || {};
+            const savedProps = Array.isArray(rawProps) ? rawProps : Object.values(rawProps);
+            const saved = savedProps.find(prop => String(prop.platformId).trim() === String(p.platformId).trim());
+            const isInConfig = !!saved;
+            const isSynced = isInConfig && saved.enabled !== false;
+            
+            const div = document.createElement('div');
+            let itemClass = 'asset-item ga-property-config-card';
+            if (isSynced) itemClass += ' synced';
+            if (isInConfig) itemClass += ' in-config';
+
+            div.className = itemClass;
+            div.dataset.platformId = p.platformId;
+            div.dataset.rawData = JSON.stringify(p);
+            
+            div.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                   <div>
+                       <div style="font-size:0.75rem; font-weight:600; color:#fff;">${p.name || p.title}</div>
+                       <div style="display:flex; gap:8px; align-items:center;">
+                           <div style="font-size:0.6rem; color:var(--text-dim); font-family:'Fira Code';">${p.platformId}</div>
+                       </div>
+                   </div>
+                   <label class="switch-mini">
+                       <input type="checkbox" class="ga-property-main-toggle" value="${p.platformId}" ${isSynced ? 'checked' : ''} onchange="this.closest('.asset-item').classList.toggle('synced', this.checked)">
+                       <span class="slider-mini"></span>
+                   </label>
+                </div>
+            `;
+            gaList.appendChild(div);
+        });
+    }
+
+    if (gadsList) {
+        gadsList.innerHTML = '';
+        const accounts = gadsAssets;
+        accounts.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        
+        if (accounts.length === 0) gadsList.innerHTML = '<div class="empty-state">No Ad Accounts found.</div>';
+        
+        accounts.forEach(a => {
+            if (!a || !a.id) return;
+            const rawAccs = currentConfig.gads_ad_accounts || currentConfig.google_ads?.ad_accounts || {};
+            const savedAccs = Array.isArray(rawAccs) ? rawAccs : Object.values(rawAccs);
+            const saved = savedAccs.find(acc => String(acc.id).trim() === String(a.id).trim());
+            const isInConfig = !!saved;
+            const isSynced = isInConfig && saved.enabled !== false;
+            
+            const div = document.createElement('div');
+            let itemClass = 'asset-item gads-account-config-card';
+            if (isSynced) itemClass += ' synced';
+            if (isInConfig) itemClass += ' in-config';
+
+            div.className = itemClass;
+            div.dataset.platformId = a.id;
+            div.dataset.rawData = JSON.stringify(a);
+            
+            div.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                   <div>
+                       <div style="font-size:0.75rem; font-weight:600; color:#fff;">${a.name || a.title}</div>
+                       <div style="display:flex; gap:8px; align-items:center;">
+                           <div style="font-size:0.6rem; color:var(--text-dim); font-family:'Fira Code';">${a.id}</div>
+                       </div>
+                   </div>
+                   <label class="switch-mini">
+                       <input type="checkbox" class="gads-account-main-toggle" value="${a.id}" ${isSynced ? 'checked' : ''} onchange="this.closest('.asset-item').classList.toggle('synced', this.checked)">
+                       <span class="slider-mini"></span>
+                   </label>
+                </div>
+            `;
+            gadsList.appendChild(div);
         });
     }
 }
