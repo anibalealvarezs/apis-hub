@@ -54,32 +54,30 @@ ALTER TABLE channeled_events
 -- Add event FK columns to metric_configs
 -- ============================================================
 ALTER TABLE metric_configs
-    ADD COLUMN event_id INT DEFAULT NULL,
-    ADD COLUMN channeled_event_id INT DEFAULT NULL;
+    ADD COLUMN IF NOT EXISTS event_id INT DEFAULT NULL,
+    ADD COLUMN IF NOT EXISTS channeled_event_id INT DEFAULT NULL;
 
-CREATE INDEX idx_metric_configs_lookup_event_idx ON metric_configs (channel, name, period, event_id);
-CREATE INDEX idx_metric_configs_lookup_channeled_event_idx ON metric_configs (channel, name, period, channeled_event_id);
-CREATE INDEX idx_metric_configs_event_idx ON metric_configs (event_id);
-CREATE INDEX idx_metric_configs_channeled_event_idx ON metric_configs (channeled_event_id);
+CREATE INDEX IF NOT EXISTS idx_metric_configs_lookup_event_idx ON metric_configs (channel, name, period, event_id);
+CREATE INDEX IF NOT EXISTS idx_metric_configs_lookup_channeled_event_idx ON metric_configs (channel, name, period, channeled_event_id);
+CREATE INDEX IF NOT EXISTS idx_metric_configs_event_idx ON metric_configs (event_id);
+CREATE INDEX IF NOT EXISTS idx_metric_configs_channeled_event_idx ON metric_configs (channeled_event_id);
 
-ALTER TABLE metric_configs
-    ADD CONSTRAINT FK_METRIC_CONFIGS_EVENT
-    FOREIGN KEY (event_id) REFERENCES events (id)
-    ON DELETE SET NULL
-    NOT DEFERRABLE INITIALLY IMMEDIATE;
-
-ALTER TABLE metric_configs
-    ADD CONSTRAINT FK_METRIC_CONFIGS_CHANNELED_EVENT
-    FOREIGN KEY (channeled_event_id) REFERENCES channeled_events (id)
-    ON DELETE SET NULL
-    NOT DEFERRABLE INITIALLY IMMEDIATE;
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'metric_configs'::regclass AND conname = 'fk_metric_configs_event') THEN
+        ALTER TABLE metric_configs ADD CONSTRAINT FK_METRIC_CONFIGS_EVENT FOREIGN KEY (event_id) REFERENCES events (id) ON DELETE SET NULL NOT DEFERRABLE INITIALLY IMMEDIATE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'metric_configs'::regclass AND conname = 'fk_metric_configs_channeled_event') THEN
+        ALTER TABLE metric_configs ADD CONSTRAINT FK_METRIC_CONFIGS_CHANNELED_EVENT FOREIGN KEY (channeled_event_id) REFERENCES channeled_events (id) ON DELETE SET NULL NOT DEFERRABLE INITIALLY IMMEDIATE;
+    END IF;
+END $$;
 
 -- ============================================================
 -- Add GA4 and GBP optimized indexes to metric_configs
 -- ============================================================
-CREATE INDEX idx_metric_configs_event_matrix_idx ON metric_configs (channel, channeled_account_id, channeled_event_id, dimension_set_id, name);
-CREATE INDEX idx_metric_configs_traffic_matrix_idx ON metric_configs (channel, channeled_account_id, page_id, country_id, device_id, dimension_set_id, name);
-CREATE INDEX idx_metric_configs_acquisition_matrix_idx ON metric_configs (channel, channeled_account_id, channeled_campaign_id, dimension_set_id, name);
-CREATE INDEX idx_metric_configs_gbp_lookup_idx ON metric_configs (channel, channeled_account_id, location_id, dimension_set_id, name);
+CREATE INDEX IF NOT EXISTS idx_metric_configs_event_matrix_idx ON metric_configs (channel, channeled_account_id, channeled_event_id, dimension_set_id, name);
+CREATE INDEX IF NOT EXISTS idx_metric_configs_traffic_matrix_idx ON metric_configs (channel, channeled_account_id, page_id, country_id, device_id, dimension_set_id, name);
+CREATE INDEX IF NOT EXISTS idx_metric_configs_acquisition_matrix_idx ON metric_configs (channel, channeled_account_id, channeled_campaign_id, dimension_set_id, name);
+CREATE INDEX IF NOT EXISTS idx_metric_configs_gbp_lookup_idx ON metric_configs (channel, channeled_account_id, location_id, dimension_set_id, name);
 
 COMMIT;

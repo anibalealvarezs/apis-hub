@@ -115,28 +115,23 @@ ALTER TABLE locations
 -- Add geo FK columns to metric_configs
 -- ============================================================
 ALTER TABLE metric_configs
-    ADD COLUMN location_id INT DEFAULT NULL,
-    ADD COLUMN state_id    INT DEFAULT NULL,
-    ADD COLUMN city_id     INT DEFAULT NULL;
+    ADD COLUMN IF NOT EXISTS location_id INT DEFAULT NULL,
+    ADD COLUMN IF NOT EXISTS state_id    INT DEFAULT NULL,
+    ADD COLUMN IF NOT EXISTS city_id     INT DEFAULT NULL;
 
-CREATE INDEX IDX_METRIC_CONFIGS_LOCATION ON metric_configs (location_id);
+CREATE INDEX IF NOT EXISTS IDX_METRIC_CONFIGS_LOCATION ON metric_configs (location_id);
 
-ALTER TABLE metric_configs
-    ADD CONSTRAINT FK_METRIC_CONFIG_LOCATION
-    FOREIGN KEY (location_id) REFERENCES locations (id)
-    ON DELETE SET NULL
-    NOT DEFERRABLE INITIALLY IMMEDIATE;
-
-ALTER TABLE metric_configs
-    ADD CONSTRAINT FK_METRIC_CONFIG_STATE
-    FOREIGN KEY (state_id) REFERENCES states (id)
-    ON DELETE SET NULL
-    NOT DEFERRABLE INITIALLY IMMEDIATE;
-
-ALTER TABLE metric_configs
-    ADD CONSTRAINT FK_METRIC_CONFIG_CITY
-    FOREIGN KEY (city_id) REFERENCES cities (id)
-    ON DELETE SET NULL
-    NOT DEFERRABLE INITIALLY IMMEDIATE;
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'metric_configs'::regclass AND conname = 'fk_metric_config_location') THEN
+        ALTER TABLE metric_configs ADD CONSTRAINT FK_METRIC_CONFIG_LOCATION FOREIGN KEY (location_id) REFERENCES locations (id) ON DELETE SET NULL NOT DEFERRABLE INITIALLY IMMEDIATE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'metric_configs'::regclass AND conname = 'fk_metric_config_state') THEN
+        ALTER TABLE metric_configs ADD CONSTRAINT FK_METRIC_CONFIG_STATE FOREIGN KEY (state_id) REFERENCES states (id) ON DELETE SET NULL NOT DEFERRABLE INITIALLY IMMEDIATE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'metric_configs'::regclass AND conname = 'fk_metric_config_city') THEN
+        ALTER TABLE metric_configs ADD CONSTRAINT FK_METRIC_CONFIG_CITY FOREIGN KEY (city_id) REFERENCES cities (id) ON DELETE SET NULL NOT DEFERRABLE INITIALLY IMMEDIATE;
+    END IF;
+END $$;
 
 COMMIT;
