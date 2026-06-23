@@ -13,8 +13,10 @@ require_once __DIR__ . '/../vendor/autoload.php';
 
 use Symfony\Component\Yaml\Yaml;
 use Helpers\Helpers;
+use Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory;
 
 $config = Helpers::getProjectConfig();
+$channelsConfig = Helpers::getChannelsConfig();
 $instances = $config['instances'] ?? [];
 
 // Capture relevant environment variables to pass to Cron
@@ -76,8 +78,20 @@ foreach ($instances as $instance) {
     if (!empty($endDate)) $params['endDate'] = $endDate;
     if (!empty($instance['requires'])) $params['requires'] = $instance['requires'];
 
-    // --- 🕒 Cron Time Override Logic (Hour & Minute) ---
-    $channelConfig = $config['channels'][$channel] ?? [];
+    // Resolve channel config using DriverFactory
+    $chanKey = $channel;
+    try {
+        $driver = DriverFactory::get($channel);
+        $commonKey = $driver::getCommonConfigKey();
+        if ($commonKey && !isset($channelsConfig[$channel])) {
+            $chanKey = $commonKey;
+        }
+    } catch (\Exception $e) {
+        // Fall back to literal channel name
+    }
+
+    $channelConfig = $channelsConfig[$channel] ?? $channelsConfig[$chanKey] ?? [];
+
     $overrideHour = null;
     $overrideMinute = null;
     
@@ -103,12 +117,19 @@ foreach ($instances as $instance) {
     }
 
     // For granular entities sync, create per-account cron lines instead of one global
-    $isGranular = $channelConfig['granular_sync'] ?? false;
-    $resourceKey = $config[$channel]['resource_key'] ?? null;
+    $isGranular = (bool)($instance['granular_sync'] ?? $channelConfig['granular_sync'] ?? false);
     $accounts = [];
 
-    if ($isGranular && $resourceKey && (str_contains($instanceName, 'entities') || str_contains($instanceName, 'recent')) && isset($channelConfig[$resourceKey])) {
-        $accounts = $channelConfig[$resourceKey];
+    if ($isGranular && (str_contains($instanceName, 'entities') || str_contains($instanceName, 'recent'))) {
+        try {
+            $regConfig = DriverFactory::getChannelConfig($channel);
+            $resourceKey = $regConfig['resource_key'] ?? null;
+            if ($resourceKey && isset($channelConfig[$resourceKey])) {
+                $accounts = $channelConfig[$resourceKey];
+            }
+            // Optional: You could fetch from DB here like ScheduleInitialJobsCommand does
+            // if you wanted cron to strictly track DB accounts, but YAML is the source of truth for setup-cron
+        } catch (\Exception $e) {}
     }
 
     if (!empty($accounts)) {
