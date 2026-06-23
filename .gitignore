@@ -184,3 +184,7 @@ check_db7.php
 check_db8.php
 
 check_db9.php
+
+check_jobs_local.php
+
+test_cleanup.php
