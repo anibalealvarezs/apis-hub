@@ -18,11 +18,12 @@ CREATE TABLE IF NOT EXISTS states (
 
 CREATE UNIQUE INDEX IF NOT EXISTS UNIQ_STATE_NAME_COUNTRY ON states (name, country_id);
 
-ALTER TABLE states
-    ADD CONSTRAINT FK_STATE_COUNTRY
-    FOREIGN KEY (country_id) REFERENCES countries (id)
-    ON DELETE CASCADE
-    NOT DEFERRABLE INITIALLY IMMEDIATE;
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'states'::regclass AND conname = 'fk_state_country') THEN
+        ALTER TABLE states ADD CONSTRAINT FK_STATE_COUNTRY FOREIGN KEY (country_id) REFERENCES countries (id) ON DELETE CASCADE NOT DEFERRABLE INITIALLY IMMEDIATE;
+    END IF;
+END $$;
 
 -- ============================================================
 -- Table: cities
@@ -39,17 +40,15 @@ CREATE TABLE IF NOT EXISTS cities (
 
 CREATE UNIQUE INDEX IF NOT EXISTS UNIQ_CITY_NAME_COUNTRY ON cities (name, country_id);
 
-ALTER TABLE cities
-    ADD CONSTRAINT FK_CITY_STATE
-    FOREIGN KEY (state_id) REFERENCES states (id)
-    ON DELETE SET NULL
-    NOT DEFERRABLE INITIALLY IMMEDIATE;
-
-ALTER TABLE cities
-    ADD CONSTRAINT FK_CITY_COUNTRY
-    FOREIGN KEY (country_id) REFERENCES countries (id)
-    ON DELETE CASCADE
-    NOT DEFERRABLE INITIALLY IMMEDIATE;
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'cities'::regclass AND conname = 'fk_city_state') THEN
+        ALTER TABLE cities ADD CONSTRAINT FK_CITY_STATE FOREIGN KEY (state_id) REFERENCES states (id) ON DELETE SET NULL NOT DEFERRABLE INITIALLY IMMEDIATE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'cities'::regclass AND conname = 'fk_city_country') THEN
+        ALTER TABLE cities ADD CONSTRAINT FK_CITY_COUNTRY FOREIGN KEY (country_id) REFERENCES countries (id) ON DELETE CASCADE NOT DEFERRABLE INITIALLY IMMEDIATE;
+    END IF;
+END $$;
 
 -- ============================================================
 -- Table: locations
@@ -81,35 +80,24 @@ CREATE INDEX IF NOT EXISTS IDX_LOCATIONS_CITY ON locations (city_id);
 CREATE INDEX IF NOT EXISTS IDX_LOCATIONS_STATE ON locations (state_id);
 CREATE INDEX IF NOT EXISTS IDX_LOCATIONS_COUNTRY ON locations (country_id);
 
-ALTER TABLE locations
-    ADD CONSTRAINT FK_LOCATION_ACCOUNT
-    FOREIGN KEY (account_id) REFERENCES accounts (id)
-    ON DELETE SET NULL
-    NOT DEFERRABLE INITIALLY IMMEDIATE;
-
-ALTER TABLE locations
-    ADD CONSTRAINT FK_LOCATION_CHANNELED_ACCOUNT
-    FOREIGN KEY (channeled_account_id) REFERENCES channeled_accounts (id)
-    ON DELETE SET NULL
-    NOT DEFERRABLE INITIALLY IMMEDIATE;
-
-ALTER TABLE locations
-    ADD CONSTRAINT FK_LOCATION_CITY
-    FOREIGN KEY (city_id) REFERENCES cities (id)
-    ON DELETE SET NULL
-    NOT DEFERRABLE INITIALLY IMMEDIATE;
-
-ALTER TABLE locations
-    ADD CONSTRAINT FK_LOCATION_STATE
-    FOREIGN KEY (state_id) REFERENCES states (id)
-    ON DELETE SET NULL
-    NOT DEFERRABLE INITIALLY IMMEDIATE;
-
-ALTER TABLE locations
-    ADD CONSTRAINT FK_LOCATION_COUNTRY
-    FOREIGN KEY (country_id) REFERENCES countries (id)
-    ON DELETE SET NULL
-    NOT DEFERRABLE INITIALLY IMMEDIATE;
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'locations'::regclass AND conname = 'fk_location_account') THEN
+        ALTER TABLE locations ADD CONSTRAINT FK_LOCATION_ACCOUNT FOREIGN KEY (account_id) REFERENCES accounts (id) ON DELETE SET NULL NOT DEFERRABLE INITIALLY IMMEDIATE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'locations'::regclass AND conname = 'fk_location_channeled_account') THEN
+        ALTER TABLE locations ADD CONSTRAINT FK_LOCATION_CHANNELED_ACCOUNT FOREIGN KEY (channeled_account_id) REFERENCES channeled_accounts (id) ON DELETE SET NULL NOT DEFERRABLE INITIALLY IMMEDIATE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'locations'::regclass AND conname = 'fk_location_city') THEN
+        ALTER TABLE locations ADD CONSTRAINT FK_LOCATION_CITY FOREIGN KEY (city_id) REFERENCES cities (id) ON DELETE SET NULL NOT DEFERRABLE INITIALLY IMMEDIATE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'locations'::regclass AND conname = 'fk_location_state') THEN
+        ALTER TABLE locations ADD CONSTRAINT FK_LOCATION_STATE FOREIGN KEY (state_id) REFERENCES states (id) ON DELETE SET NULL NOT DEFERRABLE INITIALLY IMMEDIATE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'locations'::regclass AND conname = 'fk_location_country') THEN
+        ALTER TABLE locations ADD CONSTRAINT FK_LOCATION_COUNTRY FOREIGN KEY (country_id) REFERENCES countries (id) ON DELETE SET NULL NOT DEFERRABLE INITIALLY IMMEDIATE;
+    END IF;
+END $$;
 
 -- ============================================================
 -- Add geo FK columns to metric_configs

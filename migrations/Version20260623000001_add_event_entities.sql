@@ -38,17 +38,15 @@ CREATE INDEX IF NOT EXISTS idx_channeled_events_event_idx ON channeled_events (e
 CREATE INDEX IF NOT EXISTS idx_channeled_events_channeled_account_id_event_id_idx ON channeled_events (channeled_account_id, event_id);
 CREATE UNIQUE INDEX IF NOT EXISTS channeled_events_platform_id_account_id_uidx ON channeled_events (platform_id, channeled_account_id);
 
-ALTER TABLE channeled_events
-    ADD CONSTRAINT FK_CHANNELED_EVENTS_EVENT
-    FOREIGN KEY (event_id) REFERENCES events (id)
-    ON DELETE CASCADE
-    NOT DEFERRABLE INITIALLY IMMEDIATE;
-
-ALTER TABLE channeled_events
-    ADD CONSTRAINT FK_CHANNELED_EVENTS_CHANNELED_ACCOUNT
-    FOREIGN KEY (channeled_account_id) REFERENCES channeled_accounts (id)
-    ON DELETE CASCADE
-    NOT DEFERRABLE INITIALLY IMMEDIATE;
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'channeled_events'::regclass AND conname = 'fk_channeled_events_event') THEN
+        ALTER TABLE channeled_events ADD CONSTRAINT FK_CHANNELED_EVENTS_EVENT FOREIGN KEY (event_id) REFERENCES events (id) ON DELETE CASCADE NOT DEFERRABLE INITIALLY IMMEDIATE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'channeled_events'::regclass AND conname = 'fk_channeled_events_channeled_account') THEN
+        ALTER TABLE channeled_events ADD CONSTRAINT FK_CHANNELED_EVENTS_CHANNELED_ACCOUNT FOREIGN KEY (channeled_account_id) REFERENCES channeled_accounts (id) ON DELETE CASCADE NOT DEFERRABLE INITIALLY IMMEDIATE;
+    END IF;
+END $$;
 
 -- ============================================================
 -- Add event FK columns to metric_configs
