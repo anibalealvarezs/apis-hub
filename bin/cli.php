@@ -38,6 +38,7 @@
     use Commands\MigratePagesCanonicalCommand;
     use Commands\InstallDriversCommand;
     use Commands\NuclearResyncCommand;
+    use Commands\UpgradeVersionCommand;
     use Doctrine\ORM\Tools\Console\ConsoleRunner;
     use Doctrine\ORM\Tools\Console\EntityManagerProvider\SingleManagerProvider;
     use Exceptions\ConfigurationException;
@@ -115,6 +116,7 @@
             new RetryFailedJobCommand($entityManager),
             new RetryFailedJobsCommand($entityManager),
             new NuclearResyncCommand($entityManager),
+            new UpgradeVersionCommand($entityManager),
         ];
 
         foreach ($commands as $command) {
