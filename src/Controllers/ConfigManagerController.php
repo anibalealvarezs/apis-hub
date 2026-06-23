@@ -448,6 +448,13 @@
                         }
 
                         $driver = DriverFactory::get($chan, $logger, $chanConfig);
+                        
+                        // Disable retries for validation so it fails fast
+                        $api = method_exists($driver, 'getApi') ? $driver->getApi() : null;
+                        if ($api && method_exists($api, 'setMaxRetries')) {
+                            $api->setMaxRetries(0);
+                        }
+
                         $authProvider = $driver->getAuthProvider();
                         if ($authProvider && !$authProvider->hasCredentials()) {
                             $validation = [
@@ -459,8 +466,18 @@
                             $validation = $driver->validateAuthentication();
                         }
 
+                        $status = $validation['success'] ? 'valid' : 'error';
+                        $msgLower = strtolower($validation['message'] ?? '');
+                        if (!$validation['success'] && (
+                            str_contains($msgLower, 'rate limit') || 
+                            str_contains($msgLower, 'too many requests') ||
+                            str_contains($msgLower, 'max retries')
+                        )) {
+                            $status = 'warning';
+                        }
+
                         $result = [
-                            'status'  => $validation['success'] ? 'valid' : 'error',
+                            'status'  => $status,
                             'message' => $validation['message'],
                             'details' => $validation['details'] ?? [],
                         ];
