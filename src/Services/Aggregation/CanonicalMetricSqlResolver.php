@@ -17,6 +17,7 @@
          */
         private const array SUPPORTED_CANONICAL_METRICS = [
             'spend', 'clicks', 'impressions', 'reach', 'conversions',
+            'sessions', 'new_users', 'bounce_rate', 'event_count',
             'frequency', 'ctr', 'cpc', 'cpm', 'cost_per_conversion', 'conversion_rate', 'roas_purchase',
         ];
 
@@ -165,9 +166,9 @@
             $resolvedNames = $this->resolveRawMetricNames($resolutionMetric, $channel);
 
             $sqlExpression = match ($resolutionMetric) {
-                'spend', 'clicks', 'impressions', 'reach', 'conversions', 'actions' =>
+                'spend', 'clicks', 'impressions', 'reach', 'conversions', 'actions', 'sessions', 'new_users', 'event_count' =>
                 $this->buildSumExpression($resolvedNames['raw_names'], $nameCol, $periodCol),
-                'frequency', 'roas_purchase' =>
+                'frequency', 'roas_purchase', 'bounce_rate' =>
                 $this->buildAverageExpression($resolvedNames['raw_names'], $nameCol, $periodCol),
                 'ctr' => $this->buildCtrExpression($channel, $nameCol, $periodCol),
                 'cpc' => $this->buildCpcExpression($channel, $nameCol, $periodCol),
@@ -458,7 +459,7 @@
                 $list = is_array($rawNames) ? $rawNames : [$rawNames];
                 $normalized = [];
                 foreach ($list as $name) {
-                    $value = strtolower(trim((string)$name));
+                    $value = trim((string)$name);
                     if ($value !== '' && !in_array($value, $normalized, true)) {
                         $normalized[] = $value;
                     }
@@ -510,7 +511,7 @@
                 $list = is_array($rawNames) ? $rawNames : [$rawNames];
                 $normalized = [];
                 foreach ($list as $name) {
-                    $value = strtolower(trim((string)$name));
+                    $value = trim((string)$name);
                     if ($value !== '' && !in_array($value, $normalized, true)) {
                         $normalized[] = $value;
                     }
@@ -563,7 +564,7 @@
                 $list = is_array($rawNames) ? $rawNames : [$rawNames];
                 $normalized = [];
                 foreach ($list as $name) {
-                    $value = strtolower(trim((string)$name));
+                    $value = trim((string)$name);
                     if ($value !== '' && !in_array($value, $normalized, true)) {
                         $normalized[] = $value;
                     }
@@ -758,6 +759,7 @@
         {
             $quoted = [];
             foreach ($values as $value) {
+                $value = strtolower($value);
                 $quoted[] = "'".str_replace("'", "''", $value)."'";
             }
 

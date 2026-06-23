@@ -50,20 +50,33 @@ class DimensionManager implements DimensionManagerInterface
             return $set;
         }
 
-        // 4. Create New Set
-        $set = new DimensionSet();
-        $set->setHash($hash);
+        // 4. Create New Set via Atomic Upsert to prevent Race Conditions
+        $conn = $this->em->getConnection();
+        $affectedRows = $conn->executeStatement(
+            'INSERT INTO dimension_sets (hash) VALUES (?) ON CONFLICT (hash) DO NOTHING',
+            [$hash]
+        );
+        
+        $row = $conn->fetchAssociative('SELECT id FROM dimension_sets WHERE hash = ?', [$hash]);
+        $setId = (int)$row['id'];
 
-        foreach ($dimensions as $d) {
-            $key = $this->resolveKey($d['dimensionKey']);
-            $value = $this->resolveValue($key, $d['dimensionValue'] ?? '');
-            $set->addValue($value);
+        if ($affectedRows > 0) {
+            // We just inserted the set, so we must insert the relationships
+            foreach ($dimensions as $d) {
+                $key = $this->resolveKey($d['dimensionKey']);
+                $value = $this->resolveValue($key, $d['dimensionValue'] ?? '');
+                
+                $conn->executeStatement(
+                    'INSERT INTO dimension_set_items (dimension_set_id, dimension_value_id) VALUES (?, ?) ON CONFLICT DO NOTHING',
+                    [$setId, $value->getId()]
+                );
+            }
         }
 
-        $this->em->persist($set);
-        $this->em->flush($set);
-
+        /** @var DimensionSet $set */
+        $set = $this->em->getReference(DimensionSet::class, $setId);
         $this->setCache[$hash] = $set;
+        
         return $set;
     }
 

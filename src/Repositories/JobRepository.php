@@ -333,7 +333,7 @@ class JobRepository extends BaseRepository
                     SELECT j.*, 
                            ROW_NUMBER() OVER(
                                PARTITION BY COALESCE(CAST(j.payload AS JSONB)->>'account_id', CAST(j.payload AS JSONB)->'params'->>'account_id'), j.payload->>'instance_name'
-                               ORDER BY j.priority DESC, j.id ASC
+                               ORDER BY j.priority DESC, j.updated_at ASC, j.id ASC
                            ) as account_rank
                     FROM jobs j
                     LEFT JOIN channels c ON j.channel = c.name
@@ -357,7 +357,7 @@ class JobRepository extends BaseRepository
                 )
                 SELECT * FROM RankedJobs 
                 WHERE account_rank <= 5
-                ORDER BY priority DESC, id ASC 
+                ORDER BY priority DESC, updated_at ASC, id ASC 
                 LIMIT 100";
 
             if ($channel) {
@@ -401,7 +401,7 @@ class JobRepository extends BaseRepository
             // Not supported cleanly in standard doctrine DQL without joins, but sqlite logic fallback
         }
 
-        return $qb->orderBy('j.priority', 'DESC')->addOrderBy('j.id', 'ASC')->setMaxResults(100)->getQuery()->getResult();
+        return $qb->orderBy('j.priority', 'DESC')->addOrderBy('j.updatedAt', 'ASC')->addOrderBy('j.id', 'ASC')->setMaxResults(100)->getQuery()->getResult();
     }
 
     /**
@@ -941,7 +941,7 @@ class JobRepository extends BaseRepository
                             (p.instance_name = COALESCE(j.payload->>'instance_name', '') AND COALESCE(j.payload->>'account_id', j.payload->'params'->>'account_id') IS NULL)
                         )
                     )
-                    ORDER BY j.priority DESC, j.id ASC
+                    ORDER BY j.priority DESC, j.updated_at ASC, j.id ASC
                     LIMIT 1
                     FOR UPDATE OF j SKIP LOCKED
                 )

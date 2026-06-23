@@ -21,8 +21,16 @@ class Country extends Entity
     #[ORM\Column(type: 'string')]
     protected string $name;
 
+    #[ORM\OneToMany(mappedBy: 'country', targetEntity: State::class)]
+    protected Collection $states;
+
+    #[ORM\OneToMany(mappedBy: 'country', targetEntity: City::class)]
+    protected Collection $cities;
+
     public function __construct()
     {
+        $this->states = new ArrayCollection();
+        $this->cities = new ArrayCollection();
     }
 
     public function addCode(CountryEnum $code): self
@@ -45,5 +53,55 @@ class Country extends Entity
     public function getName(): string
     {
         return $this->name;
+    }
+
+    public function getStates(): Collection
+    {
+        return $this->states;
+    }
+
+    public function addState(State $state): self
+    {
+        if (!$this->states->contains($state)) {
+            $this->states->add($state);
+            $state->addCountry($this);
+        }
+        return $this;
+    }
+
+    public function removeState(State $state): self
+    {
+        if ($this->states->contains($state)) {
+            $this->states->removeElement($state);
+            if ($state->getCountry() === $this) {
+                $state->addCountry(null);
+            }
+        }
+        return $this;
+    }
+
+    public function getCities(): Collection
+    {
+        return $this->cities;
+    }
+
+    public function addCity(City $city): self
+    {
+        if (!$this->cities->contains($city)) {
+            $this->cities->add($city);
+            $city->addCountry($this);
+        }
+        return $this;
+    }
+
+    public function removeCity(City $city): self
+    {
+        if ($this->cities->contains($city)) {
+            $this->cities->removeElement($city);
+            if ($city->getCountry() === $this) {
+                $city->addCountry(null);
+            }
+        }
+        return $this;
     }
 }

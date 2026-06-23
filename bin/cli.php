@@ -31,12 +31,14 @@
     use Commands\Infrastructure\ScaleWorkersCommand;
     use Commands\InitializeDefaultEntitiesCommand;
     use Commands\InitializeEntitiesCommand;
+    use Commands\RecalculateMetricConfigSignaturesCommand;
     use Commands\RefreshInstancesCommand;
     use Commands\SetupDatabaseCommand;
     use Commands\SeedDemoDataCommand;
     use Commands\MigratePagesCanonicalCommand;
     use Commands\InstallDriversCommand;
     use Commands\NuclearResyncCommand;
+    use Commands\UpgradeVersionCommand;
     use Doctrine\ORM\Tools\Console\ConsoleRunner;
     use Doctrine\ORM\Tools\Console\EntityManagerProvider\SingleManagerProvider;
     use Exceptions\ConfigurationException;
@@ -60,19 +62,8 @@
             version: '1.0.0'
         );
         $cli->setCatchExceptions(true);
-        // Doctrine ORM 3 removed EntityManagerHelper; prefer provider-based registration.
-        if (class_exists(SingleManagerProvider::class)) {
-            ConsoleRunner::addCommands($cli, new SingleManagerProvider($entityManager));
-        } else {
-            $helperSet = require_once __DIR__."/../config/cli-config.php";
-            // Register All Doctrine Helpers to the existing HelperSet (legacy ORM 2 path)
-            $cli->getHelperSet()->set($helperSet->get('em'), 'em');
-            if ($helperSet->has('db')) {
-                $cli->getHelperSet()->set($helperSet->get('db'), 'db');
-            }
-            // Register All Doctrine Commands
-            ConsoleRunner::addCommands($cli);
-        }
+        // Doctrine ORM 3+ provider-based registration
+        ConsoleRunner::addCommands($cli, new SingleManagerProvider($entityManager));
         // Ensure default helpers are registered
         if (!$cli->getHelperSet()->has('question')) {
             $cli->getHelperSet()->set(new QuestionHelper(), 'question');
@@ -101,6 +92,7 @@
             new AggregateEntityCommand(),
             new RefreshInstancesCommand(),
             new SetupDatabaseCommand(),
+            new RecalculateMetricConfigSignaturesCommand(Helpers::getManager()),
             new SeedDemoDataCommand(Helpers::getManager()),
             new ResetMetricsCommand($entityManager),
             new ResetEntitiesCommand($entityManager),
@@ -113,6 +105,7 @@
             new RetryFailedJobCommand($entityManager),
             new RetryFailedJobsCommand($entityManager),
             new NuclearResyncCommand($entityManager),
+            new UpgradeVersionCommand($entityManager),
         ];
 
         foreach ($commands as $command) {

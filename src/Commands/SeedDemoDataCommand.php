@@ -107,6 +107,7 @@
                 'channeled_ad' => ChanneledAd::class,
                 'page' => Page::class,
                 'post' => Post::class,
+                'location' => \Entities\Analytics\Location::class,
                 'query' => Query::class,
                 'country' => Country::class,
                 'device' => Device::class,
@@ -544,7 +545,10 @@
                 order: $orderPId,
                 country: $countryPId,
                 device: $devicePId,
-                dimensionSet: $setHash ?: $setId
+                dimensionSet: $setHash ?: $setId,
+                location: null,
+                state: null,
+                city: null
             );
             $this->bufferConfigs[] = [
                 'channel'               => $channel->value,

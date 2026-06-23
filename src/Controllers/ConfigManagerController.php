@@ -66,6 +66,7 @@
 
             $availableChannels = DriverFactory::getAvailableChannels();
             $driverJs = "";
+            $driverHtml = "";
             foreach ($availableChannels as $channel) {
                 try {
                     $reg = DriverFactory::getRegistry();
@@ -78,26 +79,42 @@
                         $className = $reflector->getShortName();
                         $baseName = str_replace('Driver', '', $className);
                         $jsPath = $driverDir."/js/".$baseName."ConfigHandler.js";
+                        $htmlPath = $driverDir."/html/".$channel."_config.html";
 
-                        // Try loading directly first (faster and doesn't require instantiation)
+                        // Try loading JS directly first (faster and doesn't require instantiation)
                         if (file_exists($jsPath)) {
                             $driverJs .= file_get_contents($jsPath)."\n";
                             $logger->debug("Loaded JS for $channel from static path: $jsPath");
-                            continue;
+                        } else {
+                            // Fallback to driver method if static path fails
+                            $driver = DriverFactory::get($channel);
+                            $js = $driver->getConfigurationJs();
+                            if ($js) {
+                                $driverJs .= $js."\n";
+                                $logger->debug("Loaded JS for $channel from driver method");
+                            } else {
+                                $logger->warning("Driver for $channel returned empty JS");
+                            }
+                        }
+
+                        // Try loading HTML directly first
+                        if (file_exists($htmlPath)) {
+                            $driverHtml .= file_get_contents($htmlPath)."\n";
+                            $logger->debug("Loaded HTML for $channel from static path: $htmlPath");
+                        } else {
+                            // Fallback to driver method
+                            $driver = DriverFactory::get($channel);
+                            if (method_exists($driver, 'getConfigurationHtml')) {
+                                $channelHtml = $driver->getConfigurationHtml();
+                                if ($channelHtml) {
+                                    $driverHtml .= $channelHtml."\n";
+                                    $logger->debug("Loaded HTML for $channel from driver method");
+                                }
+                            }
                         }
                     }
-
-                    // Fallback to driver method if static path fails
-                    $driver = DriverFactory::get($channel);
-                    $js = $driver->getConfigurationJs();
-                    if ($js) {
-                        $driverJs .= $js."\n";
-                        $logger->debug("Loaded JS for $channel from driver method");
-                    } else {
-                        $logger->warning("Driver for $channel returned empty JS");
-                    }
                 } catch (Throwable $e) {
-                    $logger->error("Failed to load JS for channel $channel: ".$e->getMessage());
+                    $logger->error("Failed to load JS/HTML for channel $channel: ".$e->getMessage());
                     continue;
                 }
             }
@@ -111,6 +128,19 @@
             $jsBlock .= $driverJs;
             $jsBlock .= "\nconsole.log('--- END DRIVER JS INJECTION ---');\n";
             $jsBlock .= "</script>\n<!-- END DRIVER JS INJECTION -->\n";
+
+            $htmlBlock = "\n<!-- START DRIVER HTML INJECTION -->\n";
+            $htmlBlock .= $driverHtml;
+            $htmlBlock .= "\n<!-- END DRIVER HTML INJECTION -->\n";
+
+            // Inject HTML (into dynamic-tabs-container or body)
+            if (str_contains($html, '<div id="dynamic-tabs-container"></div>')) {
+                $html = str_replace('<div id="dynamic-tabs-container"></div>', '<div id="dynamic-tabs-container"></div>'.$htmlBlock, $html);
+                $logger->debug("Injected HTML after dynamic-tabs-container");
+            } else {
+                $html = str_replace('</body>', $htmlBlock.'</body>', $html);
+                $logger->warning("Injection tags for HTML not found! Using safety fallback (before </body>)");
+            }
 
             // Attempt 1: Modern tag with comments
             if (str_contains($html, '/* [DRIVER_JS_INJECTION] */')) {
@@ -185,15 +215,19 @@
                             $currentConfig = array_replace_recursive($currentConfig, $uiConfig);
                         }
 
+                        $resourceKey = $systemConfig[$chan]['resource_key'] ?? null;
+
                         // Fast Load Logic for Assets: Populate basic asset lists from config without full discovery
                         if (!$forceRefresh || !$isRequestedType) {
-                            $resourceKey = $systemConfig[$chan]['resource_key'] ?? null;
                             if ($resourceKey && isset($chanConfig[$resourceKey])) {
-                                // Merge with existing assets if the key is already present (e.g. across multiple social channels)
+                                $assetValues = array_values($chanConfig[$resourceKey]);
+                                // Backward-compatible generic key
                                 $allAssets[$resourceKey] = array_merge(
                                     $allAssets[$resourceKey] ?? [],
-                                    array_values($chanConfig[$resourceKey])
+                                    $assetValues
                                 );
+                                // Channel-scoped key to prevent cross-channel contamination
+                                $allAssets[$chan . '_' . $resourceKey] = $assetValues;
                             }
                         }
 
@@ -230,6 +264,7 @@
                                 }
 
                                 $allAssets[$assetKey] = $assetList;
+                                $allAssets[$chan . '_' . $assetKey] = $assetList;
                             }
                         }
                     } catch (Exception $e) {

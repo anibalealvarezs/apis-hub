@@ -162,7 +162,7 @@
                     if (!$reflection->isAbstract()) {
                         $instance = new $driverClass();
                         if (method_exists($instance, 'getRequiredInstanceTier')) {
-                            $tier = $instance->getRequiredInstanceTier();
+                            $tier = $instance->getRequiredInstanceTier($channelConfig);
 
                             return $tier->value;
                         }

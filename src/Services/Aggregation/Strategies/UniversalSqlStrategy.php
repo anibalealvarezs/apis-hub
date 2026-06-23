@@ -107,7 +107,7 @@
                 if (!$isStandardRelation || $isDimension) {
                     // Dimension join logic
                     $dimAlias = 'dim_'.preg_replace('/[^a-z0-9]/i', '_', $dimKey);
-                    $sqlParams["key_$dimAlias"] = $dimKey;
+                    $sqlParams["key_$dimAlias"] = strtolower($dimKey);
 
                     $safeLeftJoin('dimension_set_items', "dsi_$dimAlias", "mc.dimension_set_id = dsi_$dimAlias.dimension_set_id AND dsi_$dimAlias.dimension_value_id IN (
                     SELECT sub_dv.id FROM dimension_values sub_dv 

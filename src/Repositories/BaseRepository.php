@@ -121,6 +121,7 @@
             'device'               => ['table' => 'devices', 'fk' => 'device_id', 'field' => 'type', 'alias' => 'rd'],
             'page_title'           => ['table' => 'pages', 'fk' => 'page_id', 'field' => 'title', 'alias' => 'rpa', 'isAttribute' => true],
             'page_platform_id'     => ['table' => 'pages', 'fk' => 'page_id', 'field' => 'platform_id', 'alias' => 'rpa', 'isAttribute' => true],
+            'event'                => ['table' => 'events', 'fk' => 'event_id', 'field' => 'name', 'alias' => 'rev'],
         ];
 
         /**
