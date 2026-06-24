@@ -201,6 +201,75 @@
             $this->assertNull($rows);
         }
 
+        public function testPostSnapshotReturnsEmptyForSentinelChanneledAccount(): void
+        {
+            $connection = $this->createMock(Connection::class);
+            $connection->expects($this->never())->method('fetchAllAssociative');
+
+            $repository = $this->createMock(BaseRepository::class);
+            $repository->expects($this->once())->method('appendOptimizedStrategyMeta');
+
+            $plan = new AggregationPlan(
+                aggregations: ['reach' => 'reach', 'likes' => 'likes'],
+                groupBy: ['caption', 'created_time', 'media_type', 'message', 'permalink', 'permalink_url', 'post', 'post_id', 'timestamp'],
+                filters: (object)[
+                    'channel' => 'facebook_organic',
+                    'account_type' => 'instagram_account',
+                    'channeledAccount' => (object)['operator' => 'in', 'value' => ['__NONE__']],
+                    'post' => 'NOT_NULL',
+                    'period' => 'lifetime',
+                    'latest_snapshot' => true,
+                ],
+                startDate: '2026-05-24',
+                endDate: '2026-06-23',
+                context: [
+                    'repository' => $repository,
+                ],
+                stages: [
+                    'grouping' => ['normalized_pattern' => 'caption+created_time+media_type+message+permalink+permalink_url+post+post_id+timestamp'],
+                ],
+                candidateOptimizedStrategies: ['social_organic_post_snapshot']
+            );
+
+            $strategy = new SocialOrganicStrategy(new CanonicalMetricSqlResolver());
+            $rows = $strategy->execute($connection, $plan, false);
+
+            $this->assertSame([], $rows);
+        }
+
+        public function testLinkedPagesReturnsEmptyForSentinelChanneledAccount(): void
+        {
+            $connection = $this->createMock(Connection::class);
+            $connection->expects($this->never())->method('fetchAllAssociative');
+
+            $repository = $this->createMock(BaseRepository::class);
+            $repository->expects($this->once())->method('appendOptimizedStrategyMeta');
+
+            $plan = new AggregationPlan(
+                aggregations: ['reach' => 'reach'],
+                groupBy: ['channeled_account_id', 'channeledaccount', 'linked_platform_entity_id', 'page_platform_id'],
+                filters: (object)[
+                    'channel' => 'facebook_organic',
+                    'account_type' => 'instagram_account',
+                    'channeledAccount' => (object)['operator' => 'in', 'value' => ['__NONE__']],
+                ],
+                startDate: '2026-06-01',
+                endDate: '2026-06-06',
+                context: [
+                    'repository' => $repository,
+                ],
+                stages: [
+                    'grouping' => ['normalized_pattern' => 'channeled_account_id+channeledaccount+linked_platform_entity_id+page_platform_id'],
+                ],
+                candidateOptimizedStrategies: ['social_organic_linked_pages']
+            );
+
+            $strategy = new SocialOrganicStrategy(new CanonicalMetricSqlResolver());
+            $rows = $strategy->execute($connection, $plan, false);
+
+            $this->assertSame([], $rows);
+        }
+
         public function testPostSnapshotUsesPlatformPostIdFilterForStringPostIds(): void
         {
             $capturedSql = null;

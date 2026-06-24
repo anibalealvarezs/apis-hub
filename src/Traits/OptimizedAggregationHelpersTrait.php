@@ -70,4 +70,21 @@
                 default => [$groupPattern],
             };
         }
+
+        /**
+         * @param array{operator: string, value: mixed} $condition
+         */
+        protected function isSentinelEmptyFilter(array $condition): bool
+        {
+            if ($condition['operator'] === 'in' && is_array($condition['value'])) {
+                foreach ($condition['value'] as $v) {
+                    if (is_numeric($v)) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+
+            return false;
+        }
     }

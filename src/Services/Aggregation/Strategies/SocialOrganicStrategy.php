@@ -216,10 +216,20 @@
             // Handle Account/Page filters
             if (!empty($filtersArr['channeledAccount'])) {
                 $condition = $filterResolver->resolve($filtersArr['channeledAccount']);
+
+                if ($this->isSentinelEmptyFilter($condition)) {
+                    return [];
+                }
+
                 $whereClauses[] = $this->buildFilterClause('mc.channeled_account_id', $condition, 'channeledAccount');
                 $this->bindFilterParams($sqlParams, 'channeledAccount', $condition);
             } elseif (!empty($filtersArr['page'])) {
                 $condition = $filterResolver->resolve($filtersArr['page']);
+
+                if ($this->isSentinelEmptyFilter($condition)) {
+                    return [];
+                }
+
                 $whereClauses[] = $this->buildFilterClause('mc.page_id', $condition, 'pageId');
                 $this->bindFilterParams($sqlParams, 'pageId', $condition);
             }
@@ -348,10 +358,20 @@
 
             if (!empty($filtersArr['channeledAccount'])) {
                 $condition = $filterResolver->resolve($filtersArr['channeledAccount']);
+
+                if ($this->isSentinelEmptyFilter($condition)) {
+                    return [];
+                }
+
                 $whereClauses[] = $this->buildFilterClause('mc.channeled_account_id', $condition, 'channeledAccount');
                 $this->bindFilterParams($sqlParams, 'channeledAccount', $condition);
             } elseif (!empty($filtersArr['page'])) {
                 $condition = $filterResolver->resolve($filtersArr['page']);
+
+                if ($this->isSentinelEmptyFilter($condition)) {
+                    return [];
+                }
+
                 $whereClauses[] = $this->buildFilterClause('mc.page_id', $condition, 'pageId');
                 $this->bindFilterParams($sqlParams, 'pageId', $condition);
             } else {
