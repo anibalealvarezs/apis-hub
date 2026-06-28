@@ -576,8 +576,8 @@
             if (($isMetric || $isChanneledMetric) && $this->matchesWeightedMetric($groupPattern, $reducerAnalysis, $startDate, $endDate)) {
                 $candidates[] = 'weighted_metric';
             }
-            
-            if ($isMetric || $isChanneledMetric) {
+
+            if ($candidates === [] && ($isMetric || $isChanneledMetric)) {
                 $candidates[] = 'universal_sql';
             }
 
