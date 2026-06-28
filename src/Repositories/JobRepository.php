@@ -105,7 +105,36 @@ class JobRepository extends BaseRepository
             $data['uuid'] = Factory::create()->uuid;
         }
 
-        return parent::create((object)$data, $returnEntity);
+        $result = parent::create((object)$data, $returnEntity);
+
+        if ($result && in_array($data['status'], [JobStatus::scheduled->value, JobStatus::delayed->value])) {
+            $this->triggerAsyncScaling();
+        }
+
+        return $result;
+    }
+
+    /**
+     * Triggers the scale workers command asynchronously to instantly adapt to new demand.
+     * Uses a 5-second debounce to prevent overwhelming the Docker socket during bulk job scheduling.
+     */
+    protected function triggerAsyncScaling(): void
+    {
+        try {
+            $redis = Helpers::getRedisClient();
+            if ($redis) {
+                $cache = CacheService::getInstance($redis);
+                if (!$cache->exists('last_scale_check')) {
+                    $cache->set('last_scale_check', time(), 5);
+                    $phpBin = '/usr/local/bin/php';
+                    if (file_exists('/app/bin/cli.php')) {
+                        exec("nohup $phpBin /app/bin/cli.php app:scale-workers > /dev/null 2>&1 &");
+                    }
+                }
+            }
+        } catch (Throwable $e) {
+            // Silently fail if cache or exec is unavailable, fallback cron will catch it within 60s
+        }
     }
 
     /**
