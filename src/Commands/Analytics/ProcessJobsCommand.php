@@ -130,8 +130,8 @@ use Enums\JobStatus;
 
             // 0.1 Reset jobs stuck from THIS instance (e.g. after crash/restart)
             if ($envInstance) {
-                $resetByInstance = $jobRepo->resetStuckJobsByInstance($envInstance, $timeoutMinutes);
-                $resetByWorker = $jobRepo->resetStuckJobsByWorker($envInstance, $timeoutMinutes);
+                $resetByInstance = $jobRepo->resetStuckJobsByInstance($envInstance);
+                $resetByWorker = $jobRepo->resetStuckJobsByWorker($envInstance);
 
                 if ($resetByInstance > 0 || $resetByWorker > 0) {
                     $this->logger->info("Resumption: Reset ".($resetByInstance + $resetByWorker)." jobs previously held by this instance ({$envInstance}).");
