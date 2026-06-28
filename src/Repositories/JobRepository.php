@@ -526,16 +526,19 @@ class JobRepository extends BaseRepository
      * @throws ConfigurationException
      * @throws Exception
      */
-    public function resetStuckJobsByInstance(string $instanceName): int
+    public function resetStuckJobsByInstance(string $instanceName, int $timeoutMinutes = 30): int
     {
+        $threshold = (new DateTime())->modify("-{$timeoutMinutes} minutes");
+
         if (Helpers::isPostgres()) {
-            $sql = "UPDATE jobs SET status = :scheduled, updated_at = :now WHERE status = :processing AND CAST(payload AS text) LIKE :instance_pattern";
+            $sql = "UPDATE jobs SET status = :scheduled, updated_at = :now WHERE status = :processing AND CAST(payload AS text) LIKE :instance_pattern AND updated_at < :threshold";
 
             return $this->_em->getConnection()->executeStatement($sql, [
                 'scheduled' => JobStatus::scheduled->value,
                 'now' => (new DateTime())->format('Y-m-d H:i:s'),
                 'processing' => JobStatus::processing->value,
                 'instance_pattern' => '%instance_name%'.$instanceName.'%',
+                'threshold' => $threshold->format('Y-m-d H:i:s'),
             ]);
         }
 
@@ -546,10 +549,12 @@ class JobRepository extends BaseRepository
             ->set('e.updatedAt', ':now')
             ->where('e.status = :processing')
             ->andWhere('e.payload LIKE :instance_pattern')
+            ->andWhere('e.updatedAt < :threshold')
             ->setParameter('scheduled', JobStatus::scheduled->value)
             ->setParameter('now', new DateTime())
             ->setParameter('processing', JobStatus::processing->value)
             ->setParameter('instance_pattern', '%instance_name%'.$instanceName.'%')
+            ->setParameter('threshold', $threshold)
             ->getQuery()
             ->execute();
     }
@@ -620,8 +625,10 @@ class JobRepository extends BaseRepository
      * @param string $workerId
      * @return int
      */
-    public function resetStuckJobsByWorker(string $workerId): int
+    public function resetStuckJobsByWorker(string $workerId, int $timeoutMinutes = 2): int
     {
+        $threshold = (new DateTime())->modify("-{$timeoutMinutes} minutes");
+
         $qb = $this->_em->createQueryBuilder();
 
         return $qb->update($this->getEntityName(), 'e')
@@ -629,10 +636,12 @@ class JobRepository extends BaseRepository
             ->set('e.updatedAt', ':now')
             ->where('e.status = :processing')
             ->andWhere('e.workerId = :workerId')
+            ->andWhere('e.updatedAt < :threshold')
             ->setParameter('scheduled', JobStatus::scheduled->value)
             ->setParameter('now', new DateTime())
             ->setParameter('processing', JobStatus::processing->value)
             ->setParameter('workerId', $workerId)
+            ->setParameter('threshold', $threshold)
             ->getQuery()
             ->execute();
     }
