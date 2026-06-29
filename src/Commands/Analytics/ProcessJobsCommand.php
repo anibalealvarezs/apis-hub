@@ -139,8 +139,8 @@ use Enums\JobStatus;
                     $this->logger->info("Resumption: Reset ".($resetByInstance + $resetByWorker)." jobs previously held by this instance ({$envInstance}).");
                 }
 
-                // Global recovery: If this is the Master (has docker socket), detect dead containers
-                $isMaster = file_exists('/var/run/docker.sock');
+                // Global recovery: If this is the Master (identified by INSTANCE_NAME containing 'master')
+                $isMaster = str_contains($envInstance, 'master') && file_exists('/var/run/docker.sock');
 
                 if ($isMaster) {
                     // 1. Reset by Timeout (Safety net for other issues, increased to 2 hours)
