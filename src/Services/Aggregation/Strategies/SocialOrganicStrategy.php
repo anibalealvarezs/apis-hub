@@ -39,6 +39,19 @@
             bool            $isPostgres
         ): ?array
         {
+            $filters = $plan->getFilters();
+            if ($filters !== null) {
+                $filterResolver = new FilterConditionResolver();
+                foreach ((array)$filters as $key => $value) {
+                    if (in_array((string)$key, ['channeledAccount', 'page', 'post', 'page_platform_id'], true)) {
+                        $condition = $filterResolver->resolve($value);
+                        if ($this->isSentinelEmptyFilter($condition)) {
+                            return [];
+                        }
+                    }
+                }
+            }
+
             $strategies = $plan->getCandidateOptimizedStrategies();
 
             if (in_array(self::KEY.'_page_summary', $strategies, true)) {
