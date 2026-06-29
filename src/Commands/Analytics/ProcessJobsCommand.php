@@ -225,6 +225,7 @@ use Enums\JobStatus;
                 if ($jobId) {
                     $job = $jobRepo->find($jobId);
                 } else {
+                    $this->logger->info("WORKER DEBUG ($envInstance): Attempting to claim job... [Tier: " . ($workerTier ?? 'none') . " | Channel: " . ($envChannel ?? 'none') . "]");
                     $job = $jobRepo->claimAvailableJob(
                         status: [JobStatus::scheduled->value, JobStatus::delayed->value],
                         workerId: $envInstance,
@@ -233,7 +234,9 @@ use Enums\JobStatus;
                         workerTier: $workerTier
                     );
                     if (!$job) {
-                        $this->logger->error("WORKER DEBUG ($envInstance): Found no jobs! Channel: ".($envChannel ?? 'none')." Tier: ".($workerTier ?? 'none'));
+                        $this->logger->info("WORKER DEBUG ($envInstance): Found no jobs! Queue empty or locked.");
+                    } else {
+                        $this->logger->info("WORKER DEBUG ($envInstance): CLAIMED job " . $job->getUuid() . " successfully.");
                     }
                 }
 

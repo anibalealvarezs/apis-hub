@@ -51,6 +51,15 @@
     try {
         $logger = Helpers::setLogger('cli.log');
         ErrorHandler::register($logger);
+        $configDir = Helpers::getConfigDir();
+        $mandatoryFiles = ['database.yaml', 'security.yaml', 'app.yaml'];
+        foreach ($mandatoryFiles as $mFile) {
+            if (!file_exists($configDir.'/'.$mFile)) {
+                $logger->error("FATAL CLI ERROR: Missing mandatory config file '$mFile' in $configDir.");
+                die("FATAL CLI ERROR: Missing mandatory config file '$mFile' in $configDir. Run configuration UI or sync settings.\n");
+            }
+        }
+        $logger->info("CLI BOOTSTRAP SUCCESSFUL on instance: " . getenv('INSTANCE_NAME'));
         $cliConfig = Helpers::getCliConfig();
         ini_set('memory_limit', $cliConfig['memory_limit'] ?? '1G');
 
@@ -126,8 +135,14 @@
 
         // Runs console application
         try {
+            if (isset($logger)) {
+                $logger->info("CLI RUNNING commands on instance: " . getenv('INSTANCE_NAME'));
+            }
             $cli->run();
         } catch (\Throwable $e) {
+            if (isset($logger)) {
+                $logger->error("CLI FATAL ERROR (" . getenv('INSTANCE_NAME') . "): " . $e->getMessage());
+            }
             \Helpers\Helpers::setLogger('jobs.log')->error("CLI FATAL ERROR (" . getenv('INSTANCE_NAME') . "): " . $e->getMessage());
             throw $e;
         }
