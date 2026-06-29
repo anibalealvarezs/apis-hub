@@ -1011,7 +1011,7 @@ class JobRepository extends BaseRepository
             if (isset($this->_em) && $this->_em->getConnection()->isTransactionActive()) {
                 $this->_em->rollback();
             }
-            error_log("Error in claimAvailableJob: ".$e->getMessage());
+            \Helpers\Helpers::setLogger('jobs.log')->error("Error in claimAvailableJob: ".$e->getMessage());
 
             return null;
         }

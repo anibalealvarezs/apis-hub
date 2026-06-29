@@ -125,7 +125,12 @@
         $cli->addCommands($commands);
 
         // Runs console application
-        $cli->run();
+        try {
+            $cli->run();
+        } catch (\Throwable $e) {
+            \Helpers\Helpers::setLogger('jobs.log')->error("CLI FATAL ERROR (" . getenv('INSTANCE_NAME') . "): " . $e->getMessage());
+            throw $e;
+        }
     } catch (ConfigurationException $e) {
         fwrite(STDERR, "\n[Configuration Error]\n".$e->getMessage()."\n\n");
         exit(1);

@@ -47,6 +47,7 @@ use Enums\JobStatus;
         {
             $this->em = $em ?? Helpers::getManager();
             $this->logger = Helpers::setLogger('jobs.log');
+            $this->logger->info("ProcessJobsCommand INSTANTIATED by " . getenv('INSTANCE_NAME'));
             parent::__construct();
 
         }
@@ -89,6 +90,7 @@ use Enums\JobStatus;
          */
         protected function execute(InputInterface $input, OutputInterface $output): int
         {
+            $this->logger->info("WORKER IS EXECUTING: " . getenv('INSTANCE_NAME'));
             Helpers::clearConfigCache();
             $channelsConfig = Helpers::getChannelsConfig();
             $envInstance = getenv('INSTANCE_NAME') ?: gethostname();
@@ -230,6 +232,9 @@ use Enums\JobStatus;
                         instanceName: ($forceAll || $isGenericWorker ? null : $envInstance),
                         workerTier: $workerTier
                     );
+                    if (!$job) {
+                        $this->logger->error("WORKER DEBUG ($envInstance): Found no jobs! Channel: ".($envChannel ?? 'none')." Tier: ".($workerTier ?? 'none'));
+                    }
                 }
 
                 if (!$job) {
@@ -248,20 +253,23 @@ use Enums\JobStatus;
                     $requiredInstances = array_map('trim', explode(',', $requires));
                     $allMet = true;
                     $accountId = $params['account_id'] ?? null;
+                    $missingDependency = '';
                     foreach ($requiredInstances as $requiredInstance) {
                         // Historical chunks (e.g. 2026-1) might have completed more than 24 hours ago.
                         // We pass 87600 hours (10 years) to ensure they are recognized regardless of completion date.
                         if (!$jobRepo->hasSuccessfulRecentJob($requiredInstance, 87600, $accountId)) {
                             $allMet = false;
-
+                            $missingDependency = $requiredInstance;
                             break;
                         }
                     }
                     if (!$allMet) {
+                        $msg = "Job depends on '{$missingDependency}' which has no successful recent execution.";
+                        $this->logger->warning("Job {$job->getUuid()} (Channel: {$job->getChannel()}) depends on '{$missingDependency}' which has no successful recent execution. Skipping.");
                         if (Helpers::isDebug() || $output->isVerbose()) {
                             $output->writeln("<comment>Job {$job->getUuid()} dependencies not met. Moving to delayed.</comment>");
                         }
-                        $jobRepo->update($job->getId(), (object)['status' => JobStatus::delayed->value]);
+                        $jobRepo->update($job->getId(), (object)['status' => JobStatus::delayed->value, 'message' => $msg]);
                         $stats['skipped']++;
 
                         continue;
