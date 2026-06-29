@@ -994,7 +994,11 @@ class JobRepository extends BaseRepository
                 $params['worker_tier'] = $workerTier;
             }
 
+            \Helpers\Helpers::setLogger('jobs.log')->info("WORKER DEBUG: Executing claimAvailableJob query with params: " . json_encode($params));
+
             $jobId = $this->_em->getConnection()->fetchOne($sql, $params);
+            
+            \Helpers\Helpers::setLogger('jobs.log')->info("WORKER DEBUG: claimAvailableJob returned job ID: " . ($jobId ?: 'NULL'));
 
             if ($jobId) {
                 $this->_em->commit();
