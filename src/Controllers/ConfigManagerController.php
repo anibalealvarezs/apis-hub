@@ -368,7 +368,7 @@
                             $updatedConfig = $driver->updateConfiguration($data, $currentConfig);
 
                             // Inject cron_time globally if present in payload, according to tenant's native format
-                            if (isset($data['cron_time']) && preg_match('/^(\d{1,2}):(\d{2})$/', $data['cron_time'], $matches)) {
+                            if (isset($data['cron_time']) && preg_match('/^(\d{1,2}):(\d{2})(?::\d{2})?$/', $data['cron_time'], $matches)) {
                                 $hour = (int)$matches[1];
                                 $minute = (int)$matches[2];
                                 
