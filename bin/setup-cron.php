@@ -163,7 +163,7 @@ foreach ($instances as $instance) {
                 continue;
             }
 
-            $accountId = $account['id'] ?? null;
+            $accountId = $account['id'] ?? $account['identifier'] ?? $account['url'] ?? $account['platformId'] ?? $account['location_id'] ?? null;
             if (!$accountId) {
                 continue;
             }

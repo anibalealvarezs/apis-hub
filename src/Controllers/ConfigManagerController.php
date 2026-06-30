@@ -376,16 +376,24 @@
                                 // Offset by 4 hours to match standard YAML (e.g. entities at 2:00, recent at 6:00)
                                 $entitiesHour = ($hour - 4 + 24) % 24;
                                 
-                                if (isset($updatedConfig['channels'][$chan])) {
-                                    $updatedConfig['channels'][$chan]['cron_entities_hour'] = $entitiesHour;
-                                    $updatedConfig['channels'][$chan]['cron_entities_minute'] = $minute;
-                                    $updatedConfig['channels'][$chan]['cron_recent_hour'] = $hour;
-                                    $updatedConfig['channels'][$chan]['cron_recent_minute'] = $minute;
+                                $isNested = isset($updatedConfig['channels'][$chan]);
+                                $target = $isNested ? $updatedConfig['channels'][$chan] : $updatedConfig;
+                                $originalTarget = $isNested ? ($currentConfig['channels'][$chan] ?? []) : $currentConfig;
+
+                                if (array_key_exists('cron_entities_hour', $originalTarget)) {
+                                    $target['cron_entities_hour'] = $entitiesHour;
+                                    $target['cron_entities_minute'] = $minute;
+                                }
+
+                                if (array_key_exists('cron_recent_hour', $originalTarget)) {
+                                    $target['cron_recent_hour'] = $hour;
+                                    $target['cron_recent_minute'] = $minute;
+                                }
+
+                                if ($isNested) {
+                                    $updatedConfig['channels'][$chan] = $target;
                                 } else {
-                                    $updatedConfig['cron_entities_hour'] = $entitiesHour;
-                                    $updatedConfig['cron_entities_minute'] = $minute;
-                                    $updatedConfig['cron_recent_hour'] = $hour;
-                                    $updatedConfig['cron_recent_minute'] = $minute;
+                                    $updatedConfig = $target;
                                 }
                             }
 
