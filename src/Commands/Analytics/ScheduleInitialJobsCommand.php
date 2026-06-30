@@ -295,7 +295,10 @@ class ScheduleInitialJobsCommand extends Command
                         $newStart = $jobParams['startDate'] ?? $jobParams['start_date'] ?? null;
                         $newEnd = $jobParams['endDate'] ?? $jobParams['end_date'] ?? null;
 
-                        if ($oldStart === $newStart && $oldEnd === $newEnd) {
+                        // If the start date shifted forward but the end date is the same,
+                        // this is just the rolling history window shrinking the oldest chunk.
+                        // We do NOT need to reschedule it as the data it fetches is a strict subset.
+                        if (($oldStart === $newStart && $oldEnd === $newEnd) || ($oldEnd === $newEnd && $newStart > $oldStart)) {
                             $shouldSchedule = false;
                         } else {
                             $jobStatus = (int)$lastJob['status'];
