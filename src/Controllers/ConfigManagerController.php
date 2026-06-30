@@ -367,12 +367,21 @@
                             $currentConfig = file_exists($attrs['path']) ? (Yaml::parseFile($attrs['path']) ?: []) : [];
                             $updatedConfig = $driver->updateConfiguration($data, $currentConfig);
 
-                            // Inject cron_time globally if present in payload
-                            if (isset($data['cron_time'])) {
+                            // Inject cron_time globally if present in payload, according to tenant's native format
+                            if (isset($data['cron_time']) && preg_match('/^(\d{1,2}):(\d{2})$/', $data['cron_time'], $matches)) {
+                                $hour = (int)$matches[1];
+                                $minute = (int)$matches[2];
+                                
                                 if (isset($updatedConfig['channels'][$chan])) {
-                                    $updatedConfig['channels'][$chan]['cron_time'] = $data['cron_time'];
+                                    $updatedConfig['channels'][$chan]['cron_entities_hour'] = $hour;
+                                    $updatedConfig['channels'][$chan]['cron_entities_minute'] = $minute;
+                                    $updatedConfig['channels'][$chan]['cron_recent_hour'] = $hour;
+                                    $updatedConfig['channels'][$chan]['cron_recent_minute'] = $minute;
                                 } else {
-                                    $updatedConfig['cron_time'] = $data['cron_time'];
+                                    $updatedConfig['cron_entities_hour'] = $hour;
+                                    $updatedConfig['cron_entities_minute'] = $minute;
+                                    $updatedConfig['cron_recent_hour'] = $hour;
+                                    $updatedConfig['cron_recent_minute'] = $minute;
                                 }
                             }
 
