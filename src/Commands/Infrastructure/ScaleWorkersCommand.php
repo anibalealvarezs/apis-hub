@@ -51,6 +51,9 @@
             // 3. Calculate Demand Per Tier
             $demandTier2 = 0;
             $demandTier4 = 0;
+            
+            $activeChannelsTier2 = [];
+            $activeChannelsTier4 = [];
 
             foreach ($activeJobs as $job) {
                 $tier = $channelTiers[$job->getChannel()] ?? 2;
@@ -68,10 +71,15 @@
 
                 if ($tier === 4) {
                     $demandTier4 += $jobDemand;
+                    $activeChannelsTier4[$job->getChannel()] = true;
                 } else {
                     $demandTier2 += $jobDemand;
+                    $activeChannelsTier2[$job->getChannel()] = true;
                 }
             }
+            
+            $uniqueChannelsTier2 = count($activeChannelsTier2);
+            $uniqueChannelsTier4 = count($activeChannelsTier4);
 
             // 4. Apply Scaling Formula
             $config = Helpers::getProjectConfig();
@@ -88,6 +96,14 @@
             } else {
                 $tier2Count = (int)ceil($demandTier2 / $jobsPerWorker);
                 $tier4Count = (int)ceil($demandTier4 / $jobsPerWorker);
+                
+                // Guarantee at least 1 worker per active channel to ensure parallel execution
+                if ($tier2Count < $uniqueChannelsTier2) {
+                    $tier2Count = $uniqueChannelsTier2;
+                }
+                if ($tier4Count < $uniqueChannelsTier4) {
+                    $tier4Count = $uniqueChannelsTier4;
+                }
                 
                 // Ensure at least minWorkers for the active tier, usually Tier 2
                 if ($demandTier2 > 0 && $tier2Count < $minWorkers) {
