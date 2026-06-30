@@ -372,13 +372,17 @@
                                 $hour = (int)$matches[1];
                                 $minute = (int)$matches[2];
                                 
+                                // Entities sync must run before recent data to ensure entities exist in DB
+                                // Offset by 4 hours to match standard YAML (e.g. entities at 2:00, recent at 6:00)
+                                $entitiesHour = ($hour - 4 + 24) % 24;
+                                
                                 if (isset($updatedConfig['channels'][$chan])) {
-                                    $updatedConfig['channels'][$chan]['cron_entities_hour'] = $hour;
+                                    $updatedConfig['channels'][$chan]['cron_entities_hour'] = $entitiesHour;
                                     $updatedConfig['channels'][$chan]['cron_entities_minute'] = $minute;
                                     $updatedConfig['channels'][$chan]['cron_recent_hour'] = $hour;
                                     $updatedConfig['channels'][$chan]['cron_recent_minute'] = $minute;
                                 } else {
-                                    $updatedConfig['cron_entities_hour'] = $hour;
+                                    $updatedConfig['cron_entities_hour'] = $entitiesHour;
                                     $updatedConfig['cron_entities_minute'] = $minute;
                                     $updatedConfig['cron_recent_hour'] = $hour;
                                     $updatedConfig['cron_recent_minute'] = $minute;
