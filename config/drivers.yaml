@@ -77,19 +77,7 @@ amazon:
       "vendors",
       "product_categories",
     ]
-bigcommerce:
-  driver: 'Anibalealvarezs\BigCommerceHubDriver\Drivers\BigCommerceDriver'
-  auth: 'Anibalealvarezs\BigCommerceHubDriver\Auth\BigCommerceAuthProvider'
-  entities:
-    [
-      "metrics",
-      "orders",
-      "products",
-      "customers",
-      "product_variants",
-      "vendors",
-      "product_categories",
-    ]
+
 pinterest:
   driver: 'Anibalealvarezs\PinterestHubDriver\Drivers\PinterestDriver'
   auth: 'Anibalealvarezs\PinterestHubDriver\Auth\PinterestAuthProvider'
@@ -109,10 +97,7 @@ tiktok:
   driver: 'Anibalealvarezs\TikTokHubDriver\Drivers\TikTokDriver'
   auth: 'Anibalealvarezs\TikTokHubDriver\Auth\TikTokAuthProvider'
   entities: ["metrics"]
-triplewhale:
-  driver: 'Anibalealvarezs\TripleWhaleHubDriver\Drivers\TripleWhaleDriver'
-  auth: 'Anibalealvarezs\TripleWhaleHubDriver\Auth\TripleWhaleAuthProvider'
-  entities: ["metrics"]
+
 facebook_leads:
   parent: facebook
   resource_key: pages
