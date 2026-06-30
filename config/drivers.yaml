@@ -64,20 +64,6 @@ klaviyo:
       "product_categories",
       "discounts",
     ]
-netsuite:
-  driver: 'Anibalealvarezs\NetSuiteHubDriver\Drivers\NetSuiteDriver'
-  auth: 'Anibalealvarezs\NetSuiteHubDriver\Auth\NetSuiteAuthProvider'
-  processor: ['Classes\Requests\MetricRequests', "persist"]
-  entities:
-    [
-      "metrics",
-      "orders",
-      "products",
-      "customers",
-      "product_variants",
-      "vendors",
-      "product_categories",
-    ]
 amazon:
   driver: 'Anibalealvarezs\AmazonHubDriver\Drivers\AmazonDriver'
   auth: 'Anibalealvarezs\AmazonHubDriver\Auth\AmazonAuthProvider'
