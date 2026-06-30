@@ -6,19 +6,13 @@ rules:
     enabled: false
     history_months: 6
     entities_sync: entities
-    recent_cron_hour: 5
-    recent_cron_minute: 30
   
   facebook_organic:
     enabled: false
     history_months: 12
     entities_sync: entities
-    recent_cron_hour: 6
-    recent_cron_minute: 30
 
   gsc:
     enabled: false
     history_months: 16
     entities_sync: ~
-    recent_cron_hour: 7
-    recent_cron_minute: 0

@@ -95,13 +95,38 @@ foreach ($instances as $instance) {
     $overrideHour = null;
     $overrideMinute = null;
     
-    // Determine if this is an "entities" or "recent" job based on instance name
-    if (str_contains($instanceName, 'entities')) {
-        $overrideHour = $channelConfig['cron_entities_hour'] ?? ($config['cron']['entities_hour'] ?? null);
-        $overrideMinute = $channelConfig['cron_entities_minute'] ?? ($config['cron']['entities_minute'] ?? null);
-    } elseif (str_contains($instanceName, 'recent')) {
-        $overrideHour = $channelConfig['cron_recent_hour'] ?? ($config['cron']['recent_hour'] ?? null);
-        $overrideMinute = $channelConfig['cron_recent_minute'] ?? ($config['cron']['recent_minute'] ?? null);
+    // Evaluate unified cron_time if present
+    if (isset($channelConfig['cron_time']) && preg_match('/^(\d{1,2}):(\d{2})$/', $channelConfig['cron_time'], $matches)) {
+        $overrideHour = (int)$matches[1];
+        $overrideMinute = (int)$matches[2];
+    } else {
+        // Fallback to legacy config if present
+        if (str_contains($instanceName, 'entities')) {
+            $overrideHour = $channelConfig['cron_entities_hour'] ?? null;
+            $overrideMinute = $channelConfig['cron_entities_minute'] ?? null;
+        } elseif (str_contains($instanceName, 'recent')) {
+            $overrideHour = $channelConfig['cron_recent_hour'] ?? null;
+            $overrideMinute = $channelConfig['cron_recent_minute'] ?? null;
+        }
+
+        // If STILL null (user hasn't saved UI and no legacy config), apply dynamic stagger
+        if ($overrideHour === null) {
+            static $activeChannels = null;
+            if ($activeChannels === null) {
+                $activeChannels = [];
+                foreach ($instances as $inst) {
+                    if (!empty($inst['channel']) && !in_array($inst['channel'], $activeChannels)) {
+                        $activeChannels[] = $inst['channel'];
+                    }
+                }
+            }
+            $index = array_search($channel, $activeChannels);
+            if ($index === false) $index = 0;
+            
+            $totalMinutes = 4 * 60 + ($index * 15);
+            $overrideHour = floor($totalMinutes / 60) % 24;
+            $overrideMinute = $totalMinutes % 60;
+        }
     }
 
     if ($overrideHour !== null) {
