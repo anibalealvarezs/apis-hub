@@ -96,7 +96,7 @@ foreach ($instances as $instance) {
     $overrideMinute = null;
     
     // Evaluate unified cron_time if present
-    if (isset($channelConfig['cron_time']) && preg_match('/^(\d{1,2}):(\d{2})$/', $channelConfig['cron_time'], $matches)) {
+    if (isset($channelConfig['cron_time']) && preg_match('/^(\d{1,2}):(\d{2})(?::\d{2})?$/', $channelConfig['cron_time'], $matches)) {
         $overrideHour = (int)$matches[1];
         $overrideMinute = (int)$matches[2];
     } else {

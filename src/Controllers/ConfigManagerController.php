@@ -366,7 +366,7 @@
                             // 2. Delegate YAML processing to Driver
                             $currentConfig = file_exists($attrs['path']) ? (Yaml::parseFile($attrs['path']) ?: []) : [];
                             $updatedConfig = $driver->updateConfiguration($data, $currentConfig);
-                            
+
                             // Inject cron_time globally if present in payload
                             if (isset($data['cron_time'])) {
                                 if (isset($updatedConfig['channels'][$chan])) {
