@@ -124,7 +124,7 @@ class JobRepository extends BaseRepository
             $redis = Helpers::getRedisClient();
             if ($redis) {
                 $cache = CacheService::getInstance($redis);
-                if (!$cache->exists('last_scale_check')) {
+                if (! $cache->exists('last_scale_check')) {
                     $cache->set('last_scale_check', time(), 5);
                     $phpBin = '/usr/local/bin/php';
                     if (file_exists('/app/bin/cli.php')) {
@@ -632,7 +632,7 @@ class JobRepository extends BaseRepository
             ->set('e.message', ':message')
             ->set('e.updatedAt', ':now')
             ->where('e.status = :processing')
-            ->andWhere('(e.updatedAt < :threshold OR e.updatedAt > :now)')
+            ->andWhere('e.updatedAt < :threshold')
             ->setParameter('scheduled', JobStatus::scheduled->value)
             ->setParameter('message', "Rescheduled orphaned job (timed out after {$timeoutMinutes} minutes)")
             ->setParameter('processing', JobStatus::processing->value)
@@ -998,7 +998,7 @@ class JobRepository extends BaseRepository
             \Helpers\Helpers::setLogger('jobs.log')->info("WORKER DEBUG: Executing claimAvailableJob query with params: " . json_encode($params));
 
             $jobId = $this->_em->getConnection()->fetchOne($sql, $params);
-            
+
             \Helpers\Helpers::setLogger('jobs.log')->info("WORKER DEBUG: claimAvailableJob returned job ID: " . ($jobId ?: 'NULL'));
 
             if ($jobId) {
@@ -1046,7 +1046,7 @@ class JobRepository extends BaseRepository
         if (getenv('BILLING_TIER') === 'free') {
             return 1;
         }
-        
+
         try {
             $maxWorkers = $this->_em->createQueryBuilder()
                 ->select('c.maxWorkers')
@@ -1081,7 +1081,7 @@ class JobRepository extends BaseRepository
             ->set('e.workerId', ':null')
             ->set('e.updatedAt', ':now')
             ->where('e.status = :processing')
-            ->andWhere('(e.updatedAt <= :since OR e.updatedAt > :now)')
+            ->andWhere('e.updatedAt <= :since')
             ->setParameter('scheduled', JobStatus::scheduled->value)
             ->setParameter('message', "Job timed out after ".$minutes." minutes, rescheduled automatically")
             ->setParameter('null', null)

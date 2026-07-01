@@ -913,6 +913,12 @@
                     $config = self::getDbConfig();
                     self::$connection = DriverManager::getConnection($config);
 
+                    // Force the connection timezone to match PHP's timezone to avoid NOW() mismatch
+                    $timezone = date_default_timezone_get();
+                    if (($config['driver'] ?? '') === 'pdo_pgsql') {
+                        self::$connection->executeStatement("SET TIME ZONE '$timezone'");
+                    }
+
                     $ormConfig = ORMSetup::createAttributeMetadataConfiguration(
                         paths: array_merge([__DIR__.'/../Entities'], EntityRegistry::getAll()),
                         isDevMode: true
