@@ -143,50 +143,48 @@ use Enums\JobStatus;
                 $isMaster = str_contains($envInstance, 'master') && file_exists('/var/run/docker.sock');
 
                 if ($isMaster) {
-                    // 1. Reset by Timeout (Safety net for other issues, increased to 2 hours)
-                    $jobRepo->resetAllOrphanedJobs(120);
+                    // 1. Reset by Timeout (Safety net for other issues, increased to 60 minutes instead of 120)
+                    $jobRepo->resetAllOrphanedJobs(60);
 
-                    // 2. Reset by Dead Containers (Accurate detection via Docker Socket API)
-                    $activeContainersStr = '';
-                    $ch = curl_init('http://localhost/containers/json');
-                    curl_setopt($ch, CURLOPT_UNIX_SOCKET_PATH, '/var/run/docker.sock');
-                    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                    $response = curl_exec($ch);
-                    curl_close($ch);
+                    // 2. Reset by Dead Containers (Accurate detection via Docker CLI)
+                    exec('docker ps --format "{{.ID}}|{{.Names}}" 2>&1', $dockerOutput, $dockerReturn);
 
-                    if ($response) {
-                        $containers = json_decode($response, true);
-                        if (is_array($containers)) {
-                            $activeIds = [];
-                            foreach ($containers as $container) {
-                                $shortId = substr($container['Id'], 0, 12);
+                    if ($dockerReturn === 0 && !empty($dockerOutput)) {
+                        $activeIds = [];
+                        foreach ($dockerOutput as $line) {
+                            $parts = explode('|', trim($line));
+                            if (count($parts) >= 2) {
+                                $shortId = $parts[0];
+                                $nameStr = $parts[1]; // Comma-separated if multiple names
+                                
                                 $activeIds[] = $shortId;
-                                $activeIds[] = "worker-".$shortId;
+                                $activeIds[] = "worker-" . $shortId;
 
-                                if (!empty($container['Names'])) {
-                                    foreach ($container['Names'] as $name) {
-                                        $cleanName = ltrim($name, '/');
-                                        $activeIds[] = $cleanName;
+                                $names = explode(',', $nameStr);
+                                foreach ($names as $name) {
+                                    $cleanName = ltrim(trim($name), '/');
+                                    $activeIds[] = $cleanName;
 
-                                        // Dynamically support all suffix matches to avoid deployment prefix mismatches
-                                        $parts = explode('-', $cleanName);
-                                        $numParts = count($parts);
-                                        for ($i = 1; $i < $numParts; $i++) {
-                                            $suffix = implode('-', array_slice($parts, $i));
-                                            $activeIds[] = $suffix;
-                                        }
+                                    // Dynamically support all suffix matches to avoid deployment prefix mismatches
+                                    $nameParts = explode('-', $cleanName);
+                                    $numParts = count($nameParts);
+                                    for ($i = 1; $i < $numParts; $i++) {
+                                        $suffix = implode('-', array_slice($nameParts, $i));
+                                        $activeIds[] = $suffix;
                                     }
                                 }
                             }
-
-                            // Also include ourselves and known master/specific instances
-                            $activeIds[] = $envInstance;
-
-                            $resetDead = $jobRepo->resetJobsByDeadWorkers($activeIds);
-                            if ($resetDead > 0) {
-                                $this->logger->info("Cleanup: Reset {$resetDead} jobs from dead containers.");
-                            }
                         }
+
+                        // Also include ourselves and known master/specific instances
+                        $activeIds[] = $envInstance;
+
+                        $resetDead = $jobRepo->resetJobsByDeadWorkers($activeIds);
+                        if ($resetDead > 0) {
+                            $this->logger->info("Cleanup: Reset {$resetDead} jobs from dead containers.");
+                        }
+                    } else {
+                        $this->logger->warning("Cleanup: Failed to run docker ps for container discovery. Return code: $dockerReturn");
                     }
                     
                     $this->logger->info("Master watchdog routine complete. Master instance will not process jobs.");
