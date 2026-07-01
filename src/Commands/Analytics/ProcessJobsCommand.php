@@ -143,8 +143,8 @@ use Enums\JobStatus;
                 $isMaster = str_contains($envInstance, 'master') && file_exists('/var/run/docker.sock');
 
                 if ($isMaster) {
-                    // 1. Reset by Timeout (Safety net for other issues, increased to 60 minutes instead of 120)
-                    $jobRepo->resetAllOrphanedJobs(60);
+                    // 1. Reset by Timeout (Safety net for other issues, using configurable timeout)
+                    $jobRepo->resetAllOrphanedJobs($timeoutMinutes);
 
                     // 2. Reset by Dead Containers (Accurate detection via Docker CLI)
                     exec('docker ps --format "{{.ID}}|{{.Names}}" 2>&1', $dockerOutput, $dockerReturn);
