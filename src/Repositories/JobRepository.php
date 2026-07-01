@@ -632,7 +632,7 @@ class JobRepository extends BaseRepository
             ->set('e.message', ':message')
             ->set('e.updatedAt', ':now')
             ->where('e.status = :processing')
-            ->andWhere('e.updatedAt < :threshold')
+            ->andWhere('(e.updatedAt < :threshold OR e.updatedAt > :now)')
             ->setParameter('scheduled', JobStatus::scheduled->value)
             ->setParameter('message', "Rescheduled orphaned job (timed out after {$timeoutMinutes} minutes)")
             ->setParameter('processing', JobStatus::processing->value)
@@ -974,7 +974,7 @@ class JobRepository extends BaseRepository
                     LIMIT 1
                     FOR UPDATE OF j SKIP LOCKED
                 )
-                UPDATE jobs SET status = {$processingStatus}, worker_id = :worker_id, updated_at = NOW()
+                UPDATE jobs SET status = {$processingStatus}, worker_id = :worker_id, updated_at = :now
                 WHERE id = (SELECT id FROM RankedJobs)
                 -- Job-level advisory lock (prevents two workers claiming the exact same job)
                 AND pg_try_advisory_xact_lock(hashtext(channel || '|' || entity || '|' || COALESCE(payload->>'account_id', payload->'params'->>'account_id', payload->>'instance_name', 'global')))
@@ -982,6 +982,7 @@ class JobRepository extends BaseRepository
 
             $params = [
                 'worker_id' => $workerId,
+                'now' => (new \DateTime())->format('Y-m-d H:i:s'),
             ];
             if ($channel) {
                 $params['channel'] = $channel;
@@ -1080,7 +1081,7 @@ class JobRepository extends BaseRepository
             ->set('e.workerId', ':null')
             ->set('e.updatedAt', ':now')
             ->where('e.status = :processing')
-            ->andWhere('e.updatedAt <= :since')
+            ->andWhere('(e.updatedAt <= :since OR e.updatedAt > :now)')
             ->setParameter('scheduled', JobStatus::scheduled->value)
             ->setParameter('message', "Job timed out after ".$minutes." minutes, rescheduled automatically")
             ->setParameter('null', null)
