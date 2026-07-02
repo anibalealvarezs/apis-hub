@@ -52,8 +52,11 @@ class NuclearResyncCommand extends Command
         // 1. Delete jobs
         try {
             $conn = $this->entityManager->getConnection();
-            $placeholders = implode(',', array_fill(0, count($channels), '?'));
-            $deleted = $conn->executeStatement("DELETE FROM jobs WHERE channel IN ($placeholders)", array_values($channels));
+            $deleted = $conn->executeStatement(
+                "DELETE FROM jobs WHERE channel IN (?)",
+                [array_values($channels)],
+                [\Doctrine\DBAL\Connection::PARAM_STR_ARRAY]
+            );
             $output->writeln("<info>✓ Deleted $deleted jobs for targeted channels.</info>");
         } catch (\Throwable $e) {
             $output->writeln("<error>✗ DB error: " . $e->getMessage() . "</error>");
