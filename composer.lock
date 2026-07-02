@@ -142,13 +142,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/api-client-skeleton.git",
-                "reference": "6bd36b9ef786953e929584816c10dbd86ecd6ae5"
+                "reference": "bd5f52bedba1fce4e7c9c42ade7d0ed9d2563a22"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/api-client-skeleton/anibalealvarezs-api-client-skeleton-6bd36b9ef786953e929584816c10dbd86ecd6ae5-zip-a7dd52.zip",
-                "reference": "6bd36b9ef786953e929584816c10dbd86ecd6ae5",
-                "shasum": "c6a5aa28f2a55c29bc33bb2cde90dc107b6f1cf8"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/api-client-skeleton/anibalealvarezs-api-client-skeleton-bd5f52bedba1fce4e7c9c42ade7d0ed9d2563a22-zip-f80c5d.zip",
+                "reference": "bd5f52bedba1fce4e7c9c42ade7d0ed9d2563a22",
+                "shasum": "9771510cfa5c1ccd0d325f59c3c32d47da10c078"
             },
             "require": {
                 "anibalealvarezs/oauth-v1": "^1.0.0",
@@ -197,7 +197,7 @@
             "support": {
                 "issues": "https://github.com/anibalealvarezs/api-client-skeleton/issues"
             },
-            "time": "2026-06-23T20:53:35+00:00"
+            "time": "2026-07-02T20:56:26+00:00"
         },
         {
             "name": "anibalealvarezs/api-driver-core",
