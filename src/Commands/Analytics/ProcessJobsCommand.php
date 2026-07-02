@@ -434,7 +434,10 @@ use Enums\JobStatus;
                                         'error' => $e->getMessage()
                                     ];
                                     
-                                    $ch = curl_init(rtrim($facadeUrl, '/') . '/api/channels/auth-failed');
+                                    $parsedUrl = parse_url($facadeUrl);
+                                    $baseUrl = $parsedUrl['scheme'] . '://' . $parsedUrl['host'] . (isset($parsedUrl['port']) ? ':' . $parsedUrl['port'] : '');
+                                    
+                                    $ch = curl_init($baseUrl . '/api/channels/auth-failed');
                                     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
                                     curl_setopt($ch, CURLOPT_POST, true);
                                     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payloadData));
