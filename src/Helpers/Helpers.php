@@ -1249,6 +1249,12 @@
 
             // This can be expanded to include patterns from other platforms (e.g., Meta)
             // if they have distinct messages for revoked credentials vs. temporary issues.
+            if (str_contains($message, 'OAuthException') && str_contains($message, 'Code: 190')) {
+                return true;
+            }
+            if (str_contains($message, 'Error validating access token')) {
+                return true;
+            }
 
             return false;
         }
