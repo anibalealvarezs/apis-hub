@@ -55,7 +55,7 @@ class NuclearResyncCommand extends Command
             $deleted = $conn->executeStatement(
                 "DELETE FROM jobs WHERE channel IN (?)",
                 [array_values($channels)],
-                [\Doctrine\DBAL\Connection::PARAM_STR_ARRAY]
+                [\Doctrine\DBAL\ArrayParameterType::STRING]
             );
             $output->writeln("<info>✓ Deleted $deleted jobs for targeted channels.</info>");
         } catch (\Throwable $e) {
