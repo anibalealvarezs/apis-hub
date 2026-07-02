@@ -411,21 +411,13 @@ use Enums\JobStatus;
                     try {
                         $payload = is_string($job->getPayload()) ? json_decode($job->getPayload(), true) : $job->getPayload();
                         $accountId = $payload['account_id'] ?? $payload['params']['account_id'] ?? null;
+                        
                         if ($accountId) {
-                            $caRepo = $this->em->getRepository(\Entities\Analytics\Channeled\ChanneledAccount::class);
-                            $channeledAccount = $caRepo->findOneBy([
-                                'channel' => $job->getChannel(),
-                                'platformId' => $accountId
-                            ]);
-                            if ($channeledAccount) {
-                                // We no longer disable the account, we just notify Facade.
-                                // The jobs will remain failed and won't be retried until re-authentication.
-                                
-                                $output->writeln("<comment>Permanent auth error for ChanneledAccount {$accountId} on channel {$job->getChannel()}. Notifying Facade...</comment>");
-                                
-                                // Notify Facade to clear connection
-                                $facadeUrl = getenv('MONITOR_FACADE_URL') ?: ($_ENV['MONITOR_FACADE_URL'] ?? null);
-                                $token = getenv('MONITOR_TOKEN') ?: ($_ENV['MONITOR_TOKEN'] ?? null);
+                            $output->writeln("<comment>Permanent auth error for account {$accountId} on channel {$job->getChannel()}. Notifying Facade...</comment>");
+                            
+                            // Notify Facade to clear connection
+                            $facadeUrl = getenv('MONITOR_FACADE_URL') ?: ($_ENV['MONITOR_FACADE_URL'] ?? null);
+                            $token = getenv('MONITOR_TOKEN') ?: ($_ENV['MONITOR_TOKEN'] ?? null);
                                 
                                 if ($facadeUrl && $token) {
                                     $payloadData = [
@@ -456,7 +448,6 @@ use Enums\JobStatus;
                                     }
                                     curl_close($ch);
                                 }
-                            }
                         }
                     } catch (Throwable $caError) {
                         $this->logger->error("Failed to process permanent auth error for ChanneledAccount: " . $caError->getMessage());
