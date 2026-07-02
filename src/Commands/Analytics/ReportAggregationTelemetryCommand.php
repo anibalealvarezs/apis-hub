@@ -75,10 +75,43 @@
          */
         private function readJsonPayload(string $inputPath): array
         {
-            if (!is_file($inputPath)) {
-                throw new \RuntimeException(sprintf('Input file not found: %s', $inputPath));
+            if (is_dir($inputPath)) {
+                return $this->readDirectoryPayload($inputPath);
             }
 
+            if (!is_file($inputPath)) {
+                throw new \RuntimeException(sprintf('Input file or directory not found: %s', $inputPath));
+            }
+
+            return $this->readFilePayload($inputPath);
+        }
+
+        private function readDirectoryPayload(string $directoryPath): array
+        {
+            $events = [];
+            $files = glob(rtrim($directoryPath, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . '*.jsonl');
+            if ($files === false || $files === []) {
+                throw new \RuntimeException(sprintf('No .jsonl files found in directory: %s', $directoryPath));
+            }
+
+            foreach ($files as $file) {
+                try {
+                    $payload = $this->readFilePayload($file);
+                    $fileEvents = $this->isList($payload) ? $payload : ($payload['events'] ?? []);
+                    if (is_array($fileEvents)) {
+                        $events = array_merge($events, $fileEvents);
+                    }
+                } catch (\Throwable $e) {
+                    // Skip files that fail to parse
+                    continue;
+                }
+            }
+
+            return $events;
+        }
+
+        private function readFilePayload(string $inputPath): array
+        {
             $raw = file_get_contents($inputPath);
             if ($raw === false) {
                 throw new \RuntimeException(sprintf('Unable to read input file: %s', $inputPath));

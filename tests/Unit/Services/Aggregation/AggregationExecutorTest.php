@@ -217,12 +217,15 @@
                     endDate: '2026-04-30',
                 );
 
+                $date = date('Y-m-d');
+                $suffixedPath = substr($telemetryPath, 0, -6) . '-' . $date . '.jsonl';
+
                 $this->assertSame('optimized', $result->getMeta()['execution_path']);
                 $this->assertSame('optimized', $result->getMeta()['planned_execution_path']);
                 $this->assertSame(['weighted_metric'], $result->getMeta()['candidate_optimized_strategies']);
-                $this->assertFileExists($telemetryPath);
+                $this->assertFileExists($suffixedPath);
 
-                $lines = file($telemetryPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+                $lines = file($suffixedPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
                 $this->assertIsArray($lines);
                 $this->assertCount(1, $lines);
                 $event = json_decode((string)$lines[0], true, 512, JSON_THROW_ON_ERROR);
@@ -231,7 +234,9 @@
                 $this->assertSame(['daily'], $event['group_by']);
                 $this->assertSame('optimized', $event['planned_execution_path']);
             } finally {
-                @unlink($telemetryPath);
+                $date = date('Y-m-d');
+                $suffixedPath = substr($telemetryPath, 0, -6) . '-' . $date . '.jsonl';
+                @unlink($suffixedPath);
             }
         }
 
@@ -314,10 +319,13 @@
                     endDate: '2026-04-30',
                 );
 
-                $this->assertSame('optimized', $result->getMeta()['execution_path']);
-                $this->assertFileExists($telemetryPath);
+                $date = date('Y-m-d');
+                $suffixedPath = substr($telemetryPath, 0, -6) . '-' . $date . '.jsonl';
 
-                $lines = file($telemetryPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+                $this->assertSame('optimized', $result->getMeta()['execution_path']);
+                $this->assertFileExists($suffixedPath);
+
+                $lines = file($suffixedPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
                 $this->assertIsArray($lines);
                 $this->assertCount(1, $lines);
                 $event = json_decode((string)$lines[0], true, 512, JSON_THROW_ON_ERROR);
@@ -327,7 +335,9 @@
                 $this->assertSame('cost_per_conversion', $event['metric_resolution']['resolved_metrics'][0]['canonical_metric']);
                 $this->assertSame(['results', 'results_daily'], $event['metric_resolution']['resolved_metrics'][0]['raw_names']);
             } finally {
-                @unlink($telemetryPath);
+                $date = date('Y-m-d');
+                $suffixedPath = substr($telemetryPath, 0, -6) . '-' . $date . '.jsonl';
+                @unlink($suffixedPath);
             }
         }
     }

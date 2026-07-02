@@ -147,10 +147,13 @@
                 filters: (object)['country' => 117, 'channel' => 1]
             );
 
-            $this->assertCount(1, $results);
-            $this->assertFileExists($this->telemetryPath);
+            $date = date('Y-m-d');
+            $suffixedPath = substr($this->telemetryPath, 0, -6) . '-' . $date . '.jsonl';
 
-            $lines = file($this->telemetryPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+            $this->assertCount(1, $results);
+            $this->assertFileExists($suffixedPath);
+
+            $lines = file($suffixedPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
             $this->assertIsArray($lines);
             $this->assertCount(1, $lines);
 
@@ -161,5 +164,6 @@
             $this->assertSame(['channel', 'country'], $event['filter_keys']);
             $this->assertSame(['dimensions.country'], $event['group_by']);
             $this->assertSame(['position'], $event['aggregation_aliases']);
+            @unlink($suffixedPath);
         }
     }

@@ -55,7 +55,7 @@
         private function resolveOutputPath(): ?string
         {
             if (is_string($this->outputPath) && trim($this->outputPath) !== '') {
-                return $this->outputPath;
+                return $this->applyDateSuffix($this->outputPath);
             }
 
             $path = getenv('AGGREGATION_TELEMETRY_PATH');
@@ -67,6 +67,15 @@
                 $path = __DIR__.'/../../../storage/logs/aggregation-telemetry.jsonl';
             }
 
-            return trim($path) !== '' ? $path : null;
+            return trim($path) !== '' ? $this->applyDateSuffix($path) : null;
+        }
+
+        private function applyDateSuffix(string $path): string
+        {
+            $date = date('Y-m-d');
+            if (str_ends_with($path, '.jsonl')) {
+                return substr($path, 0, -6) . '-' . $date . '.jsonl';
+            }
+            return $path . '-' . $date;
         }
     }
