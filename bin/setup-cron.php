@@ -176,7 +176,9 @@ foreach ($instances as $instance) {
                 $paramString = ' --params="' . http_build_query($accountParams) . '"';
             }
 
-            $cronLines[] = "{$frequency} cd /app && /usr/local/bin/php bin/cli.php apis-hub:cache \"{$channel}\" \"{$entity}\"{$paramString} > /dev/null 2>&1";
+            $cmd = "cd /app && /usr/local/bin/php bin/cli.php apis-hub:cache \"{$channel}\" \"{$entity}\"{$paramString} > /dev/null 2>&1";
+            $cmd = str_replace('%', '\%', $cmd);
+            $cronLines[] = "{$frequency} {$cmd}";
         }
     } else {
         $paramString = "";
@@ -184,7 +186,9 @@ foreach ($instances as $instance) {
             $paramString = ' --params="' . http_build_query($params) . '"';
         }
 
-        $cronLines[] = "{$frequency} cd /app && /usr/local/bin/php bin/cli.php apis-hub:cache \"{$channel}\" \"{$entity}\"{$paramString} > /dev/null 2>&1";
+        $cmd = "cd /app && /usr/local/bin/php bin/cli.php apis-hub:cache \"{$channel}\" \"{$entity}\"{$paramString} > /dev/null 2>&1";
+        $cmd = str_replace('%', '\%', $cmd);
+        $cronLines[] = "{$frequency} {$cmd}";
     }
 }
 
