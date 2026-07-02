@@ -38,6 +38,7 @@
     use RuntimeException;
     use Symfony\Component\Yaml\Yaml;
     use Throwable;
+    use Anibalealvarezs\ApiSkeleton\Classes\Exceptions\PermanentAuthenticationException;
 
     class Helpers
     {
@@ -1237,6 +1238,10 @@
          */
         public static function isAuthenticationRevokedException(Throwable $e): bool
         {
+            if ($e instanceof PermanentAuthenticationException) {
+                return true;
+            }
+
             $message = $e->getMessage();
 
             // Google's "invalid_grant" is a strong indicator of a revoked refresh token.
@@ -1245,15 +1250,6 @@
                 if (str_contains($message, 'Token has been expired or revoked') || str_contains($message, 'Bad Request')) {
                     return true;
                 }
-            }
-
-            // This can be expanded to include patterns from other platforms (e.g., Meta)
-            // if they have distinct messages for revoked credentials vs. temporary issues.
-            if (str_contains($message, 'OAuthException') && str_contains($message, 'Code: 190')) {
-                return true;
-            }
-            if (str_contains($message, 'Error validating access token')) {
-                return true;
             }
 
             return false;

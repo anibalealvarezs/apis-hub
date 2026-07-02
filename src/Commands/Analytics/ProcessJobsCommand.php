@@ -364,6 +364,10 @@ use Enums\JobStatus;
                     if ($result instanceof Response && $result->getStatusCode() >= 400) {
                         $content = json_decode($result->getContent(), true);
 
+                        if ($result->getStatusCode() === Response::HTTP_UNAUTHORIZED) {
+                            throw new PermanentAuthenticationException($content['error'] ?? $content['message'] ?? 'Authentication revoked');
+                        }
+
                         throw new Exception($content['error'] ?? 'Unknown error from fetchData');
                     }
 
