@@ -295,17 +295,12 @@ class ScheduleInitialJobsCommand extends Command
                         $newStart = $jobParams['startDate'] ?? $jobParams['start_date'] ?? null;
                         $newEnd = $jobParams['endDate'] ?? $jobParams['end_date'] ?? null;
 
-                        $startDiffDays = 0;
-                        if ($oldStart && $newStart) {
-                            $startDiffDays = abs(strtotime($newStart) - strtotime($oldStart)) / 86400;
-                        }
+                        $oldEndDate = $oldEnd ? date('Y-m-d', strtotime($oldEnd)) : null;
+                        $newEndDate = $newEnd ? date('Y-m-d', strtotime($newEnd)) : null;
 
-                        // If the start date shifted forward but the end date is the same,
-                        // this is just the rolling history window shrinking the oldest chunk.
-                        // We also tolerate a backward jitter of up to 4 days to prevent redundant scheduling
-                        // caused by month-length variations (e.g., Feb 28 vs Mar 2) when using relative '-X months' limits.
-                        // We do NOT need to reschedule it as the data it fetches is a strict subset or essentially identical.
-                        if (($oldStart === $newStart && $oldEnd === $newEnd) || ($oldEnd === $newEnd && ($newStart > $oldStart || $startDiffDays <= 4))) {
+                        // Only reschedule if the end date has moved.
+                        // Changes in the start date are usually just the rolling history window shrinking the oldest chunk.
+                        if ($oldEndDate === $newEndDate) {
                             $shouldSchedule = false;
                         } else {
                             $jobStatus = (int)$lastJob['status'];
