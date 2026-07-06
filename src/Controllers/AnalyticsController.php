@@ -80,6 +80,16 @@ class AnalyticsController extends BaseController
                 $sdkMethod = 'calculateMacd';
             } elseif (!empty($payload['calculate_anomaly'])) {
                 $sdkMethod = 'calculateAnomaly';
+            } elseif (!empty($payload['calculate_trend_linear'])) {
+                $sdkMethod = 'calculateTrendLinear';
+            } elseif (!empty($payload['calculate_trend_sma'])) {
+                $sdkMethod = 'calculateTrendSma';
+            } elseif (!empty($payload['calculate_trend_ema'])) {
+                $sdkMethod = 'calculateTrendEma';
+            } elseif (!empty($payload['calculate_trend_holt_winters'])) {
+                $sdkMethod = 'calculateTrendHoltWinters';
+            } elseif (!empty($payload['calculate_trend_logarithmic'])) {
+                $sdkMethod = 'calculateTrendLogarithmic';
             }
 
             // Forward to Python Analytics Engine if requested
