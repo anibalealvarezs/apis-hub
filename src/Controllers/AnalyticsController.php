@@ -131,7 +131,7 @@ class AnalyticsController extends BaseController
                     // Apply the chosen zero-handling strategy
                     switch ($zeroHandling) {
                         case 'keep':
-                            $finalDates = $alignedDates;
+                            $finalDates = array_map('strval', $alignedDates);
                             $yValues = $alignedY;
                             $xValues = $alignedX;
                             break;
@@ -150,7 +150,7 @@ class AnalyticsController extends BaseController
                                 $yValues = [];
                                 $xValues = [];
                             } else {
-                                $finalDates = array_slice($alignedDates, $firstNonZero, $lastNonZero - $firstNonZero + 1);
+                                $finalDates = array_map('strval', array_slice($alignedDates, $firstNonZero, $lastNonZero - $firstNonZero + 1));
                                 $yValues = array_slice($alignedY, $firstNonZero, $lastNonZero - $firstNonZero + 1);
                                 $xValues = array_slice($alignedX, $firstNonZero, $lastNonZero - $firstNonZero + 1);
                             }
@@ -160,7 +160,7 @@ class AnalyticsController extends BaseController
                         default:
                             foreach ($alignedDates as $i => $date) {
                                 if (!empty($alignedY[$i]) && !empty($alignedX[$i])) {
-                                    $finalDates[] = $date;
+                                    $finalDates[] = (string)$date;
                                     $yValues[] = $alignedY[$i];
                                     $xValues[] = $alignedX[$i];
                                 }
