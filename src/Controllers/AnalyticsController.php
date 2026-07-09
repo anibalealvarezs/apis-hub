@@ -289,8 +289,13 @@ class AnalyticsController extends BaseController
                         $result = $qb->getQuery()->getResult();
 
                         // Some channels (e.g. GSC) store platformId as MD5 hash of the URL
-                        if (empty($result) && !$isArray) {
-                            $qb->setParameter('platformId', md5(trim($platformId)));
+                        if (empty($result)) {
+                            if ($isArray) {
+                                $hashedIds = array_map(fn($id) => md5(trim($id)), $platformId);
+                                $qb->setParameter('platformId', $hashedIds);
+                            } else {
+                                $qb->setParameter('platformId', md5(trim($platformId)));
+                            }
                             $result = $qb->getQuery()->getResult();
                         }
 
