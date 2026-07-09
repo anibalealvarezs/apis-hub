@@ -173,12 +173,16 @@ class AnalyticsController extends BaseController
                     $removedX = $originalXSize - $finalSize;
 
                     if ($finalSize < 2) {
-                        return $this->errorResponse(
-                            "Not enough overlapping non-zero data points for regression. Found: {$finalSize}. " .
-                            "Original Dependent (Y) size: {$originalYSize} (Removed: {$removedY}). " .
-                            "Original Independent (X) size: {$originalXSize} (Removed: {$removedX}).",
-                            500
-                        );
+                        return new JsonResponse([
+                            'success' => true,
+                            'data' => [
+                                'labels' => [],
+                                'datasets' => [],
+                                '_debug' => "Not enough overlapping non-zero data points for regression. Found: {$finalSize}. " .
+                                    "Original Dependent (Y) size: {$originalYSize} (Removed: {$removedY}). " .
+                                    "Original Independent (X) size: {$originalXSize} (Removed: {$removedX})."
+                            ]
+                        ]);
                     }
                         
                         $regressionPayload = [
