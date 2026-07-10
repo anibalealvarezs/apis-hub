@@ -168,6 +168,16 @@ class AnalyticsController extends BaseController
                             break;
                     }
 
+                    // Apply dimension-based grouping for bivariate stats (e.g., group low-frequency queries/pages into "others")
+                    if (!empty($payload['grouping']['enabled']) && $requiresBivariate) {
+                        $grouped = $this->applyGroupByDimensionGrouping(
+                            $finalDates, $yValues, $xValues, $payload['grouping']
+                        );
+                        $finalDates = $grouped['dates'];
+                        $yValues = $grouped['y'];
+                        $xValues = $grouped['x'];
+                    }
+
                     $finalSize = count($finalDates);
                     $removedY = $originalYSize - $finalSize;
                     $removedX = $originalXSize - $finalSize;
@@ -185,6 +195,10 @@ class AnalyticsController extends BaseController
                         ]);
                     }
                         
+                        $edgeCaseHandling = $payload['edge_case_handling'] ?? $payload['grouping'] ?? [
+                            'weighted' => true,
+                            'grouping' => 'none',
+                        ];
                         $regressionPayload = [
                             'dependent_var' => [
                                 'dates' => $finalDates,
@@ -195,7 +209,8 @@ class AnalyticsController extends BaseController
                                     'dates' => $finalDates,
                                     'values' => $xValues
                                 ]
-                            ]
+                            ],
+                            'edge_case_handling' => $edgeCaseHandling,
                         ];
                         if (!$requiresBivariate) {
                             // Strip dummy independent vars for univariate payloads to keep it clean
@@ -251,6 +266,67 @@ class AnalyticsController extends BaseController
             // Forward the Python engine's HTTP error message if possible
             throw new \Exception("Analytics Engine Error: " . $e->getMessage());
         }
+    }
+
+    /**
+     * Group low-frequency dimension values (queries, pages, etc.) into a single "others" point
+     * so outliers with very few events don't skew the regression line.
+     *
+     * Supported methods:
+     *  - 'percentile' (default): groups the bottom N% of points sorted by the independent variable (x).
+     *    The grouped points are replaced by their centroid (mean x, mean y) labeled as $label.
+     *
+     * @param array $dates  Dimension labels (query strings, page URLs, etc.)
+     * @param array $y      Dependent variable values
+     * @param array $x      Independent variable values (used as frequency proxy)
+     * @param array $config Grouping configuration
+     * @return array  ['dates' => string[], 'y' => float[], 'x' => float[]]
+     */
+    protected function applyGroupByDimensionGrouping(array $dates, array $y, array $x, array $config): array
+    {
+        $n = count($dates);
+        if ($n < 3) {
+            return ['dates' => $dates, 'y' => $y, 'x' => $x];
+        }
+
+        $method = $config['method'] ?? 'percentile';
+        $value  = (float)($config['value'] ?? 25);
+        $label  = $config['label'] ?? 'others';
+
+        if ($method === 'percentile') {
+            // Clamp percentile between 5 and 50
+            $value = max(5, min(50, $value));
+            $thresholdIndex = (int)ceil($n * $value / 100);
+            $thresholdIndex = max(1, min($thresholdIndex, $n - 1));
+
+            // Build combined tuple, sort by x ascending
+            $combined = [];
+            for ($i = 0; $i < $n; $i++) {
+                $combined[] = ['date' => $dates[$i], 'y' => $y[$i], 'x' => $x[$i]];
+            }
+            usort($combined, fn($a, $b) => $a['x'] <=> $b['x']);
+
+            $low  = array_slice($combined, 0, $thresholdIndex);
+            $high = array_slice($combined, $thresholdIndex);
+
+            // Single aggregated centroid for the low-frequency tail
+            $meanX = array_sum(array_column($low, 'x')) / count($low);
+            $meanY = array_sum(array_column($low, 'y')) / count($low);
+
+            $result = array_merge(
+                [['date' => $label, 'y' => $meanY, 'x' => $meanX]],
+                $high
+            );
+            usort($result, fn($a, $b) => $a['x'] <=> $b['x']);
+
+            return [
+                'dates' => array_column($result, 'date'),
+                'y'     => array_column($result, 'y'),
+                'x'     => array_column($result, 'x'),
+            ];
+        }
+
+        return ['dates' => $dates, 'y' => $y, 'x' => $x];
     }
 
     protected function errorResponse(string $message, int $code): JsonResponse
