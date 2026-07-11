@@ -220,7 +220,11 @@ class AnalyticsController extends BaseController
                         $result = $pythonResponse['data'] ?? $pythonResponse;
                         
                         if (isset($result['scatter_data']) && !empty($finalDates)) {
-                            $result['scatter_data']['labels'] = array_values($finalDates);
+                            // Use Python's labels if available (correctly ordered after histogram grouping),
+                            // otherwise fall back to original $finalDates order
+                            if (empty($result['scatter_data']['labels'])) {
+                                $result['scatter_data']['labels'] = array_values($finalDates);
+                            }
                         }
                     } else {
                         return $this->errorResponse("The mathematical payload requires time-series array evaluation. Pass groupBy: ['daily'] in filters.", 500);
