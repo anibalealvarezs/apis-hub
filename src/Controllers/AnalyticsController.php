@@ -112,6 +112,25 @@ class AnalyticsController extends BaseController
                 }
                 
                 if (is_array($ySeriesRaw) && is_array($xSeriesRaw)) {
+                    // Normalize page URL keys across different sources (e.g. GA4 stores
+                    // relative paths like "/es/" while GSC stores full URLs like
+                    // "https://anibalalvarez.com/es/"). Extract just the path component
+                    // from full URLs so keys match across channels.
+                    $normalizeKey = function (string $key): string {
+                        if (preg_match('#^https?://[^/]+(/.*)$#', $key, $matches)) {
+                            return $matches[1] ?: '/';
+                        }
+                        return $key;
+                    };
+                    $ySeriesRaw = array_combine(
+                        array_map($normalizeKey, array_keys($ySeriesRaw)),
+                        array_values($ySeriesRaw)
+                    );
+                    $xSeriesRaw = array_combine(
+                        array_map($normalizeKey, array_keys($xSeriesRaw)),
+                        array_values($xSeriesRaw)
+                    );
+
                     $originalYSize = count($ySeriesRaw);
                     $originalXSize = count($xSeriesRaw);
 
