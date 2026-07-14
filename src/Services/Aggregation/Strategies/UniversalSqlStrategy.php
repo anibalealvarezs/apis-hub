@@ -116,9 +116,23 @@
                 )");
                     $safeLeftJoin('dimension_values', "dv_$dimAlias", "dsi_$dimAlias.dimension_value_id = dv_$dimAlias.id");
 
-                    $selectFields[] = "COALESCE(dv_$dimAlias.value, 'unknown') AS $quotedField";
-                    $groupByFields[] = "dv_$dimAlias.value";
-                    $orderMap[$field] = "dv_$dimAlias.value";
+                    // Fallback dimension for metrics that store page-like data under an alternate key
+                    $fallbackExpr = "'unknown'";
+                    if ($dimKey === 'page') {
+                        $fbAlias = 'dim_landing_page';
+                        $sqlParams["key_$fbAlias"] = 'landing_page';
+                        $safeLeftJoin('dimension_set_items', "dsi_$fbAlias", "mc.dimension_set_id = dsi_$fbAlias.dimension_set_id AND dsi_$fbAlias.dimension_value_id IN (
+                        SELECT sub_dv.id FROM dimension_values sub_dv 
+                        JOIN dimension_keys sub_dk ON sub_dv.dimension_key_id = sub_dk.id 
+                        WHERE LOWER(sub_dk.name) = :key_$fbAlias
+                    )");
+                        $safeLeftJoin('dimension_values', "dv_$fbAlias", "dsi_$fbAlias.dimension_value_id = dv_$fbAlias.id");
+                        $fallbackExpr = "dv_$fbAlias.value, 'unknown'";
+                    }
+
+                    $selectFields[] = "COALESCE(dv_$dimAlias.value, $fallbackExpr) AS $quotedField";
+                    $groupByFields[] = "COALESCE(dv_$dimAlias.value, $fallbackExpr)";
+                    $orderMap[$field] = "COALESCE(dv_$dimAlias.value, $fallbackExpr)";
                     continue;
                 }
 
