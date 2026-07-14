@@ -129,14 +129,24 @@ class AnalyticsController extends BaseController
                         }
                         return $key;
                     };
-                    $ySeriesRaw = array_combine(
-                        array_map($normalizeKey, array_keys($ySeriesRaw)),
-                        array_values($ySeriesRaw)
-                    );
-                    $xSeriesRaw = array_combine(
-                        array_map($normalizeKey, array_keys($xSeriesRaw)),
-                        array_values($xSeriesRaw)
-                    );
+                    $mergeNormalized = function (array $data, callable $normalizeKey): array {
+                        $merged = [];
+                        foreach ($data as $key => $value) {
+                            $nKey = $normalizeKey((string)$key);
+                            if (!isset($merged[$nKey])) {
+                                $merged[$nKey] = ['sum' => 0.0, 'count' => 0];
+                            }
+                            $merged[$nKey]['sum'] += (float)$value;
+                            $merged[$nKey]['count']++;
+                        }
+                        $result = [];
+                        foreach ($merged as $nKey => $item) {
+                            $result[$nKey] = $item['sum'] / $item['count'];
+                        }
+                        return $result;
+                    };
+                    $ySeriesRaw = $mergeNormalized($ySeriesRaw, $normalizeKey);
+                    $xSeriesRaw = $mergeNormalized($xSeriesRaw, $normalizeKey);
 
                     $originalYSize = count($ySeriesRaw);
                     $originalXSize = count($xSeriesRaw);
