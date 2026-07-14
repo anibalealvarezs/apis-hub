@@ -118,10 +118,10 @@ class AnalyticsController extends BaseController
                     // from full URLs so keys match across channels, and strip query
                     // parameters that GA4 may include (e.g. "/es/?gad_source=1").
                     $normalizeKey = function (string $key): string {
-                        if (preg_match('#^https?://[^/]+(/.*)$#', $key, $matches)) {
-                            $key = $matches[1] ?: '/';
-                        } elseif (preg_match('#^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}(/.*)$#', $key, $matches)) {
-                            $key = $matches[1] ?: '/';
+                        if (preg_match('#^https?://[^/]+(/.*)?$#', $key, $matches)) {
+                            $key = !empty($matches[1]) ? $matches[1] : '/';
+                        } elseif (preg_match('#^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}(/.*)?$#', $key, $matches)) {
+                            $key = !empty($matches[1]) ? $matches[1] : '/';
                         }
                         $queryPos = strpos($key, '?');
                         if ($queryPos !== false) {
