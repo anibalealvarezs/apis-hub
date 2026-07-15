@@ -235,7 +235,18 @@ class AnalyticsController extends BaseController
                         ]);
                     }
                         
-                        if ($requiresBivariate) {
+                        // Python engine schema varies by endpoint:
+                        //   /trend/* endpoints expect a flat 'series' key
+                        //   all others (macd, anomaly, autocorrelation, regression, etc.) expect dependent_var/independent_vars
+                        $isTrendStat = str_starts_with($sdkMethod, 'calculateTrend');
+                        if ($isTrendStat) {
+                            $enginePayload = [
+                                'series' => [
+                                    'dates' => $finalDates,
+                                    'values' => $yValues,
+                                ],
+                            ];
+                        } else {
                             $edgeCaseHandling = $payload['edge_case_handling'] ?? $payload['grouping'] ?? [
                                 'weighted' => true,
                                 'grouping' => 'none',
@@ -252,15 +263,6 @@ class AnalyticsController extends BaseController
                                     ]
                                 ],
                                 'edge_case_handling' => $edgeCaseHandling,
-                            ];
-                        } else {
-                            // Univariate stats (trend, macd, anomaly, autocorrelation, etc.)
-                            // expect a flat 'series' key, not dependent_var/independent_vars
-                            $enginePayload = [
-                                'series' => [
-                                    'dates' => $finalDates,
-                                    'values' => $yValues,
-                                ],
                             ];
                         }
                         $pythonResponse = $this->forwardToPythonEngine($enginePayload, $sdkMethod, $engineHost, $apiKey);
