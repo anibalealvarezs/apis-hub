@@ -164,6 +164,10 @@ class AnalyticsController extends BaseController
                         $alignedX[] = (float)$xSeriesRaw[$date];
                     }
 
+                    $finalDates = [];
+                    $yValues = [];
+                    $xValues = [];
+
                     // Apply the chosen zero-handling strategy
                     switch ($zeroHandling) {
                         case 'keep':
