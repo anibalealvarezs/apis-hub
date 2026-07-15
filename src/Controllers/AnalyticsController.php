@@ -235,28 +235,35 @@ class AnalyticsController extends BaseController
                         ]);
                     }
                         
-                        $edgeCaseHandling = $payload['edge_case_handling'] ?? $payload['grouping'] ?? [
-                            'weighted' => true,
-                            'grouping' => 'none',
-                        ];
-                        $regressionPayload = [
-                            'dependent_var' => [
-                                'dates' => $finalDates,
-                                'values' => $yValues
-                            ],
-                            'independent_vars' => [
-                                'x1' => [
+                        if ($requiresBivariate) {
+                            $edgeCaseHandling = $payload['edge_case_handling'] ?? $payload['grouping'] ?? [
+                                'weighted' => true,
+                                'grouping' => 'none',
+                            ];
+                            $enginePayload = [
+                                'dependent_var' => [
                                     'dates' => $finalDates,
-                                    'values' => $xValues
-                                ]
-                            ],
-                            'edge_case_handling' => $edgeCaseHandling,
-                        ];
-                        if (!$requiresBivariate) {
-                            // Strip dummy independent vars for univariate payloads to keep it clean
-                            $regressionPayload['independent_vars'] = (object)[];
+                                    'values' => $yValues
+                                ],
+                                'independent_vars' => [
+                                    'x1' => [
+                                        'dates' => $finalDates,
+                                        'values' => $xValues
+                                    ]
+                                ],
+                                'edge_case_handling' => $edgeCaseHandling,
+                            ];
+                        } else {
+                            // Univariate stats (trend, macd, anomaly, autocorrelation, etc.)
+                            // expect a flat 'series' key, not dependent_var/independent_vars
+                            $enginePayload = [
+                                'series' => [
+                                    'dates' => $finalDates,
+                                    'values' => $yValues,
+                                ],
+                            ];
                         }
-                        $pythonResponse = $this->forwardToPythonEngine($regressionPayload, $sdkMethod, $engineHost, $apiKey);
+                        $pythonResponse = $this->forwardToPythonEngine($enginePayload, $sdkMethod, $engineHost, $apiKey);
                         $result = $pythonResponse['data'] ?? $pythonResponse;
                         
                         if (isset($result['scatter_data']) && !empty($finalDates)) {
