@@ -24,11 +24,11 @@ return [
         'httpMethod' => 'POST',
         'callable' => function (?string $body = null, ?array $params = null) {
             $logger = \Helpers\Helpers::setLogger('nuclear_resync.log');
-            $logger->info("=== NUCLEAR RESYNC INITIATED VIA API ===");
+            $logger->warning("ROUTE: callable invoked");
             $input = (array) \Helpers\Helpers::bodyToObject(data: $body);
             $channel = $input['channel'] ?? $params['channel'] ?? null;
             $asset = $input['asset'] ?? $params['asset'] ?? null;
-            $logger->info("ROUTE: channel=" . ($channel ?? 'all') . ", asset=" . ($asset ?? 'none'));
+            $logger->warning("ROUTE: body parsed, channel=" . ($channel ?? 'none') . ", asset=" . ($asset ?? 'none'));
             $ctrl = new CacheController();
             return $ctrl->triggerHistoricalResync($channel, $asset);
         },
