@@ -35,21 +35,25 @@ class NuclearResyncCommand extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
+        $logger = Helpers::setLogger('nuclear_resync.log');
         $channelArg = $input->getOption('channel');
         $assetArg = $input->getOption('asset');
         
         if (empty($channelArg)) {
+            $logger->error("No channels provided for resync.");
             $output->writeln("<error>No channels provided for resync.</error>");
             return Command::FAILURE;
         }
 
         $channels = array_filter(array_map('trim', explode(',', $channelArg)));
         if (empty($channels)) {
+            $logger->error("Invalid channel list provided.");
             $output->writeln("<error>Invalid channel list provided.</error>");
             return Command::FAILURE;
         }
 
         $assetInfo = $assetArg ? " (Asset: {$assetArg})" : "";
+        $logger->info("Nuclear Resync starting for channels: " . implode(', ', $channels) . $assetInfo);
         $output->writeln("<info>Nuclear Resync starting for channels: <comment>" . implode(', ', $channels) . "</comment>{$assetInfo}</info>");
 
         // 1. Delete jobs
