@@ -449,11 +449,15 @@
 
         public function triggerHistoricalResync(?string $channel = null, ?string $asset = null): Response
         {
+            $logger = Helpers::setLogger('nuclear_resync.log');
             $cliPath = realpath(dirname(__DIR__, 2) . '/bin/cli.php');
             $channelArg = ($channel && $channel !== 'all') ? '--channel=' . escapeshellarg($channel) : '';
             $assetArg = ($asset && $asset !== '') ? '--asset=' . escapeshellarg($asset) : '';
-            $command = "nohup php \"$cliPath\" app:nuclear-resync $channelArg $assetArg > /dev/null 2>&1 &";
-            exec($command);
+            $command = "php \"$cliPath\" app:nuclear-resync $channelArg $assetArg > /dev/null 2>&1 &";
+            
+            $logger->info("API triggerHistoricalResync executing command: {$command}");
+            exec($command, $outputLines, $returnCode);
+            $logger->info("API triggerHistoricalResync exec finished with code {$returnCode}");
 
             return $this->createResponse(
                 data: ['status' => 'initiated', 'message' => 'Nuclear resync is running in the background.'],
