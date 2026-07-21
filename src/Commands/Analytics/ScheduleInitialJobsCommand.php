@@ -39,6 +39,7 @@ class ScheduleInitialJobsCommand extends Command
     {
         $this->addOption('instance', null, InputOption::VALUE_OPTIONAL, 'Schedule only for this instance name');
         $this->addOption('channel', null, InputOption::VALUE_OPTIONAL, 'Schedule only for this channel');
+        $this->addOption('asset', null, InputOption::VALUE_OPTIONAL, 'Schedule only for this asset ID');
     }
 
     /**
@@ -52,6 +53,7 @@ class ScheduleInitialJobsCommand extends Command
         $instances = $config['instances'] ?? [];
         $targetInstance = $input->getOption('instance');
         $targetChannel = $input->getOption('channel');
+        $targetAsset = $input->getOption('asset');
 
         if (empty($instances)) {
             if (Helpers::isDebug()) {
@@ -236,6 +238,10 @@ class ScheduleInitialJobsCommand extends Command
                     $jobParams = $params;
                     if ($accountId) {
                         $jobParams['account_id'] = $accountId;
+                    }
+
+                    if ($targetAsset && ($accountId ?: null) !== $targetAsset) {
+                        continue;
                     }
 
                     $shouldSchedule = true;

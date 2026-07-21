@@ -30,11 +30,13 @@ class NuclearResyncCommand extends Command
     protected function configure(): void
     {
         $this->addOption('channel', null, InputOption::VALUE_REQUIRED, 'Target channels (comma-separated)');
+        $this->addOption('asset', null, InputOption::VALUE_OPTIONAL, 'Target single asset/account ID');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $channelArg = $input->getOption('channel');
+        $assetArg = $input->getOption('asset');
         
         if (empty($channelArg)) {
             $output->writeln("<error>No channels provided for resync.</error>");
@@ -47,17 +49,30 @@ class NuclearResyncCommand extends Command
             return Command::FAILURE;
         }
 
-        $output->writeln("<info>Nuclear Resync starting for channels: <comment>" . implode(', ', $channels) . "</comment></info>");
+        $assetInfo = $assetArg ? " (Asset: {$assetArg})" : "";
+        $output->writeln("<info>Nuclear Resync starting for channels: <comment>" . implode(', ', $channels) . "</comment>{$assetInfo}</info>");
 
         // 1. Delete jobs
         try {
             $conn = $this->entityManager->getConnection();
-            $deleted = $conn->executeStatement(
-                "DELETE FROM jobs WHERE channel IN (?)",
-                [array_values($channels)],
-                [\Doctrine\DBAL\ArrayParameterType::STRING]
-            );
-            $output->writeln("<info>✓ Deleted $deleted jobs for targeted channels.</info>");
+            if ($assetArg) {
+                $deleted = $conn->executeStatement(
+                    "DELETE FROM jobs WHERE channel IN (?) AND (
+                        CAST(payload AS text) LIKE ? 
+                        OR CAST(payload AS JSONB)->'params'->>'account_id' = ? 
+                        OR CAST(payload AS JSONB)->>'account_id' = ?
+                    )",
+                    [array_values($channels), '%account_id%' . $assetArg . '%', $assetArg, $assetArg],
+                    [\Doctrine\DBAL\ArrayParameterType::STRING, \PDO::PARAM_STR, \PDO::PARAM_STR, \PDO::PARAM_STR]
+                );
+            } else {
+                $deleted = $conn->executeStatement(
+                    "DELETE FROM jobs WHERE channel IN (?)",
+                    [array_values($channels)],
+                    [\Doctrine\DBAL\ArrayParameterType::STRING]
+                );
+            }
+            $output->writeln("<info>✓ Deleted $deleted jobs for targeted channels{$assetInfo}.</info>");
         } catch (\Throwable $e) {
             $output->writeln("<error>✗ DB error: " . $e->getMessage() . "</error>");
             return Command::FAILURE;
@@ -110,9 +125,13 @@ class NuclearResyncCommand extends Command
         foreach ($channels as $channel) {
             try {
                 $scheduleCmd = new ScheduleInitialJobsCommand($this->entityManager);
-                $scheduleInput = new ArrayInput(['--channel' => $channel]);
+                $scheduleInputParams = ['--channel' => $channel];
+                if ($assetArg) {
+                    $scheduleInputParams['--asset'] = $assetArg;
+                }
+                $scheduleInput = new ArrayInput($scheduleInputParams);
                 $scheduleCmd->run($scheduleInput, $output);
-                $output->writeln("<info>✓ Initial jobs scheduled for $channel.</info>");
+                $output->writeln("<info>✓ Initial jobs scheduled for $channel{$assetInfo}.</info>");
             } catch (\Throwable $e) {
                 $output->writeln("<error>✗ Schedule error for $channel: " . $e->getMessage() . "</error>");
             }
