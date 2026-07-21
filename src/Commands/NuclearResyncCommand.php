@@ -56,14 +56,26 @@ class NuclearResyncCommand extends Command
         try {
             $conn = $this->entityManager->getConnection();
             if ($assetArg) {
+                $cleanAsset = str_replace('act_', '', $assetArg);
                 $deleted = $conn->executeStatement(
                     "DELETE FROM jobs WHERE channel IN (?) AND (
                         CAST(payload AS text) LIKE ? 
+                        OR CAST(payload AS text) LIKE ?
+                        OR CAST(payload AS JSONB)->'params'->>'account_id' = ? 
                         OR CAST(payload AS JSONB)->'params'->>'account_id' = ? 
                         OR CAST(payload AS JSONB)->>'account_id' = ?
+                        OR CAST(payload AS JSONB)->>'account_id' = ?
                     )",
-                    [array_values($channels), '%account_id%' . $assetArg . '%', $assetArg, $assetArg],
-                    [\Doctrine\DBAL\ArrayParameterType::STRING, \PDO::PARAM_STR, \PDO::PARAM_STR, \PDO::PARAM_STR]
+                    [array_values($channels), '%' . $assetArg . '%', '%' . $cleanAsset . '%', $assetArg, 'act_' . $cleanAsset, $assetArg, 'act_' . $cleanAsset],
+                    [
+                        \Doctrine\DBAL\ArrayParameterType::STRING,
+                        \PDO::PARAM_STR,
+                        \PDO::PARAM_STR,
+                        \PDO::PARAM_STR,
+                        \PDO::PARAM_STR,
+                        \PDO::PARAM_STR,
+                        \PDO::PARAM_STR
+                    ]
                 );
             } else {
                 $deleted = $conn->executeStatement(
@@ -140,9 +152,11 @@ class NuclearResyncCommand extends Command
         $output->writeln("<comment>Worker restart is now handled externally by bin/nuclear-sync.sh to ensure graceful container lifecycle management.</comment>");
 
         // 4. Force invalidate telemetry cache at the end of the process
+        $telemetryService = new \Services\Sync\SyncTelemetryService(new \Services\CacheService(Helpers::getRedisClient()));
         foreach ($channels as $channel) {
             try {
                 $output->writeln("<info>Invalidating telemetry cache for $channel...</info>");
+                $telemetryService->invalidate($channel, $assetArg);
                 $invalidateSyncCacheCmd = new InvalidateSyncCacheCommand();
                 $invalidateSyncCacheInput = new ArrayInput(['--channel' => $channel]);
                 $invalidateSyncCacheCmd->run($invalidateSyncCacheInput, $output);

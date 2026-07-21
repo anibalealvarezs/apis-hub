@@ -240,8 +240,12 @@ class ScheduleInitialJobsCommand extends Command
                         $jobParams['account_id'] = $accountId;
                     }
 
-                    if ($targetAsset && ($accountId ?: null) !== $targetAsset) {
-                        continue;
+                    if ($targetAsset !== null && $targetAsset !== '') {
+                        $cleanTarget = str_replace('act_', '', (string) $targetAsset);
+                        $cleanAccount = str_replace('act_', '', (string) $accountId);
+                        if ($cleanAccount !== $cleanTarget) {
+                            continue;
+                        }
                     }
 
                     $shouldSchedule = true;
