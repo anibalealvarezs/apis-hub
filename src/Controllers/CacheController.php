@@ -453,7 +453,7 @@
             $cliPath = realpath(dirname(__DIR__, 2) . '/bin/cli.php');
             $channelArg = ($channel && $channel !== 'all') ? '--channel=' . escapeshellarg($channel) : '';
             $assetArg = ($asset && $asset !== '') ? '--asset=' . escapeshellarg($asset) : '';
-            $command = "nohup php \"$cliPath\" app:nuclear-resync $channelArg $assetArg < /dev/null > /dev/null 2>&1 &";
+            $command = "nohup php \"$cliPath\" app:nuclear-resync $channelArg $assetArg > /dev/null 2>&1 &";
             
             $logger->info("API triggerHistoricalResync executing command: {$command}");
             exec($command, $outputLines, $returnCode);
