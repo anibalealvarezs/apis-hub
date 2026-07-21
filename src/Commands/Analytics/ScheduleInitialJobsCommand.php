@@ -258,8 +258,13 @@ class ScheduleInitialJobsCommand extends Command
                             'instance_pattern' => '%instance_name%'.$name.'%',
                         ];
                         if ($accountId) {
-                            $sql .= " AND (CAST(j.payload AS JSONB)->'params'->>'account_id' = :account_id OR CAST(j.payload AS JSONB)->>'account_id' = :account_id)";
-                            $sqlParams['account_id'] = $accountId;
+                            $cleanAcc = str_replace('act_', '', (string)$accountId);
+                            $sql .= " AND (
+                                CAST(j.payload AS JSONB)->'params'->>'account_id' IN (:acc1, :acc2)
+                                OR CAST(j.payload AS JSONB)->>'account_id' IN (:acc1, :acc2)
+                            )";
+                            $sqlParams['acc1'] = (string)$accountId;
+                            $sqlParams['acc2'] = 'act_' . $cleanAcc;
                         } else {
                             $sql .= " AND (CAST(j.payload AS JSONB)->'params'->>'account_id' IS NULL AND CAST(j.payload AS JSONB)->>'account_id' IS NULL)";
                         }
@@ -291,8 +296,10 @@ class ScheduleInitialJobsCommand extends Command
                         $payloadObj = is_string($lastJob['payload']) ? json_decode($lastJob['payload'], true) : $lastJob['payload'];
                         $foundAcc = $payloadObj['params']['account_id'] ?? $payloadObj['account_id'] ?? null;
 
-                        // FINAL GUARD: If account IDs don't match, this is NOT a duplicate
-                        if (($accountId ?: null) !== ($foundAcc ?: null)) {
+                        // FINAL GUARD: If account IDs don't match (after normalizing act_ prefix), this is NOT a duplicate
+                        $cleanFound = $foundAcc ? str_replace('act_', '', (string)$foundAcc) : null;
+                        $cleanCurrent = $accountId ? str_replace('act_', '', (string)$accountId) : null;
+                        if ($cleanCurrent !== $cleanFound) {
                             $lastJob = null;
                         }
                     }
