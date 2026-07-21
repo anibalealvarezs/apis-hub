@@ -452,8 +452,12 @@
             $cliPath = realpath(dirname(__DIR__, 2) . '/bin/cli.php');
             $channelArg = ($channel && $channel !== 'all') ? '--channel=' . escapeshellarg($channel) : '';
             $assetArg = ($asset && $asset !== '') ? '--asset=' . escapeshellarg($asset) : '';
-            $command = "nohup php \"$cliPath\" app:nuclear-resync $channelArg $assetArg > /dev/null 2>&1 &";
-            exec($command);
+            
+            if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+                pclose(popen("start /B php \"$cliPath\" app:nuclear-resync $channelArg $assetArg", "r"));
+            } else {
+                exec("nohup php \"$cliPath\" app:nuclear-resync $channelArg $assetArg > /dev/null 2>&1 &");
+            }
 
             return $this->createResponse(
                 data: ['status' => 'initiated', 'message' => 'Nuclear resync is running in the background.'],
