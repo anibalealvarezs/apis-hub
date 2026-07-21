@@ -26,12 +26,11 @@ return [
             $logger = \Helpers\Helpers::setLogger('nuclear_resync.log');
             $logger->warning("ROUTE: callable invoked");
             $input = (array) \Helpers\Helpers::bodyToObject(data: $body);
-            $logger->warning("ROUTE: body parsed, channel=" . ($input['channel'] ?? 'none'));
             $channel = $input['channel'] ?? $params['channel'] ?? null;
-            $logger->warning("ROUTE: instantiating CacheController");
+            $asset = $input['asset'] ?? $params['asset'] ?? null;
+            $logger->warning("ROUTE: body parsed, channel=" . ($channel ?? 'none') . ", asset=" . ($asset ?? 'none'));
             $ctrl = new CacheController();
-            $logger->warning("ROUTE: calling triggerHistoricalResync");
-            return $ctrl->triggerHistoricalResync($channel);
+            return $ctrl->triggerHistoricalResync($channel, $asset);
         },
         'admin' => true
     ],

@@ -447,11 +447,12 @@
             }
         }
 
-        public function triggerHistoricalResync(?string $channel = null): Response
+        public function triggerHistoricalResync(?string $channel = null, ?string $asset = null): Response
         {
             $cliPath = realpath(dirname(__DIR__, 2) . '/bin/cli.php');
             $channelArg = ($channel && $channel !== 'all') ? '--channel=' . escapeshellarg($channel) : '';
-            $command = "nohup php \"$cliPath\" app:nuclear-resync $channelArg > /dev/null 2>&1 &";
+            $assetArg = ($asset && $asset !== '') ? '--asset=' . escapeshellarg($asset) : '';
+            $command = "nohup php \"$cliPath\" app:nuclear-resync $channelArg $assetArg > /dev/null 2>&1 &";
             exec($command);
 
             return $this->createResponse(
