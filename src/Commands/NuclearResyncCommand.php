@@ -56,25 +56,37 @@ class NuclearResyncCommand extends Command
         try {
             $conn = $this->entityManager->getConnection();
             if ($assetArg) {
-                $cleanAsset = str_replace('act_', '', $assetArg);
+                $cleanAsset = str_replace(['act_', 'properties/', 'sc-domain:', 'https://', 'http://'], '', $assetArg);
+                $cleanAsset = rtrim($cleanAsset, '/');
+                $md5Asset = md5($assetArg);
+                $md5Clean = md5($cleanAsset);
+
                 $deleted = $conn->executeStatement(
                     "DELETE FROM jobs WHERE channel IN (?) AND (
                         CAST(payload AS text) LIKE ? 
                         OR CAST(payload AS text) LIKE ?
-                        OR CAST(payload AS JSONB)->'params'->>'account_id' = ? 
-                        OR CAST(payload AS JSONB)->'params'->>'account_id' = ? 
-                        OR CAST(payload AS JSONB)->>'account_id' = ?
-                        OR CAST(payload AS JSONB)->>'account_id' = ?
+                        OR CAST(payload AS text) LIKE ?
+                        OR CAST(payload AS text) LIKE ?
+                        OR CAST(payload AS JSONB)->'params'->>'account_id' IN (?, ?, ?, ?, ?) 
+                        OR CAST(payload AS JSONB)->>'account_id' IN (?, ?, ?, ?, ?)
                     )",
-                    [array_values($channels), '%' . $assetArg . '%', '%' . $cleanAsset . '%', $assetArg, 'act_' . $cleanAsset, $assetArg, 'act_' . $cleanAsset],
+                    [
+                        array_values($channels),
+                        '%' . $assetArg . '%',
+                        '%' . $cleanAsset . '%',
+                        '%' . $md5Asset . '%',
+                        '%' . $md5Clean . '%',
+                        $assetArg, 'act_' . $cleanAsset, 'properties/' . $cleanAsset, $md5Asset, $md5Clean,
+                        $assetArg, 'act_' . $cleanAsset, 'properties/' . $cleanAsset, $md5Asset, $md5Clean
+                    ],
                     [
                         \Doctrine\DBAL\ArrayParameterType::STRING,
                         \PDO::PARAM_STR,
                         \PDO::PARAM_STR,
                         \PDO::PARAM_STR,
                         \PDO::PARAM_STR,
-                        \PDO::PARAM_STR,
-                        \PDO::PARAM_STR
+                        \PDO::PARAM_STR, \PDO::PARAM_STR, \PDO::PARAM_STR, \PDO::PARAM_STR, \PDO::PARAM_STR,
+                        \PDO::PARAM_STR, \PDO::PARAM_STR, \PDO::PARAM_STR, \PDO::PARAM_STR, \PDO::PARAM_STR
                     ]
                 );
             } else {

@@ -241,9 +241,7 @@ class ScheduleInitialJobsCommand extends Command
                     }
 
                     if ($targetAsset !== null && $targetAsset !== '') {
-                        $cleanTarget = str_replace('act_', '', (string) $targetAsset);
-                        $cleanAccount = str_replace('act_', '', (string) $accountId);
-                        if ($cleanAccount !== $cleanTarget) {
+                        if (! $this->isSameAssetId((string)$accountId, (string)$targetAsset)) {
                             continue;
                         }
                     }
@@ -296,10 +294,8 @@ class ScheduleInitialJobsCommand extends Command
                         $payloadObj = is_string($lastJob['payload']) ? json_decode($lastJob['payload'], true) : $lastJob['payload'];
                         $foundAcc = $payloadObj['params']['account_id'] ?? $payloadObj['account_id'] ?? null;
 
-                        // FINAL GUARD: If account IDs don't match (after normalizing act_ prefix), this is NOT a duplicate
-                        $cleanFound = $foundAcc ? str_replace('act_', '', (string)$foundAcc) : null;
-                        $cleanCurrent = $accountId ? str_replace('act_', '', (string)$accountId) : null;
-                        if ($cleanCurrent !== $cleanFound) {
+                        // FINAL GUARD: If account IDs don't match across any platform variant, this is NOT a duplicate
+                        if (! $this->isSameAssetId((string)$accountId, (string)$foundAcc)) {
                             $lastJob = null;
                         }
                     }
@@ -414,5 +410,56 @@ class ScheduleInitialJobsCommand extends Command
         $output->writeln("<info>Successfully scheduled $scheduledCount new jobs ($skippedCount skipped).</info>");
 
         return Command::SUCCESS;
+    }
+
+    /**
+     * Determine if two asset IDs match across channel-specific formatting variations:
+     * - Facebook Marketing / Organic: act_12345 vs 12345
+     * - Google Search Console (GSC): https://example.com/ vs sc-domain:example.com vs md5 hash
+     * - Google Analytics (GA): 123456789 vs properties/123456789
+     */
+    private function isSameAssetId(?string $idA, ?string $idB): bool
+    {
+        if ($idA === null || $idB === null || $idA === '' || $idB === '') {
+            return $idA === $idB;
+        }
+
+        // Direct exact match
+        if ($idA === $idB) {
+            return true;
+        }
+
+        // 1. FB act_ prefix normalization (act_12345 <-> 12345)
+        $cleanA = str_replace('act_', '', $idA);
+        $cleanB = str_replace('act_', '', $idB);
+        if ($cleanA === $cleanB) {
+            return true;
+        }
+
+        // 2. Google Analytics (properties/123456789 <-> 123456789)
+        $cleanPropA = str_replace('properties/', '', $cleanA);
+        $cleanPropB = str_replace('properties/', '', $cleanB);
+        if ($cleanPropA === $cleanPropB) {
+            return true;
+        }
+
+        // 3. GSC URL & Domain normalization (sc-domain:example.com <-> https://example.com/ <-> md5 hash)
+        $normalizeUrl = function(string $val): string {
+            $val = str_replace(['sc-domain:', 'https://', 'http://'], '', $val);
+            return rtrim($val, '/');
+        };
+
+        $normA = $normalizeUrl($idA);
+        $normB = $normalizeUrl($idB);
+        if ($normA !== '' && $normA === $normB) {
+            return true;
+        }
+
+        // MD5 hash matching for GSC URL identifiers
+        if (md5($idA) === $idB || md5($idB) === $idA || md5($normA) === $normB || md5($normB) === $normA) {
+            return true;
+        }
+
+        return false;
     }
 }
