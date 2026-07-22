@@ -450,7 +450,6 @@
         public function triggerHistoricalResync(?string $channel = null, ?string $asset = null): Response
         {
             $logger = Helpers::setLogger('nuclear_resync.log');
-            $logger->info("DEBUG: triggerHistoricalResync STARTED - Channel: " . ($channel ?? 'ALL') . " | Asset: " . ($asset ?? 'NONE'));
             $cliPath = realpath(dirname(__DIR__, 2) . '/bin/cli.php');
             $channelArg = ($channel && $channel !== 'all') ? '--channel=' . escapeshellarg($channel) : '';
             $assetArg = ($asset && $asset !== '') ? '--asset=' . escapeshellarg($asset) : '';
