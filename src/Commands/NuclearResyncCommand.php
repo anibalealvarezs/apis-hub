@@ -100,8 +100,10 @@ class NuclearResyncCommand extends Command
                     [\Doctrine\DBAL\ArrayParameterType::STRING]
                 );
             }
+            $logger->info("Deleted $deleted jobs for targeted channels{$assetInfo}.");
             $output->writeln("<info>✓ Deleted $deleted jobs for targeted channels{$assetInfo}.</info>");
         } catch (\Throwable $e) {
+            $logger->error("DB error deleting jobs: " . $e->getMessage());
             $output->writeln("<error>✗ DB error: " . $e->getMessage() . "</error>");
             return Command::FAILURE;
         }
@@ -114,11 +116,13 @@ class NuclearResyncCommand extends Command
                 $keys = $redis->keys($pattern);
                 if (! empty($keys)) {
                     $redis->del($keys);
+                    $logger->info("Cleared " . count($keys) . " Redis telemetry keys for $channel.");
                     $output->writeln("<info>✓ Cleared " . count($keys) . " Redis telemetry keys for $channel.</info>");
                 } else {
                     $output->writeln("<comment>No Redis telemetry keys found for pattern: $pattern</comment>");
                 }
             } catch (\Throwable $e) {
+                $logger->error("Redis telemetry cache clear error for $channel: " . $e->getMessage());
                 $output->writeln("<error>✗ Redis telemetry cache clear error for $channel: " . $e->getMessage() . "</error>");
             }
         }
@@ -129,8 +133,10 @@ class NuclearResyncCommand extends Command
                 $invalidateSyncCacheCmd = new InvalidateSyncCacheCommand();
                 $invalidateSyncCacheInput = new ArrayInput(['--channel' => $channel]);
                 $invalidateSyncCacheCmd->run($invalidateSyncCacheInput, $output);
+                $logger->info("Fallback Redis telemetry cache cleared for $channel.");
                 $output->writeln("<info>✓ Fallback Redis telemetry cache cleared for $channel.</info>");
             } catch (\Throwable $e) {
+                $logger->error("Fallback Redis telemetry cache clear error for $channel: " . $e->getMessage());
                 $output->writeln("<error>✗ Fallback Redis telemetry cache clear error for $channel: " . $e->getMessage() . "</error>");
             }
         }
@@ -141,8 +147,10 @@ class NuclearResyncCommand extends Command
             $refreshCmd = new \Commands\RefreshInstancesCommand();
             $refreshInput = new ArrayInput([]);
             $refreshCmd->run($refreshInput, $output);
+            $logger->info("Instances configuration refreshed.");
             $output->writeln("<info>✓ Instances configuration refreshed.</info>");
         } catch (\Throwable $e) {
+            $logger->error("Refresh instances error: " . $e->getMessage());
             $output->writeln("<error>✗ Refresh instances error: " . $e->getMessage() . "</error>");
             return Command::FAILURE;
         }
@@ -159,8 +167,10 @@ class NuclearResyncCommand extends Command
                 }
                 $scheduleInput = new ArrayInput($scheduleInputParams);
                 $scheduleCmd->run($scheduleInput, $output);
+                $logger->info("Initial jobs scheduled for $channel{$assetInfo}.");
                 $output->writeln("<info>✓ Initial jobs scheduled for $channel{$assetInfo}.</info>");
             } catch (\Throwable $e) {
+                $logger->error("Schedule error for $channel: " . $e->getMessage());
                 $output->writeln("<error>✗ Schedule error for $channel: " . $e->getMessage() . "</error>");
             }
         }
@@ -176,12 +186,15 @@ class NuclearResyncCommand extends Command
                 $invalidateSyncCacheCmd = new InvalidateSyncCacheCommand();
                 $invalidateSyncCacheInput = new ArrayInput(['--channel' => $channel]);
                 $invalidateSyncCacheCmd->run($invalidateSyncCacheInput, $output);
+                $logger->info("Telemetry cache successfully invalidated for $channel.");
                 $output->writeln("<info>✓ Telemetry cache successfully invalidated for $channel.</info>");
             } catch (\Throwable $e) {
+                $logger->error("Telemetry cache invalidation error for $channel: " . $e->getMessage());
                 $output->writeln("<error>✗ Telemetry cache invalidation error for $channel: " . $e->getMessage() . "</error>");
             }
         }
 
+        $logger->info("Nuclear Resync complete for channels: " . implode(', ', $channels) . $assetInfo);
         $output->writeln("<info>✓ Nuclear Resync complete.</info>");
 
         return Command::SUCCESS;
