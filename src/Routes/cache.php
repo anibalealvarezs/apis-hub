@@ -20,11 +20,11 @@ return [
         },
         'admin' => true
     ],
-    '/cache/reset-historical' => [
+    '/api/cache/reset-historical' => [
         'httpMethod' => 'POST',
         'callable' => function (?string $body = null, ?array $params = null) {
             $logger = \Helpers\Helpers::setLogger('nuclear_resync.log');
-            $logger->info("DEBUG: ROUTE /cache/reset-historical ENTERED");
+            $logger->info("DEBUG: ROUTE /api/cache/reset-historical ENTERED");
             $input = (array) \Helpers\Helpers::bodyToObject(data: $body);
             $channel = $input['channel'] ?? $params['channel'] ?? null;
             $asset = $input['asset'] ?? $params['asset'] ?? null;
