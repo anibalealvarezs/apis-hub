@@ -85,12 +85,12 @@ class NuclearResyncCommand extends Command
                     ],
                     [
                         \Doctrine\DBAL\ArrayParameterType::STRING,
-                        \PDO::PARAM_STR,
-                        \PDO::PARAM_STR,
-                        \PDO::PARAM_STR,
-                        \PDO::PARAM_STR,
-                        \PDO::PARAM_STR, \PDO::PARAM_STR, \PDO::PARAM_STR, \PDO::PARAM_STR, \PDO::PARAM_STR,
-                        \PDO::PARAM_STR, \PDO::PARAM_STR, \PDO::PARAM_STR, \PDO::PARAM_STR, \PDO::PARAM_STR
+                        \Doctrine\DBAL\ParameterType::STRING,
+                        \Doctrine\DBAL\ParameterType::STRING,
+                        \Doctrine\DBAL\ParameterType::STRING,
+                        \Doctrine\DBAL\ParameterType::STRING,
+                        \Doctrine\DBAL\ParameterType::STRING, \Doctrine\DBAL\ParameterType::STRING, \Doctrine\DBAL\ParameterType::STRING, \Doctrine\DBAL\ParameterType::STRING, \Doctrine\DBAL\ParameterType::STRING,
+                        \Doctrine\DBAL\ParameterType::STRING, \Doctrine\DBAL\ParameterType::STRING, \Doctrine\DBAL\ParameterType::STRING, \Doctrine\DBAL\ParameterType::STRING, \Doctrine\DBAL\ParameterType::STRING
                     ]
                 );
             } else {
