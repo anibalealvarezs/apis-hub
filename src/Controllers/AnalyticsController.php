@@ -265,8 +265,23 @@ class AnalyticsController extends BaseController
                                 'edge_case_handling' => $edgeCaseHandling,
                             ];
                         }
-                        $pythonResponse = $this->forwardToPythonEngine($enginePayload, $sdkMethod, $engineHost, $apiKey);
-                        $result = $pythonResponse['data'] ?? $pythonResponse;
+                        try {
+                            $pythonResponse = $this->forwardToPythonEngine($enginePayload, $sdkMethod, $engineHost, $apiKey);
+                            $result = $pythonResponse['data'] ?? $pythonResponse;
+                        } catch (\GuzzleHttp\Exception\ClientException|\GuzzleHttp\Exception\ServerException $e) {
+                            $res = $e->getResponse();
+                            $body = $res ? json_decode((string)$res->getBody(), true) : null;
+                            $detail = $body['detail'] ?? $e->getMessage();
+
+                            return new JsonResponse([
+                                'success' => true,
+                                'data' => [
+                                    'labels' => [],
+                                    'datasets' => [],
+                                    '_debug' => "Statistical calculation warning: {$detail}",
+                                ]
+                            ]);
+                        }
                         
                         if (isset($result['scatter_data']) && !empty($finalDates)) {
                             // Use Python's labels if available (correctly ordered after histogram grouping),
