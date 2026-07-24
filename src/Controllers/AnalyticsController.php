@@ -180,7 +180,7 @@ class AnalyticsController extends BaseController
                             $firstNonZero = null;
                             $lastNonZero = null;
                             foreach ($alignedY as $i => $yVal) {
-                                if (!empty($yVal) && !empty($alignedX[$i])) {
+                                if (!empty($yVal) || !empty($alignedX[$i])) {
                                     if ($firstNonZero === null) $firstNonZero = $i;
                                     $lastNonZero = $i;
                                 }
@@ -265,23 +265,8 @@ class AnalyticsController extends BaseController
                                 'edge_case_handling' => $edgeCaseHandling,
                             ];
                         }
-                        try {
-                            $pythonResponse = $this->forwardToPythonEngine($enginePayload, $sdkMethod, $engineHost, $apiKey);
-                            $result = $pythonResponse['data'] ?? $pythonResponse;
-                        } catch (\GuzzleHttp\Exception\ClientException|\GuzzleHttp\Exception\ServerException $e) {
-                            $res = $e->getResponse();
-                            $body = $res ? json_decode((string)$res->getBody(), true) : null;
-                            $detail = $body['detail'] ?? $e->getMessage();
-
-                            return new JsonResponse([
-                                'success' => true,
-                                'data' => [
-                                    'labels' => [],
-                                    'datasets' => [],
-                                    '_debug' => "Statistical calculation warning: {$detail}",
-                                ]
-                            ]);
-                        }
+                        $pythonResponse = $this->forwardToPythonEngine($enginePayload, $sdkMethod, $engineHost, $apiKey);
+                        $result = $pythonResponse['data'] ?? $pythonResponse;
                         
                         if (isset($result['scatter_data']) && !empty($finalDates)) {
                             // Use Python's labels if available (correctly ordered after histogram grouping),
