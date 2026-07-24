@@ -325,15 +325,8 @@ class AnalyticsController extends BaseController
             throw new \Exception("Analytics Engine SDK Error: Method {$sdkMethod} does not exist.");
         }
         
-        try {
-            // The SDK inherently injects the API key and routes to the correct endpoint
-            $response = call_user_func([$api, $sdkMethod], $data);
-            
-            return $response;
-        } catch (\Exception $e) {
-            // Forward the Python engine's HTTP error message if possible
-            throw new \Exception("Analytics Engine Error: " . $e->getMessage());
-        }
+        // The SDK inherently injects the API key and routes to the correct endpoint
+        return call_user_func([$api, $sdkMethod], $data);
     }
 
     /**
