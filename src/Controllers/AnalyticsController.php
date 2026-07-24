@@ -111,6 +111,14 @@ class AnalyticsController extends BaseController
                     $xSeriesRaw = $ySeriesRaw; // Dummy clone to pass the alignment loop
                 }
                 
+                $logger->info('[DIAGNOSTIC APIS-HUB] Raw evaluated series sizes', [
+                    'requiresBivariate' => $requiresBivariate,
+                    'ySeriesRaw_count' => is_array($ySeriesRaw) ? count($ySeriesRaw) : null,
+                    'xSeriesRaw_count' => is_array($xSeriesRaw) ? count($xSeriesRaw) : null,
+                    'ySeriesRaw_sample' => is_array($ySeriesRaw) ? array_slice($ySeriesRaw, 0, 5, true) : null,
+                    'xSeriesRaw_sample' => is_array($xSeriesRaw) ? array_slice($xSeriesRaw, 0, 5, true) : null,
+                ]);
+                
                 if (is_array($ySeriesRaw) && is_array($xSeriesRaw)) {
                     // Normalize page URL keys across different sources (e.g. GA4 stores
                     // relative paths like "/es/" while GSC stores full URLs like
@@ -153,6 +161,13 @@ class AnalyticsController extends BaseController
 
                     $dates = array_intersect(array_keys($ySeriesRaw), array_keys($xSeriesRaw));
                     $zeroHandling = $payload['zero_handling'] ?? 'remove';
+
+                    $logger->info('[DIAGNOSTIC APIS-HUB] Key alignment after mergeNormalized', [
+                        'originalYSize' => $originalYSize,
+                        'originalXSize' => $originalXSize,
+                        'intersected_dates_count' => count($dates),
+                        'intersected_dates_sample' => array_slice(array_values($dates), 0, 5),
+                    ]);
 
                     // Collect all aligned points (including zeros) in order
                     $alignedDates = [];
