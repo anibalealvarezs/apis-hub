@@ -234,50 +234,65 @@ class AnalyticsController extends BaseController
                             ]
                         ]);
                     }
-                        
-                        // Python engine schema varies by endpoint:
-                        //   /trend/* endpoints expect a flat 'series' key
-                        //   all others (macd, anomaly, autocorrelation, regression, etc.) expect dependent_var/independent_vars
-                        $isTrendStat = str_starts_with($sdkMethod, 'calculateTrend');
-                        if ($isTrendStat) {
-                            $enginePayload = [
-                                'series' => [
-                                    'dates' => $finalDates,
-                                    'values' => $yValues,
-                                ],
-                            ];
-                        } else {
-                            $edgeCaseHandling = $payload['edge_case_handling'] ?? $payload['grouping'] ?? [
-                                'weighted' => true,
-                                'grouping' => 'none',
-                            ];
-                            $enginePayload = [
-                                'dependent_var' => [
-                                    'dates' => $finalDates,
-                                    'values' => $yValues
-                                ],
-                                'independent_vars' => [
-                                    'x1' => [
-                                        'dates' => $finalDates,
-                                        'values' => $xValues
-                                    ]
-                                ],
-                                'edge_case_handling' => $edgeCaseHandling,
-                            ];
+
+                    // Check for zero variance (constant values) in bivariate statistics before calling Python
+                    if ($requiresBivariate) {
+                        $xUnique = array_unique($xValues);
+                        if (count($xUnique) <= 1) {
+                            return new JsonResponse([
+                                'success' => true,
+                                'data' => [
+                                    'labels' => [],
+                                    'datasets' => [],
+                                    '_debug' => "The independent variable (X) contains constant values (all " . (reset($xUnique) ?? 0) . ") across the selected date range. Statistical calculation cannot be computed."
+                                ]
+                            ]);
                         }
-                        $pythonResponse = $this->forwardToPythonEngine($enginePayload, $sdkMethod, $engineHost, $apiKey);
-                        $result = $pythonResponse['data'] ?? $pythonResponse;
-                        
-                        if (isset($result['scatter_data']) && !empty($finalDates)) {
-                            // Use Python's labels if available (correctly ordered after histogram grouping),
-                            // otherwise fall back to original $finalDates order
-                            if (empty($result['scatter_data']['labels'])) {
-                                $result['scatter_data']['labels'] = array_values($finalDates);
-                            }
-                        }
-                    } else {
-                        return $this->errorResponse("The mathematical payload requires time-series array evaluation. Pass groupBy: ['daily'] in filters.", 500);
                     }
+                        
+                    // Python engine schema varies by endpoint:
+                    //   /trend/* endpoints expect a flat 'series' key
+                    //   all others (macd, anomaly, autocorrelation, regression, etc.) expect dependent_var/independent_vars
+                    $isTrendStat = str_starts_with($sdkMethod, 'calculateTrend');
+                    if ($isTrendStat) {
+                        $enginePayload = [
+                            'series' => [
+                                'dates' => $finalDates,
+                                'values' => $yValues,
+                            ],
+                        ];
+                    } else {
+                        $edgeCaseHandling = $payload['edge_case_handling'] ?? $payload['grouping'] ?? [
+                            'weighted' => true,
+                            'grouping' => 'none',
+                        ];
+                        $enginePayload = [
+                            'dependent_var' => [
+                                'dates' => $finalDates,
+                                'values' => $yValues
+                            ],
+                            'independent_vars' => [
+                                'x1' => [
+                                    'dates' => $finalDates,
+                                    'values' => $xValues
+                                ]
+                            ],
+                            'edge_case_handling' => $edgeCaseHandling,
+                        ];
+                    }
+                    $pythonResponse = $this->forwardToPythonEngine($enginePayload, $sdkMethod, $engineHost, $apiKey);
+                    $result = $pythonResponse['data'] ?? $pythonResponse;
+                    
+                    if (isset($result['scatter_data']) && !empty($finalDates)) {
+                        // Use Python's labels if available (correctly ordered after histogram grouping),
+                        // otherwise fall back to original $finalDates order
+                        if (empty($result['scatter_data']['labels'])) {
+                            $result['scatter_data']['labels'] = array_values($finalDates);
+                        }
+                    }
+                } else {
+                    return $this->errorResponse("The mathematical payload requires time-series array evaluation. Pass groupBy: ['daily'] in filters.", 500);
+                }
 
                 $logger->info("Python engine request completed in " . round((microtime(true) - $tPythonStart) * 1000, 2) . "ms");
             }
