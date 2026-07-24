@@ -222,7 +222,23 @@ class AnalyticsController extends BaseController
                     $removedY = $originalYSize - $finalSize;
                     $removedX = $originalXSize - $finalSize;
 
+                    $logger->info('[DIAGNOSTIC APIS-HUB] Aligned series evaluation', [
+                        'sdk_method' => $sdkMethod,
+                        'zero_handling' => $zeroHandling,
+                        'originalYSize' => $originalYSize,
+                        'originalXSize' => $originalXSize,
+                        'datesCount' => count($dates),
+                        'finalSize' => $finalSize,
+                        'yValues_sample' => array_slice($yValues, 0, 5),
+                        'xValues_sample' => array_slice($xValues, 0, 5),
+                    ]);
+
                     if ($finalSize < 2) {
+                        $logger->warning('[DIAGNOSTIC APIS-HUB] Not enough overlapping points', [
+                            'finalSize' => $finalSize,
+                            'originalYSize' => $originalYSize,
+                            'originalXSize' => $originalXSize,
+                        ]);
                         return new JsonResponse([
                             'success' => true,
                             'data' => [
@@ -237,14 +253,29 @@ class AnalyticsController extends BaseController
 
                     // Check for zero variance (constant values) in bivariate statistics before calling Python
                     if ($requiresBivariate) {
-                        $xUnique = array_unique($xValues);
-                        if (count($xUnique) <= 1) {
+                        $xFloats = array_map(fn($v) => (float)$v, $xValues);
+                        $xMin = !empty($xFloats) ? min($xFloats) : 0;
+                        $xMax = !empty($xFloats) ? max($xFloats) : 0;
+                        $xRange = abs($xMax - $xMin);
+
+                        $logger->info('[DIAGNOSTIC APIS-HUB] Variance check on X', [
+                            'xMin' => $xMin,
+                            'xMax' => $xMax,
+                            'xRange' => $xRange,
+                            'is_constant' => $xRange < 1e-9,
+                        ]);
+
+                        if ($xRange < 1e-9) {
+                            $logger->warning('[DIAGNOSTIC APIS-HUB] Constant X values detected, short circuiting', [
+                                'xMin' => $xMin,
+                                'xMax' => $xMax,
+                            ]);
                             return new JsonResponse([
                                 'success' => true,
                                 'data' => [
                                     'labels' => [],
                                     'datasets' => [],
-                                    '_debug' => "The independent variable (X) contains constant values (all " . (reset($xUnique) ?? 0) . ") across the selected date range. Statistical calculation cannot be computed."
+                                    '_debug' => "The independent variable (X) contains constant values (all {$xMin}) across the selected date range. Statistical calculation cannot be computed."
                                 ]
                             ]);
                         }
