@@ -13,7 +13,7 @@ class OperatorNode implements AstNodeInterface
         protected AstNodeInterface $left,
         protected AstNodeInterface $right
     ) {
-        if (!in_array($operator, ['+', '-', '*', '/'])) {
+        if (!in_array($operator, ['+', '-', '*', '/', 'ratio', 'avg', 'min', 'max', 'abs_diff', 'pct_change'])) {
             throw new InvalidArgumentException("Unsupported operator: {$operator}");
         }
     }
@@ -81,6 +81,12 @@ class OperatorNode implements AstNodeInterface
             '-' => $left - $right,
             '*' => $left * $right,
             '/' => $right == 0 ? 0 : $left / $right,
+            'ratio' => ($left + $right) == 0 ? 0 : $left / ($left + $right),
+            'avg' => ($left + $right) / 2,
+            'min' => min($left, $right),
+            'max' => max($left, $right),
+            'abs_diff' => abs($left - $right),
+            'pct_change' => $right == 0 ? 0 : (($left - $right) / $right) * 100,
             default => 0,
         };
     }
