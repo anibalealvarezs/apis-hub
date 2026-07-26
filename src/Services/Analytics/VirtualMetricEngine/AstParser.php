@@ -46,6 +46,9 @@ class AstParser
                 $this->buildNode($data['left']),
                 $this->buildNode($data['right'])
             ),
+            'derived_metric' => new \Services\Analytics\VirtualMetricEngine\Nodes\DerivedMetricNode(
+                (int) $data['derived_metric_id']
+            ),
             default => throw new InvalidArgumentException("Unknown AST node type: {$type}")
         };
     }

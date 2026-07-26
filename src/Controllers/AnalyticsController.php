@@ -44,18 +44,27 @@ class AnalyticsController extends BaseController
             $node = $parser->parse($payload['ast']);
             $logger->info("AST parsed in " . round((microtime(true) - $tParseStart) * 1000, 2) . "ms");
             
-            $logger->info("5. Initializing AstDataHydrator...");
-            $tHydrateStart = microtime(true);
-            $hydrator = new \Services\Analytics\VirtualMetricEngine\AstDataHydrator($this->em, $logger);
             $filters = $payload['filters'] ?? [];
-            
-            $logger->info("6. Starting AST Hydration...");
-            $metricData = $hydrator->hydrate($node, $filters);
-            $logger->info("Total Hydration completed in " . round((microtime(true) - $tHydrateStart) * 1000, 2) . "ms", ['metrics' => $metricData]);
+            $derivedMetrics = $payload['derived_metrics'] ?? [];
+
+            $logger->info("5. Hydrating metric data...");
+            $tHydrateStart = microtime(true);
+
+            if (!empty($payload['series_data'])) {
+                $logger->info("Using pre-fetched series_data from payload");
+                $metricData = $payload['series_data'];
+            } else {
+                $logger->info("5a. Initializing AstDataHydrator...");
+                $hydrator = new \Services\Analytics\VirtualMetricEngine\AstDataHydrator($this->em, $logger);
+                
+                $logger->info("6. Starting AST Hydration...");
+                $metricData = $hydrator->hydrate($node, $filters);
+            }
+            $logger->info("Hydration completed in " . round((microtime(true) - $tHydrateStart) * 1000, 2) . "ms", ['metrics' => $metricData]);
             
             $logger->info("7. Initializing EvaluationContext...");
             $tEvalStart = microtime(true);
-            $context = new EvaluationContext($metricData);
+            $context = new EvaluationContext($metricData, $derivedMetrics, $filters);
             
             $logger->info("8. Evaluating Node...");
             $result = $node->evaluate($context);
