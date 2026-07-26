@@ -14,8 +14,6 @@ class EvaluationContext
      */
     protected array $metricData;
 
-    protected ?callable $derivedMetricResolver = null;
-
     public function __construct(array $metricData = [])
     {
         $this->metricData = $metricData;
@@ -30,19 +28,5 @@ class EvaluationContext
     public function getMetricTimeSeries(string $metricAlias): array|float|int
     {
         return $this->metricData[$metricAlias] ?? 0;
-    }
-
-    public function setDerivedMetricResolver(callable $resolver): void
-    {
-        $this->derivedMetricResolver = $resolver;
-    }
-
-    public function resolveDerivedMetric(int $id): array
-    {
-        if ($this->derivedMetricResolver === null) {
-            throw new \RuntimeException("No derived metric resolver set in EvaluationContext.");
-        }
-
-        return ($this->derivedMetricResolver)($id);
     }
 }

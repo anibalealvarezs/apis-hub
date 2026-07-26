@@ -5,7 +5,6 @@ namespace Services\Analytics\VirtualMetricEngine;
 use Services\Analytics\VirtualMetricEngine\Nodes\MetricNode;
 use Services\Analytics\VirtualMetricEngine\Nodes\OperatorNode;
 use Services\Analytics\VirtualMetricEngine\Nodes\ValueNode;
-use Services\Analytics\VirtualMetricEngine\Nodes\DerivedMetricNode;
 use InvalidArgumentException;
 
 class AstParser
@@ -46,9 +45,6 @@ class AstParser
                 $data['operator'],
                 $this->buildNode($data['left']),
                 $this->buildNode($data['right'])
-            ),
-            'derived_metric' => new DerivedMetricNode(
-                $data['derived_metric_id']
             ),
             default => throw new InvalidArgumentException("Unknown AST node type: {$type}")
         };
