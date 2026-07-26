@@ -53,6 +53,18 @@ class AnalyticsController extends BaseController
             if (!empty($payload['series_data'])) {
                 $logger->info("Using pre-fetched series_data from payload");
                 $metricData = $payload['series_data'];
+
+                // Re-key from raw aliases (a, b) to hash keys that MetricNode::getHashKey() expects
+                $metricNodes = $node->getMetricNodes();
+                foreach ($metricNodes as $mNode) {
+                    $alias = $mNode->getMetricAlias();
+                    $hashKey = $mNode->getHashKey();
+                    if (isset($metricData[$alias]) && $hashKey !== $alias) {
+                        $metricData[$hashKey] = $metricData[$alias];
+                        unset($metricData[$alias]);
+                    }
+                }
+                $logger->info("Re-keyed series_data to hash keys", ['keys' => array_keys($metricData)]);
             } else {
                 $logger->info("5a. Initializing AstDataHydrator...");
                 $hydrator = new \Services\Analytics\VirtualMetricEngine\AstDataHydrator($this->em, $logger);
