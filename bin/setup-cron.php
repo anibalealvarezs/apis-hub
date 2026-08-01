@@ -158,6 +158,11 @@ foreach ($instances as $instance) {
     }
 
     if (!empty($accounts)) {
+        $accountIndex = 0;
+        $freqParts = explode(' ', $frequency);
+        $baseMinute = (int)($freqParts[0] ?? 0);
+        $baseHour = (int)($freqParts[1] ?? 4);
+
         foreach ($accounts as $account) {
             if (isset($account['enabled']) && !$account['enabled']) {
                 continue;
@@ -167,6 +172,12 @@ foreach ($instances as $instance) {
             if (!$accountId) {
                 continue;
             }
+
+            // Stagger each granular account by 1 minute to prevent 28 simultaneous process spikes
+            $staggeredTotalMins = ($baseHour * 60 + $baseMinute + $accountIndex) % 1440;
+            $staggeredHour = (int)floor($staggeredTotalMins / 60);
+            $staggeredMinute = $staggeredTotalMins % 60;
+            $staggeredFreq = sprintf('%d %d * * *', $staggeredMinute, $staggeredHour);
 
             $accountParams = $params;
             $accountParams['account_id'] = $accountId;
@@ -178,7 +189,9 @@ foreach ($instances as $instance) {
 
             $cmd = "cd /app && /usr/local/bin/php bin/cli.php apis-hub:cache \"{$channel}\" \"{$entity}\"{$paramString} > /dev/null 2>&1";
             $cmd = str_replace('%', '\%', $cmd);
-            $cronLines[] = "{$frequency} {$cmd}";
+            $cronLines[] = "{$staggeredFreq} {$cmd}";
+
+            $accountIndex++;
         }
     } else {
         $paramString = "";
