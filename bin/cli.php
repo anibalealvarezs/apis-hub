@@ -12,6 +12,7 @@
     use Commands\Analytics\ClearCacheCommand;
     use Commands\Analytics\CheckCoverageCommand;
     use Commands\Analytics\InspectJobsCommand;
+    use Commands\Analytics\InspectDelayedRecentJobsCommand;
     use Commands\Analytics\AnalyzeLogsCommand;
     use Commands\Analytics\ReportAggregationTelemetryCommand;
     use Commands\Analytics\PlanMetricConfigIndexesCommand;
@@ -94,6 +95,7 @@
             new ClearCacheCommand(),
             new CheckCoverageCommand(),
             new InspectJobsCommand(),
+            new InspectDelayedRecentJobsCommand(),
             new AnalyzeLogsCommand(),
             new ReportAggregationTelemetryCommand(),
             new PlanMetricConfigIndexesCommand(),
