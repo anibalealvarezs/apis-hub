@@ -15,7 +15,7 @@ use Throwable;
 
 #[AsCommand(
     name: 'app:inspect-delayed-recent',
-    description: 'Inspects delayed -recent jobs and checks their entity-sync dependencies'
+    description: 'Inspects -recent jobs (any status) and checks their entity-sync dependencies'
 )]
 class InspectDelayedRecentJobsCommand extends Command
 {
@@ -30,8 +30,9 @@ class InspectDelayedRecentJobsCommand extends Command
     protected function configure(): void
     {
         $this
-            ->setHelp('Lists delayed jobs whose instance_name ends in -recent (defaults to facebook_marketing and facebook_organic), prints their params, and verifies whether their "requires" dependency has a successful job.')
-            ->addOption('channel', 'c', InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Restrict to specific channels (repeatable). Defaults to facebook_marketing and facebook_organic.');
+            ->setHelp('Lists jobs whose instance_name ends in -recent (defaults to facebook_marketing and facebook_organic), grouped by status with full detail, and verifies whether their "requires" dependency has a successful job.')
+            ->addOption('channel', 'c', InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Restrict to specific channels (repeatable). Defaults to facebook_marketing and facebook_organic.')
+            ->addOption('status', 's', InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Restrict to specific statuses by name or int (repeatable). Defaults to all.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -40,13 +41,38 @@ class InspectDelayedRecentJobsCommand extends Command
         foreach (JobStatus::cases() as $case) {
             $statusNames[$case->value] = $case->name;
         }
+        $statusByName = [];
+        foreach (JobStatus::cases() as $case) {
+            $statusByName[strtolower($case->name)] = $case->value;
+        }
 
         $channels = $input->getOption('channel') ?: ['facebook_marketing', 'facebook_organic'];
 
+        $statusFilter = null;
+        $rawStatuses = $input->getOption('status');
+        if (! empty($rawStatuses)) {
+            $statusFilter = [];
+            foreach ($rawStatuses as $rawStatus) {
+                if (is_numeric($rawStatus)) {
+                    $statusFilter[] = (int) $rawStatus;
+                } elseif (isset($statusByName[strtolower($rawStatus)])) {
+                    $statusFilter[] = $statusByName[strtolower($rawStatus)];
+                } else {
+                    $output->writeln('<error>Invalid status: ' . $rawStatus . '</error>');
+
+                    return Command::FAILURE;
+                }
+            }
+        }
+
         try {
+            /** @var \Repositories\JobRepository $jobRepo */
+            $jobRepo = $this->em->getRepository(Job::class);
+            $conn = $this->em->getConnection();
+
             // 1. Delayed jobs grouped by channel (overview)
-            $output->writeln('=== DELAYED JOBS BY CHANNEL ===');
-            $rows = $this->em->getConnection()->fetchAllAssociative(
+            $output->writeln('=== DELAYED JOBS BY CHANNEL (overview) ===');
+            $rows = $conn->fetchAllAssociative(
                 'SELECT channel, COUNT(*) AS cnt FROM jobs WHERE status = :status GROUP BY channel ORDER BY cnt DESC',
                 ['status' => JobStatus::delayed->value]
             );
@@ -58,23 +84,46 @@ class InspectDelayedRecentJobsCommand extends Command
                 }
             }
 
-            // 2. Delayed -recent jobs detail
+            // 2. All -recent jobs for the channels, grouped by status
             $output->writeln('');
-            $output->writeln('=== DELAYED \'-recent\' JOBS [' . implode(', ', $channels) . '] ===');
+            $output->writeln('=== \'-recent\' JOBS [' . implode(', ', $channels) . '] BY STATUS ===');
 
-            /** @var \Repositories\JobRepository $jobRepo */
-            $jobRepo = $this->em->getRepository(Job::class);
+            $sql = "SELECT j.status, COUNT(*) AS cnt FROM jobs j
+                    WHERE j.channel IN (:channels)
+                    AND CAST(j.payload AS TEXT) LIKE '%instance_name%' AND CAST(j.payload AS TEXT) LIKE '%-recent%'
+                    GROUP BY j.status ORDER BY j.status";
+            $statusRows = $conn->fetchAllAssociative($sql, ['channels' => $channels], ['channels' => \Doctrine\DBAL\ArrayParameterType::STRING]);
+            $statusCounts = [];
+            foreach ($statusRows as $row) {
+                $statusCounts[(int) $row['status']] = (int) $row['cnt'];
+            }
+            if (empty($statusCounts)) {
+                $output->writeln('  (NO -recent jobs found for these channels)');
+            } else {
+                foreach (JobStatus::cases() as $case) {
+                    $cnt = $statusCounts[$case->value] ?? 0;
+                    $output->writeln(sprintf('  %-12s %d', $case->name, $cnt));
+                }
+            }
+
+            // 3. Detail per -recent job
+            $output->writeln('');
+            $output->writeln('=== \'-recent\' JOBS DETAIL ===');
 
             $recentJobs = array_values(array_filter(
                 $jobRepo->findBy(
-                    ['status' => JobStatus::delayed->value, 'channel' => $channels],
+                    ['channel' => $channels],
                     ['updatedAt' => 'DESC']
                 ),
-                function (Job $job) {
+                function (Job $job) use ($statusFilter) {
                     $payload = $job->getPayload() ?? [];
                     $instance = $payload['instance_name'] ?? null;
+                    $isRecent = $instance && str_ends_with((string) $instance, '-recent');
+                    if (! $isRecent) {
+                        return false;
+                    }
 
-                    return $instance && str_ends_with((string) $instance, '-recent');
+                    return $statusFilter === null || in_array($job->getStatus(), $statusFilter, true);
                 }
             ));
 
@@ -110,7 +159,7 @@ class InspectDelayedRecentJobsCommand extends Command
                 $output->writeln(str_repeat('-', 59));
             }
 
-            // 3. Last completed per recent instance
+            // 4. Last completed per recent instance
             $output->writeln('');
             $output->writeln('=== LATEST COMPLETED JOB PER RECENT INSTANCE ===');
             $instances = array_unique(array_values(array_map(function (Job $job) {
@@ -122,6 +171,28 @@ class InspectDelayedRecentJobsCommand extends Command
                 }
                 $last = $jobRepo->getLastSuccessfulJobTime($instance);
                 $output->writeln('  ' . $instance . ': ' . ($last?->format('Y-m-d H:i:s') ?? 'NEVER COMPLETED'));
+            }
+
+            // 5. Latest job per entities-sync instance (the dependency targets)
+            $output->writeln('');
+            $output->writeln('=== LATEST JOB PER \'-entities-sync\' INSTANCE (dependencies) ===');
+            foreach ($channels as $channel) {
+                $syncName = str_replace('_', '-', $channel) . '-entities-sync';
+                $sql = "SELECT j.status, j.message, j.updated_at FROM jobs j
+                        WHERE CAST(j.payload AS TEXT) LIKE :name_pattern
+                        ORDER BY j.updated_at DESC LIMIT 1";
+                $syncJob = $conn->fetchAssociative($sql, ['name_pattern' => '%instance_name%' . $syncName . '%']);
+                if ($syncJob) {
+                    $output->writeln(sprintf(
+                        '  %s: %s | updated: %s | %s',
+                        $syncName,
+                        $statusNames[(int) $syncJob['status']] ?? $syncJob['status'],
+                        $syncJob['updated_at'],
+                        ($syncJob['message'] ?? '(no message)')
+                    ));
+                } else {
+                    $output->writeln('  ' . $syncName . ': NO JOBS EVER CREATED');
+                }
             }
 
             return Command::SUCCESS;
