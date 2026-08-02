@@ -294,11 +294,20 @@ class AnalyticsController extends BaseController
                         $xMax = !empty($xFloats) ? max($xFloats) : 0;
                         $xRange = abs($xMax - $xMin);
 
-                        $logger->info('[DIAGNOSTIC APIS-HUB] Variance check on X', [
+                        $yFloats = array_map(fn($v) => (float)$v, $yValues);
+                        $yMin = !empty($yFloats) ? min($yFloats) : 0;
+                        $yMax = !empty($yFloats) ? max($yFloats) : 0;
+                        $yRange = abs($yMax - $yMin);
+
+                        $logger->info('[DIAGNOSTIC APIS-HUB] Variance check on X and Y', [
                             'xMin' => $xMin,
                             'xMax' => $xMax,
                             'xRange' => $xRange,
-                            'is_constant' => $xRange < 1e-9,
+                            'x_is_constant' => $xRange < 1e-9,
+                            'yMin' => $yMin,
+                            'yMax' => $yMax,
+                            'yRange' => $yRange,
+                            'y_is_constant' => $yRange < 1e-9,
                         ]);
 
                         if ($xRange < 1e-9) {
@@ -312,6 +321,21 @@ class AnalyticsController extends BaseController
                                     'labels' => [],
                                     'datasets' => [],
                                     '_debug' => "The independent variable (X) contains constant values (all {$xMin}) across the selected date range. Statistical calculation cannot be computed."
+                                ]
+                            ]);
+                        }
+
+                        if ($yRange < 1e-9) {
+                            $logger->warning('[DIAGNOSTIC APIS-HUB] Constant Y values detected, short circuiting', [
+                                'yMin' => $yMin,
+                                'yMax' => $yMax,
+                            ]);
+                            return new JsonResponse([
+                                'success' => true,
+                                'data' => [
+                                    'labels' => [],
+                                    'datasets' => [],
+                                    '_debug' => "The dependent variable (Y) contains constant values (all {$yMin}) across the selected date range. Statistical calculation cannot be computed."
                                 ]
                             ]);
                         }
@@ -347,8 +371,21 @@ class AnalyticsController extends BaseController
                             'edge_case_handling' => $edgeCaseHandling,
                         ];
                     }
-                    $pythonResponse = $this->forwardToPythonEngine($enginePayload, $sdkMethod, $engineHost, $apiKey);
-                    $result = $pythonResponse['data'] ?? $pythonResponse;
+
+                    try {
+                        $pythonResponse = $this->forwardToPythonEngine($enginePayload, $sdkMethod, $engineHost, $apiKey);
+                        $result = $pythonResponse['data'] ?? $pythonResponse;
+                    } catch (\Throwable $pe) {
+                        $logger->warning('[DIAGNOSTIC APIS-HUB] Python engine returned error: ' . $pe->getMessage());
+                        return new JsonResponse([
+                            'success' => true,
+                            'data' => [
+                                'labels' => [],
+                                'datasets' => [],
+                                '_debug' => "Statistical calculation error: " . $pe->getMessage()
+                            ]
+                        ]);
+                    }
                     
                     if (isset($result['scatter_data']) && !empty($finalDates)) {
                         // Use Python's labels if available (correctly ordered after histogram grouping),
