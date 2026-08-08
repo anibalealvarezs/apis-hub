@@ -40,7 +40,7 @@
             $activeJobs = array_merge($scheduledJobs, $processingJobs);
             $activeJobsCount = count($activeJobs);
 
-            // 2. Fetch Channel Tiers
+            // 2. Fetch Channel Tiers Dynamically
             $channelsRepo = $this->entityManager->getRepository(\Entities\Analytics\Channel::class);
             $channels = $channelsRepo->findAll();
             $channelTiers = [];
@@ -81,7 +81,7 @@
             $uniqueChannelsTier2 = count($activeChannelsTier2);
             $uniqueChannelsTier4 = count($activeChannelsTier4);
 
-            // 4. Apply Scaling Formula
+            // 4. Apply Dynamic Scaling Formula
             $config = Helpers::getProjectConfig();
             $infraConfig = $config['infrastructure'] ?? [];
 
@@ -94,8 +94,15 @@
                 $tier2Count = 0;
                 $tier4Count = 0;
             } else {
-                $tier2Count = (int)ceil($demandTier2 / $jobsPerWorker);
-                $tier4Count = (int)ceil($demandTier4 / $jobsPerWorker);
+                $rawTier2 = (int)ceil($demandTier2 / $jobsPerWorker);
+                $rawTier4 = (int)ceil($demandTier4 / $jobsPerWorker);
+
+                // Prevent underperformance: if ready jobs exist, ensure worker count matches job count up to channel limits
+                $countTier2 = count(array_filter($activeJobs, fn($j) => ($channelTiers[$j->getChannel()] ?? 2) !== 4));
+                $countTier4 = count(array_filter($activeJobs, fn($j) => ($channelTiers[$j->getChannel()] ?? 2) === 4));
+
+                $tier2Count = max($rawTier2, $countTier2);
+                $tier4Count = max($rawTier4, $countTier4);
                 
                 // Guarantee at least 1 worker per active channel to ensure parallel execution
                 if ($tier2Count < $uniqueChannelsTier2) {
@@ -105,12 +112,12 @@
                     $tier4Count = $uniqueChannelsTier4;
                 }
                 
-                // Ensure at least minWorkers for the active tier, usually Tier 2
+                // Ensure at least minWorkers for active tiers
                 if ($demandTier2 > 0 && $tier2Count < $minWorkers) {
                     $tier2Count = $minWorkers;
                 }
                 if ($demandTier4 > 0 && $tier4Count < $minWorkers) {
-                    $tier4Count = $minWorkers; // Only apply min if there is demand for Tier 4
+                    $tier4Count = $minWorkers;
                 }
 
                 // Enforce global max limits (prioritize Tier 2 for general workload)
@@ -119,6 +126,10 @@
                     $ratio = $maxWorkers / $total;
                     $tier2Count = (int)floor($tier2Count * $ratio);
                     $tier4Count = (int)floor($tier4Count * $ratio);
+
+                    // Ensure active tiers retain at least 1 worker if total > 0
+                    if ($demandTier2 > 0 && $tier2Count < 1) $tier2Count = 1;
+                    if ($demandTier4 > 0 && $tier4Count < 1) $tier4Count = 1;
                 }
             }
 
