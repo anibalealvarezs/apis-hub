@@ -34,7 +34,7 @@ class AnalyticsController extends BaseController
             }
 
             // Translate Facade external platform IDs to internal APIs Hub IDs
-            $this->translatePlatformIds($payload['ast'], $this->em);
+            self::translatePlatformIds($payload['ast'], $this->em);
 
             $logger->info("3. Initializing AstParser...");
             $tParseStart = microtime(true);
@@ -561,10 +561,10 @@ class AnalyticsController extends BaseController
                 }
             } elseif ($node['type'] === 'operator') {
                 if (isset($node['left']) && is_array($node['left'])) {
-                    $this->translatePlatformIds($node['left'], $em);
+                    self::translatePlatformIds($node['left'], $em);
                 }
                 if (isset($node['right']) && is_array($node['right'])) {
-                    $this->translatePlatformIds($node['right'], $em);
+                    self::translatePlatformIds($node['right'], $em);
                 }
             }
         }
