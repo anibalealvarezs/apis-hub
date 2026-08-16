@@ -31,6 +31,7 @@ class EvaluateAlertsCommand extends Command
     {
         $this
             ->addOption('config', 'c', InputOption::VALUE_OPTIONAL, 'Path to alerts.json config file', 'config/alerts.json')
+            ->addOption('alert-id', 'a', InputOption::VALUE_OPTIONAL, 'Specific alert ID to evaluate')
             ->addOption('force', 'f', InputOption::VALUE_NONE, 'Force evaluation regardless of next_evaluation_at schedule')
             ->addOption('dry-run', 'd', InputOption::VALUE_NONE, 'Evaluate thresholds without sending HTTP callbacks to Facade');
     }
@@ -38,6 +39,7 @@ class EvaluateAlertsCommand extends Command
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $configPath = $input->getOption('config');
+        $alertIdFilter = $input->getOption('alert-id');
         $force = (bool) $input->getOption('force');
         $dryRun = (bool) $input->getOption('dry-run');
 
@@ -58,6 +60,14 @@ class EvaluateAlertsCommand extends Command
         if (!is_array($alerts) || empty($alerts)) {
             $output->writeln("<comment>No active alerts defined in {$configPath}.</comment>");
             return Command::SUCCESS;
+        }
+
+        if ($alertIdFilter !== null) {
+            $alerts = array_values(array_filter($alerts, fn ($a) => (string)($a['id'] ?? '') === (string)$alertIdFilter));
+            if (empty($alerts)) {
+                $output->writeln("<comment>Alert with ID '{$alertIdFilter}' not found in {$configPath}.</comment>");
+                return Command::SUCCESS;
+            }
         }
 
         $logger = Helpers::setLogger('alerts.log');
