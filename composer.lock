@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "3e87ad6d94b7408f5c802230858a1b4a",
+    "content-hash": "aa78164ef5c5ddd3e9250cd55eb65374",
     "packages": [
         {
             "name": "anibalealvarezs/amazon-api",
