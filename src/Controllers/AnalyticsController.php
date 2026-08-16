@@ -507,7 +507,7 @@ class AnalyticsController extends BaseController
      * @param \Doctrine\ORM\EntityManager $em
      * @throws \Exception
      */
-    protected function translatePlatformIds(array &$node, \Doctrine\ORM\EntityManager $em): void
+    public static function translatePlatformIds(array &$node, \Doctrine\ORM\EntityManager $em): void
     {
         if (isset($node['type'])) {
             if ($node['type'] === 'metric') {
