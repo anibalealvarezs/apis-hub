@@ -67,7 +67,7 @@
 
                 $sql = "
                     SELECT
-                        j.channel,
+                        j.channel AS channel_name,
                         $jsonExtract as account_id,
                         COUNT(*) as total,
                         SUM(CASE WHEN status = :completed THEN 1 ELSE 0 END) as completed,
@@ -93,7 +93,7 @@
                 // 2. Group by channel and process
                 $chanStats = [];
                 foreach ($rows as $row) {
-                    $chan = $row['channel'];
+                    $chan = $row['channel_name'];
                     if (!isset($chanStats[$chan])) {
                         $chanStats[$chan] = ['assets' => []];
                     }

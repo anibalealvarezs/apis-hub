@@ -114,15 +114,20 @@ class AstDataHydrator
                 $this->logger->info("Fetched rows for channel {$channel}", ['rowCount' => count($rows), 'sample' => $rows[0] ?? null]);
             }
             $isSeries = false;
-            $temporalField = 'unknown';
+            $groupField = null;
             
             // AggregationPlanner outputs the date under the literal key of the temporal grouping (e.g. 'daily')
             foreach (['daily', 'weekly', 'monthly', 'quarterly', 'yearly'] as $tField) {
                 if (in_array($tField, $groupBy)) {
                     $isSeries = true;
-                    $temporalField = $tField;
+                    $groupField = $tField;
                     break;
                 }
+            }
+
+            // If no temporal field, but we have a group by, use the first one (cross-sectional)
+            if (!$groupField && !empty($groupBy)) {
+                $groupField = $groupBy[0];
             }
 
             // Map data back to unique hash keys
@@ -130,11 +135,11 @@ class AstDataHydrator
                 $metric = count(explode('.', $mNode->getMetricAlias(), 2)) === 2 ? explode('.', $mNode->getMetricAlias(), 2)[1] : $mNode->getMetricAlias();
                 $hashKey = $mNode->getHashKey();
                 
-                if ($isSeries) {
+                if ($groupField) {
                     $seriesData = [];
                     foreach ($rows as $row) {
-                        $date = $row[$temporalField] ?? $row['date'] ?? 'unknown';
-                        $seriesData[$date] = $row[$metric] ?? 0;
+                        $key = $row[$groupField] ?? $row['date'] ?? 'unknown';
+                        $seriesData[$key] = $row[$metric] ?? 0;
                     }
                     $metricData[$hashKey] = $seriesData;
                 } else {

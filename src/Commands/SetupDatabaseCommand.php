@@ -52,6 +52,24 @@
                 }
                 $output->writeln("<info>✔  Database '$dbName' check passed.</info>");
 
+                // 1b. Synchronize database-level timezone with PHP
+                // This ensures NOW(), CURRENT_TIMESTAMP, and all session defaults match PHP's timezone.
+                // We use ALTER DATABASE (not per-connection SET TIME ZONE) because the Swoole HTTP server
+                // reuses connections across workers, and session-level SET commands corrupt the PDO protocol.
+                if ($isPostgres) {
+                    $phpTimezone = date_default_timezone_get();
+                    $output->writeln("<info>🕐 Synchronizing database timezone to '$phpTimezone'...</info>");
+                    try {
+                        $em = Helpers::getManager();
+                        $em->getConnection()->executeStatement(
+                            "ALTER DATABASE \"$dbName\" SET TIMEZONE TO " . $em->getConnection()->quote($phpTimezone)
+                        );
+                        $output->writeln("<info>✔  Database timezone set to '$phpTimezone'.</info>");
+                    } catch (\Exception $e) {
+                        $output->writeln("<comment>  ⚠ Could not set database timezone: " . $e->getMessage() . "</comment>");
+                    }
+                }
+
                 // 2. Update Schema
                 $output->writeln("<info>📂 Updating schema structure...</info>");
                 $schemaUpdateCommand = $this->getApplication()->find('orm:schema-tool:update');

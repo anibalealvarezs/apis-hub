@@ -263,7 +263,21 @@
                 WHERE LOWER(dk.name) = LOWER('".str_replace("'", "''", $dkName)."')
             ) $tAlias ON $tAlias.dimension_set_id = mc.dimension_set_id";
 
-                $configsSelect[] = "COALESCE($tAlias.value, 'N/A') AS $alias";
+                // Fallback dimension for metrics that store page-like data under landing_page
+                $fbExpr = "'N/A'";
+                if ($dkName === 'page') {
+                    $fbAlias = "t_landing_page";
+                    $configsJoins[] = "LEFT JOIN (
+                    SELECT dsi.dimension_set_id, dv.value
+                    FROM dimension_set_items dsi
+                    JOIN dimension_values dv ON dv.id = dsi.dimension_value_id
+                    JOIN dimension_keys dk ON dk.id = dv.dimension_key_id
+                    WHERE LOWER(dk.name) = LOWER('landing_page')
+                ) $fbAlias ON $fbAlias.dimension_set_id = mc.dimension_set_id";
+                    $fbExpr = "$fbAlias.value, 'N/A'";
+                }
+
+                $configsSelect[] = "COALESCE($tAlias.value, $fbExpr) AS $alias";
                 $finalSelect[] = "mc.$alias";
                 $groupBy[] = $alias;
                 $outerSelect[] = $alias;

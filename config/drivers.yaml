@@ -24,7 +24,16 @@ facebook_marketing:
   driver: 'Anibalealvarezs\MetaHubDriver\Drivers\FacebookMarketingDriver'
   auth: 'Anibalealvarezs\MetaHubDriver\Auth\FacebookAuthProvider'
   processor: ['Classes\Requests\MetricRequests', "persist"]
-  entities: ["metrics", "campaigns", "ad_groups", "ads", "creatives", "customers", "entities"]
+  entities:
+    [
+      "metrics",
+      "campaigns",
+      "ad_groups",
+      "ads",
+      "creatives",
+      "customers",
+      "entities",
+    ]
 facebook_organic:
   parent: facebook
   resource_key: pages
@@ -64,36 +73,9 @@ klaviyo:
       "product_categories",
       "discounts",
     ]
-netsuite:
-  driver: 'Anibalealvarezs\NetSuiteHubDriver\Drivers\NetSuiteDriver'
-  auth: 'Anibalealvarezs\NetSuiteHubDriver\Auth\NetSuiteAuthProvider'
-  processor: ['Classes\Requests\MetricRequests', "persist"]
-  entities:
-    [
-      "metrics",
-      "orders",
-      "products",
-      "customers",
-      "product_variants",
-      "vendors",
-      "product_categories",
-    ]
 amazon:
   driver: 'Anibalealvarezs\AmazonHubDriver\Drivers\AmazonDriver'
   auth: 'Anibalealvarezs\AmazonHubDriver\Auth\AmazonAuthProvider'
-  entities:
-    [
-      "metrics",
-      "orders",
-      "products",
-      "customers",
-      "product_variants",
-      "vendors",
-      "product_categories",
-    ]
-bigcommerce:
-  driver: 'Anibalealvarezs\BigCommerceHubDriver\Drivers\BigCommerceDriver'
-  auth: 'Anibalealvarezs\BigCommerceHubDriver\Auth\BigCommerceAuthProvider'
   entities:
     [
       "metrics",
@@ -122,10 +104,6 @@ x:
 tiktok:
   driver: 'Anibalealvarezs\TikTokHubDriver\Drivers\TikTokDriver'
   auth: 'Anibalealvarezs\TikTokHubDriver\Auth\TikTokAuthProvider'
-  entities: ["metrics"]
-triplewhale:
-  driver: 'Anibalealvarezs\TripleWhaleHubDriver\Drivers\TripleWhaleDriver'
-  auth: 'Anibalealvarezs\TripleWhaleHubDriver\Auth\TripleWhaleAuthProvider'
   entities: ["metrics"]
 facebook_leads:
   parent: facebook

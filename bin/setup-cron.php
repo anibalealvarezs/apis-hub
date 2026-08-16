@@ -95,13 +95,38 @@ foreach ($instances as $instance) {
     $overrideHour = null;
     $overrideMinute = null;
     
-    // Determine if this is an "entities" or "recent" job based on instance name
-    if (str_contains($instanceName, 'entities')) {
-        $overrideHour = $channelConfig['cron_entities_hour'] ?? ($config['cron']['entities_hour'] ?? null);
-        $overrideMinute = $channelConfig['cron_entities_minute'] ?? ($config['cron']['entities_minute'] ?? null);
-    } elseif (str_contains($instanceName, 'recent')) {
-        $overrideHour = $channelConfig['cron_recent_hour'] ?? ($config['cron']['recent_hour'] ?? null);
-        $overrideMinute = $channelConfig['cron_recent_minute'] ?? ($config['cron']['recent_minute'] ?? null);
+    // Evaluate unified cron_time if present
+    if (isset($channelConfig['cron_time']) && preg_match('/^(\d{1,2}):(\d{2})(?::\d{2})?$/', $channelConfig['cron_time'], $matches)) {
+        $overrideHour = (int)$matches[1];
+        $overrideMinute = (int)$matches[2];
+    } else {
+        // Fallback to legacy config if present
+        if (str_contains($instanceName, 'entities')) {
+            $overrideHour = $channelConfig['cron_entities_hour'] ?? null;
+            $overrideMinute = $channelConfig['cron_entities_minute'] ?? null;
+        } elseif (str_contains($instanceName, 'recent')) {
+            $overrideHour = $channelConfig['cron_recent_hour'] ?? null;
+            $overrideMinute = $channelConfig['cron_recent_minute'] ?? null;
+        }
+
+        // If STILL null (user hasn't saved UI and no legacy config), apply dynamic stagger
+        if ($overrideHour === null) {
+            static $activeChannels = null;
+            if ($activeChannels === null) {
+                $activeChannels = [];
+                foreach ($instances as $inst) {
+                    if (!empty($inst['channel']) && !in_array($inst['channel'], $activeChannels)) {
+                        $activeChannels[] = $inst['channel'];
+                    }
+                }
+            }
+            $index = array_search($channel, $activeChannels);
+            if ($index === false) $index = 0;
+            
+            $totalMinutes = 4 * 60 + ($index * 15);
+            $overrideHour = floor($totalMinutes / 60) % 24;
+            $overrideMinute = $totalMinutes % 60;
+        }
     }
 
     if ($overrideHour !== null) {
@@ -133,15 +158,26 @@ foreach ($instances as $instance) {
     }
 
     if (!empty($accounts)) {
+        $accountIndex = 0;
+        $freqParts = explode(' ', $frequency);
+        $baseMinute = (int)($freqParts[0] ?? 0);
+        $baseHour = (int)($freqParts[1] ?? 4);
+
         foreach ($accounts as $account) {
             if (isset($account['enabled']) && !$account['enabled']) {
                 continue;
             }
 
-            $accountId = $account['id'] ?? null;
+            $accountId = $account['id'] ?? $account['identifier'] ?? $account['url'] ?? $account['platformId'] ?? $account['location_id'] ?? null;
             if (!$accountId) {
                 continue;
             }
+
+            // Stagger each granular account by 1 minute to prevent 28 simultaneous process spikes
+            $staggeredTotalMins = ($baseHour * 60 + $baseMinute + $accountIndex) % 1440;
+            $staggeredHour = (int)floor($staggeredTotalMins / 60);
+            $staggeredMinute = $staggeredTotalMins % 60;
+            $staggeredFreq = sprintf('%d %d * * *', $staggeredMinute, $staggeredHour);
 
             $accountParams = $params;
             $accountParams['account_id'] = $accountId;
@@ -151,7 +187,11 @@ foreach ($instances as $instance) {
                 $paramString = ' --params="' . http_build_query($accountParams) . '"';
             }
 
-            $cronLines[] = "{$frequency} cd /app && /usr/local/bin/php bin/cli.php apis-hub:cache \"{$channel}\" \"{$entity}\"{$paramString} > /dev/null 2>&1";
+            $cmd = "cd /app && /usr/local/bin/php bin/cli.php apis-hub:cache \"{$channel}\" \"{$entity}\"{$paramString} > /dev/null 2>&1";
+            $cmd = str_replace('%', '\%', $cmd);
+            $cronLines[] = "{$staggeredFreq} {$cmd}";
+
+            $accountIndex++;
         }
     } else {
         $paramString = "";
@@ -159,7 +199,9 @@ foreach ($instances as $instance) {
             $paramString = ' --params="' . http_build_query($params) . '"';
         }
 
-        $cronLines[] = "{$frequency} cd /app && /usr/local/bin/php bin/cli.php apis-hub:cache \"{$channel}\" \"{$entity}\"{$paramString} > /dev/null 2>&1";
+        $cmd = "cd /app && /usr/local/bin/php bin/cli.php apis-hub:cache \"{$channel}\" \"{$entity}\"{$paramString} > /dev/null 2>&1";
+        $cmd = str_replace('%', '\%', $cmd);
+        $cronLines[] = "{$frequency} {$cmd}";
     }
 }
 

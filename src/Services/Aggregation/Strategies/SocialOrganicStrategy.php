@@ -39,6 +39,19 @@
             bool            $isPostgres
         ): ?array
         {
+            $filters = $plan->getFilters();
+            if ($filters !== null) {
+                $filterResolver = new FilterConditionResolver();
+                foreach ((array)$filters as $key => $value) {
+                    if (in_array((string)$key, ['channeledAccount', 'page', 'post', 'page_platform_id'], true)) {
+                        $condition = $filterResolver->resolve($value);
+                        if ($this->isSentinelEmptyFilter($condition)) {
+                            return [];
+                        }
+                    }
+                }
+            }
+
             $strategies = $plan->getCandidateOptimizedStrategies();
 
             if (in_array(self::KEY.'_page_summary', $strategies, true)) {
@@ -216,10 +229,20 @@
             // Handle Account/Page filters
             if (!empty($filtersArr['channeledAccount'])) {
                 $condition = $filterResolver->resolve($filtersArr['channeledAccount']);
+
+                if ($this->isSentinelEmptyFilter($condition)) {
+                    return [];
+                }
+
                 $whereClauses[] = $this->buildFilterClause('mc.channeled_account_id', $condition, 'channeledAccount');
                 $this->bindFilterParams($sqlParams, 'channeledAccount', $condition);
             } elseif (!empty($filtersArr['page'])) {
                 $condition = $filterResolver->resolve($filtersArr['page']);
+
+                if ($this->isSentinelEmptyFilter($condition)) {
+                    return [];
+                }
+
                 $whereClauses[] = $this->buildFilterClause('mc.page_id', $condition, 'pageId');
                 $this->bindFilterParams($sqlParams, 'pageId', $condition);
             }
@@ -348,10 +371,20 @@
 
             if (!empty($filtersArr['channeledAccount'])) {
                 $condition = $filterResolver->resolve($filtersArr['channeledAccount']);
+
+                if ($this->isSentinelEmptyFilter($condition)) {
+                    return [];
+                }
+
                 $whereClauses[] = $this->buildFilterClause('mc.channeled_account_id', $condition, 'channeledAccount');
                 $this->bindFilterParams($sqlParams, 'channeledAccount', $condition);
             } elseif (!empty($filtersArr['page'])) {
                 $condition = $filterResolver->resolve($filtersArr['page']);
+
+                if ($this->isSentinelEmptyFilter($condition)) {
+                    return [];
+                }
+
                 $whereClauses[] = $this->buildFilterClause('mc.page_id', $condition, 'pageId');
                 $this->bindFilterParams($sqlParams, 'pageId', $condition);
             } else {

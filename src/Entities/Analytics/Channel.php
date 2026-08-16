@@ -131,6 +131,9 @@
             try {
                 return Helpers::getManager()->getRepository(self::class)->findOneBy(['name' => $name]);
             } catch (Throwable $e) {
+                if (class_exists(\Helpers\Helpers::class)) {
+                    \Helpers\Helpers::setLogger('db.log')->warning("Failed to find Channel by name '{$name}': " . $e->getMessage());
+                }
                 return null;
             }
         }
@@ -157,6 +160,9 @@
             try {
                 return Helpers::getManager()->getRepository(self::class)->find($id);
             } catch (Throwable $e) {
+                if (class_exists(\Helpers\Helpers::class)) {
+                    \Helpers\Helpers::setLogger('db.log')->warning("Failed to find Channel by ID '{$id}': " . $e->getMessage());
+                }
                 return null;
             }
         }

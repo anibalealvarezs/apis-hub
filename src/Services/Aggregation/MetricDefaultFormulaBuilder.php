@@ -77,6 +77,7 @@
                 'reposts'                        => "SUM(CASE WHEN {$getNameExpr('shares')} AND $periodCondition THEN $valCol ELSE 0 END)",
                 'post_clicks'                    => "SUM(CASE WHEN {$getNameExpr('clicks')} AND $periodCondition THEN $valCol ELSE 0 END)",
                 'post_engagements'               => "SUM(CASE WHEN {$getNameExpr('total_interactions')} AND $periodCondition THEN $valCol ELSE 0 END)",
+                'average_session_duration'       => "AVG(CASE WHEN {$getNameExpr('average_session_duration')} AND $periodCondition THEN $valCol ELSE NULL END)",
             ];
         }
     }

@@ -66,6 +66,18 @@ class CacheEntityCommand extends Command
             }
         }
 
+        try {
+            $config = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getChannelConfig($channel);
+            if (($config['is_disconnected'] ?? false) === true) {
+                if (\Helpers\Helpers::isDebug()) {
+                    $output->writeln("<info>Circuit Breaker: Skipped caching job for {$channel} ({$entity}) because the channel is marked as disconnected in configuration.</info>");
+                }
+                return Command::SUCCESS;
+            }
+        } catch (\Exception $e) {
+            // If we can't load the config, just proceed and let the normal flow handle it
+        }
+
         $controller = $this->controller ?? new CacheController();
         /** @var Response $response */
         $response = $controller(

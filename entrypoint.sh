@@ -151,7 +151,18 @@ fi
 # Start cron service (Master instance ONLY)
 if [[ "$INSTANCE_NAME" == *"master"* ]]; then
     echo "Master Instance ($INSTANCE_NAME): Starting cron service..."
-    cron || service cron start || echo "Cron service startup failed"
+    service cron start || cron || echo "Cron service startup failed"
+
+    # Background watchdog to ensure cron daemon never dies silently
+    (
+        while true; do
+            sleep 60
+            if ! pgrep cron >/dev/null 2>&1 && ! ps aux 2>/dev/null | grep -v grep | grep cron >/dev/null 2>&1; then
+                echo "[$(date)] Watchdog: Cron process died. Restarting cron..." >> /app/logs/cron.log
+                service cron start || cron || true
+            fi
+        done
+    ) &
 else
     echo "Worker Instance ($INSTANCE_NAME): Skipping cron service (not master)."
 fi

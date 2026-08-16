@@ -37,6 +37,14 @@ else
     docker exec "${DEPLOYMENT_NAME}-master" php bin/cli.php app:schedule-initial-jobs || (command -v php >/dev/null 2>&1 && php bin/cli.php app:schedule-initial-jobs || echo -e "\033[1;31m⚠️ Schedule jobs failed and php-cli is not available locally. Skipping.\033[0m")
 fi
 
+# ── Step 3.5: Update Cron Configuration ──────────────────────────────
+echo -e "\033[1;33m⏰ [3.5/4] Updating cron schedules...\033[0m"
+if [[ "$INSTANCE_NAME" == *"master"* ]]; then
+    php bin/setup-cron.php && crontab /tmp/apis-hub-cron || true
+else
+    docker exec "${DEPLOYMENT_NAME}-master" bash -c "php bin/setup-cron.php && crontab /tmp/apis-hub-cron" || echo -e "\033[1;31m⚠️ Cron update failed via docker. Skipping.\033[0m"
+fi
+
 # ── Step 4: Apply Containers ───────────────────────────────────────────
 echo -e "\033[1;33m🚀 [4/4] Scaling and starting containers (No Downtime)...\033[0m"
 WORKER_SERVICES=$(docker compose --env-file "$ENV_FILE" config --services | grep '^worker-tier-' | tr '\r\n' ' ' || true)

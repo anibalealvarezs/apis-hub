@@ -188,3 +188,7 @@ check_db9.php
 check_jobs_local.php
 
 test_cleanup.php
+
+test_validation_time.php
+
+check_root_page.php

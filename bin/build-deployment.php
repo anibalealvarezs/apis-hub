@@ -84,6 +84,7 @@
                 "SKIP_SEED=\${SKIP_SEED:-0}",
                 "ENV_FILE=\${ENV_FILE:-".(getenv('ENV_FILE') ?: '.env')."}",
                 "PROJECT_PATH_HOST=\${PROJECT_PATH_HOST:-./}",
+                "TZ=\${APP_TIMEZONE:-".($config['timezone'] ?? 'UTC')."}",
         ];
         if ($instanceName) {
             $envVars[] = "INSTANCE_NAME=$instanceName";

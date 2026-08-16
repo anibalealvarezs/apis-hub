@@ -39,6 +39,7 @@ class ScheduleInitialJobsCommand extends Command
     {
         $this->addOption('instance', null, InputOption::VALUE_OPTIONAL, 'Schedule only for this instance name');
         $this->addOption('channel', null, InputOption::VALUE_OPTIONAL, 'Schedule only for this channel');
+        $this->addOption('asset', null, InputOption::VALUE_OPTIONAL, 'Schedule only for this asset ID');
     }
 
     /**
@@ -52,6 +53,7 @@ class ScheduleInitialJobsCommand extends Command
         $instances = $config['instances'] ?? [];
         $targetInstance = $input->getOption('instance');
         $targetChannel = $input->getOption('channel');
+        $targetAsset = $input->getOption('asset');
 
         if (empty($instances)) {
             if (Helpers::isDebug()) {
@@ -238,6 +240,12 @@ class ScheduleInitialJobsCommand extends Command
                         $jobParams['account_id'] = $accountId;
                     }
 
+                    if ($targetAsset !== null && $targetAsset !== '') {
+                        if (! $this->isSameAssetId((string)$accountId, (string)$targetAsset)) {
+                            continue;
+                        }
+                    }
+
                     $shouldSchedule = true;
                     // Try to find the LAST existing job for this instance/account
                     if (Helpers::isPostgres()) {
@@ -248,8 +256,13 @@ class ScheduleInitialJobsCommand extends Command
                             'instance_pattern' => '%instance_name%'.$name.'%',
                         ];
                         if ($accountId) {
-                            $sql .= " AND (CAST(j.payload AS JSONB)->'params'->>'account_id' = :account_id OR CAST(j.payload AS JSONB)->>'account_id' = :account_id)";
-                            $sqlParams['account_id'] = $accountId;
+                            $cleanAcc = str_replace('act_', '', (string)$accountId);
+                            $sql .= " AND (
+                                CAST(j.payload AS JSONB)->'params'->>'account_id' IN (:acc1, :acc2)
+                                OR CAST(j.payload AS JSONB)->>'account_id' IN (:acc1, :acc2)
+                            )";
+                            $sqlParams['acc1'] = (string)$accountId;
+                            $sqlParams['acc2'] = 'act_' . $cleanAcc;
                         } else {
                             $sql .= " AND (CAST(j.payload AS JSONB)->'params'->>'account_id' IS NULL AND CAST(j.payload AS JSONB)->>'account_id' IS NULL)";
                         }
@@ -281,8 +294,8 @@ class ScheduleInitialJobsCommand extends Command
                         $payloadObj = is_string($lastJob['payload']) ? json_decode($lastJob['payload'], true) : $lastJob['payload'];
                         $foundAcc = $payloadObj['params']['account_id'] ?? $payloadObj['account_id'] ?? null;
 
-                        // FINAL GUARD: If account IDs don't match, this is NOT a duplicate
-                        if (($accountId ?: null) !== ($foundAcc ?: null)) {
+                        // FINAL GUARD: If account IDs don't match across any platform variant, this is NOT a duplicate
+                        if (! $this->isSameAssetId((string)$accountId, (string)$foundAcc)) {
                             $lastJob = null;
                         }
                     }
@@ -295,7 +308,12 @@ class ScheduleInitialJobsCommand extends Command
                         $newStart = $jobParams['startDate'] ?? $jobParams['start_date'] ?? null;
                         $newEnd = $jobParams['endDate'] ?? $jobParams['end_date'] ?? null;
 
-                        if ($oldStart === $newStart && $oldEnd === $newEnd) {
+                        $oldEndDate = $oldEnd ? date('Y-m-d', strtotime($oldEnd)) : null;
+                        $newEndDate = $newEnd ? date('Y-m-d', strtotime($newEnd)) : null;
+
+                        // Only reschedule if the end date has moved.
+                        // Changes in the start date are usually just the rolling history window shrinking the oldest chunk.
+                        if ($oldEndDate === $newEndDate) {
                             $shouldSchedule = false;
                         } else {
                             $jobStatus = (int)$lastJob['status'];
@@ -392,5 +410,56 @@ class ScheduleInitialJobsCommand extends Command
         $output->writeln("<info>Successfully scheduled $scheduledCount new jobs ($skippedCount skipped).</info>");
 
         return Command::SUCCESS;
+    }
+
+    /**
+     * Determine if two asset IDs match across channel-specific formatting variations:
+     * - Facebook Marketing / Organic: act_12345 vs 12345
+     * - Google Search Console (GSC): https://example.com/ vs sc-domain:example.com vs md5 hash
+     * - Google Analytics (GA): 123456789 vs properties/123456789
+     */
+    private function isSameAssetId(?string $idA, ?string $idB): bool
+    {
+        if ($idA === null || $idB === null || $idA === '' || $idB === '') {
+            return $idA === $idB;
+        }
+
+        // Direct exact match
+        if ($idA === $idB) {
+            return true;
+        }
+
+        // 1. FB act_ prefix normalization (act_12345 <-> 12345)
+        $cleanA = str_replace('act_', '', $idA);
+        $cleanB = str_replace('act_', '', $idB);
+        if ($cleanA === $cleanB) {
+            return true;
+        }
+
+        // 2. Google Analytics (properties/123456789 <-> 123456789)
+        $cleanPropA = str_replace('properties/', '', $cleanA);
+        $cleanPropB = str_replace('properties/', '', $cleanB);
+        if ($cleanPropA === $cleanPropB) {
+            return true;
+        }
+
+        // 3. GSC URL & Domain normalization (sc-domain:example.com <-> https://example.com/ <-> md5 hash)
+        $normalizeUrl = function(string $val): string {
+            $val = str_replace(['sc-domain:', 'https://', 'http://'], '', $val);
+            return rtrim($val, '/');
+        };
+
+        $normA = $normalizeUrl($idA);
+        $normB = $normalizeUrl($idB);
+        if ($normA !== '' && $normA === $normB) {
+            return true;
+        }
+
+        // MD5 hash matching for GSC URL identifiers
+        if (md5($idA) === $idB || md5($idB) === $idA || md5($normA) === $normB || md5($normB) === $normA) {
+            return true;
+        }
+
+        return false;
     }
 }

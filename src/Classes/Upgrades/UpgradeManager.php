@@ -81,7 +81,7 @@ class UpgradeManager
 
             return true;
             
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             $failedStep = end($path);
             if (!empty($executedRoutines)) {
                 $failedStep = $executedRoutines[count($executedRoutines)-1];
@@ -103,7 +103,7 @@ class UpgradeManager
                 $output->writeln("<comment>Rolling back: {$rollbackRoutine->getToVersion()} -> [{$froms}]</comment>");
                 try {
                     $rollbackRoutine->down($this->em, $output);
-                } catch (\Exception $ex) {
+                } catch (\Throwable $ex) {
                     $output->writeln("<error>CRITICAL: Rollback failed at step {$rollbackRoutine->getToVersion()} -> [{$froms}]</error>");
                     $output->writeln("<error>{$ex->getMessage()}</error>");
                     $output->writeln("<error>Halting rollback to prevent further corruption.</error>");

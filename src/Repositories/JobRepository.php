@@ -105,7 +105,36 @@ class JobRepository extends BaseRepository
             $data['uuid'] = Factory::create()->uuid;
         }
 
-        return parent::create((object)$data, $returnEntity);
+        $result = parent::create((object)$data, $returnEntity);
+
+        if ($result && in_array($data['status'], [JobStatus::scheduled->value, JobStatus::delayed->value])) {
+            $this->triggerAsyncScaling();
+        }
+
+        return $result;
+    }
+
+    /**
+     * Triggers the scale workers command asynchronously to instantly adapt to new demand.
+     * Uses a 5-second debounce to prevent overwhelming the Docker socket during bulk job scheduling.
+     */
+    protected function triggerAsyncScaling(): void
+    {
+        try {
+            $redis = Helpers::getRedisClient();
+            if ($redis) {
+                $cache = CacheService::getInstance($redis);
+                if (! $cache->exists('last_scale_check')) {
+                    $cache->set('last_scale_check', time(), 5);
+                    $phpBin = '/usr/local/bin/php';
+                    if (file_exists('/app/bin/cli.php')) {
+                        exec("nohup $phpBin /app/bin/cli.php app:scale-workers > /dev/null 2>&1 &");
+                    }
+                }
+            }
+        } catch (Throwable $e) {
+            // Silently fail if cache or exec is unavailable, fallback cron will catch it within 60s
+        }
     }
 
     /**
@@ -945,7 +974,7 @@ class JobRepository extends BaseRepository
                     LIMIT 1
                     FOR UPDATE OF j SKIP LOCKED
                 )
-                UPDATE jobs SET status = {$processingStatus}, worker_id = :worker_id, updated_at = NOW()
+                UPDATE jobs SET status = {$processingStatus}, worker_id = :worker_id, updated_at = :now
                 WHERE id = (SELECT id FROM RankedJobs)
                 -- Job-level advisory lock (prevents two workers claiming the exact same job)
                 AND pg_try_advisory_xact_lock(hashtext(channel || '|' || entity || '|' || COALESCE(payload->>'account_id', payload->'params'->>'account_id', payload->>'instance_name', 'global')))
@@ -953,6 +982,7 @@ class JobRepository extends BaseRepository
 
             $params = [
                 'worker_id' => $workerId,
+                'now' => (new \DateTime())->format('Y-m-d H:i:s'),
             ];
             if ($channel) {
                 $params['channel'] = $channel;
@@ -965,7 +995,11 @@ class JobRepository extends BaseRepository
                 $params['worker_tier'] = $workerTier;
             }
 
+            \Helpers\Helpers::setLogger('jobs.log')->info("WORKER DEBUG: Executing claimAvailableJob query with params: " . json_encode($params));
+
             $jobId = $this->_em->getConnection()->fetchOne($sql, $params);
+
+            \Helpers\Helpers::setLogger('jobs.log')->info("WORKER DEBUG: claimAvailableJob returned job ID: " . ($jobId ?: 'NULL'));
 
             if ($jobId) {
                 $this->_em->commit();
@@ -982,7 +1016,7 @@ class JobRepository extends BaseRepository
             if (isset($this->_em) && $this->_em->getConnection()->isTransactionActive()) {
                 $this->_em->rollback();
             }
-            error_log("Error in claimAvailableJob: ".$e->getMessage());
+            \Helpers\Helpers::setLogger('jobs.log')->error("Error in claimAvailableJob: ".$e->getMessage());
 
             return null;
         }
@@ -1012,7 +1046,7 @@ class JobRepository extends BaseRepository
         if (getenv('BILLING_TIER') === 'free') {
             return 1;
         }
-        
+
         try {
             $maxWorkers = $this->_em->createQueryBuilder()
                 ->select('c.maxWorkers')

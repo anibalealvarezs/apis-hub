@@ -44,18 +44,39 @@ class AnalyticsController extends BaseController
             $node = $parser->parse($payload['ast']);
             $logger->info("AST parsed in " . round((microtime(true) - $tParseStart) * 1000, 2) . "ms");
             
-            $logger->info("5. Initializing AstDataHydrator...");
-            $tHydrateStart = microtime(true);
-            $hydrator = new \Services\Analytics\VirtualMetricEngine\AstDataHydrator($this->em, $logger);
             $filters = $payload['filters'] ?? [];
-            
-            $logger->info("6. Starting AST Hydration...");
-            $metricData = $hydrator->hydrate($node, $filters);
-            $logger->info("Total Hydration completed in " . round((microtime(true) - $tHydrateStart) * 1000, 2) . "ms", ['metrics' => $metricData]);
+            $derivedMetrics = $payload['derived_metrics'] ?? [];
+
+            $logger->info("5. Hydrating metric data...");
+            $tHydrateStart = microtime(true);
+
+            if (!empty($payload['series_data'])) {
+                $logger->info("Using pre-fetched series_data from payload");
+                $metricData = $payload['series_data'];
+
+                // Re-key from raw aliases (a, b) to hash keys that MetricNode::getHashKey() expects
+                $metricNodes = $node->getMetricNodes();
+                foreach ($metricNodes as $mNode) {
+                    $alias = $mNode->getMetricAlias();
+                    $hashKey = $mNode->getHashKey();
+                    if (isset($metricData[$alias]) && $hashKey !== $alias) {
+                        $metricData[$hashKey] = $metricData[$alias];
+                        unset($metricData[$alias]);
+                    }
+                }
+                $logger->info("Re-keyed series_data to hash keys", ['keys' => array_keys($metricData)]);
+            } else {
+                $logger->info("5a. Initializing AstDataHydrator...");
+                $hydrator = new \Services\Analytics\VirtualMetricEngine\AstDataHydrator($this->em, $logger);
+                
+                $logger->info("6. Starting AST Hydration...");
+                $metricData = $hydrator->hydrate($node, $filters);
+            }
+            $logger->info("Hydration completed in " . round((microtime(true) - $tHydrateStart) * 1000, 2) . "ms", ['metrics' => $metricData]);
             
             $logger->info("7. Initializing EvaluationContext...");
             $tEvalStart = microtime(true);
-            $context = new EvaluationContext($metricData);
+            $context = new EvaluationContext($metricData, $derivedMetrics, $filters);
             
             $logger->info("8. Evaluating Node...");
             $result = $node->evaluate($context);
@@ -80,6 +101,16 @@ class AnalyticsController extends BaseController
                 $sdkMethod = 'calculateMacd';
             } elseif (!empty($payload['calculate_anomaly'])) {
                 $sdkMethod = 'calculateAnomaly';
+            } elseif (!empty($payload['calculate_trend_linear'])) {
+                $sdkMethod = 'calculateTrendLinear';
+            } elseif (!empty($payload['calculate_trend_sma'])) {
+                $sdkMethod = 'calculateTrendSma';
+            } elseif (!empty($payload['calculate_trend_ema'])) {
+                $sdkMethod = 'calculateTrendEma';
+            } elseif (!empty($payload['calculate_trend_holt_winters'])) {
+                $sdkMethod = 'calculateTrendHoltWinters';
+            } elseif (!empty($payload['calculate_trend_logarithmic'])) {
+                $sdkMethod = 'calculateTrendLogarithmic';
             }
 
             // Forward to Python Analytics Engine if requested
@@ -101,12 +132,63 @@ class AnalyticsController extends BaseController
                     $xSeriesRaw = $ySeriesRaw; // Dummy clone to pass the alignment loop
                 }
                 
+                $logger->info('[DIAGNOSTIC APIS-HUB] Raw evaluated series sizes', [
+                    'requiresBivariate' => $requiresBivariate,
+                    'ySeriesRaw_count' => is_array($ySeriesRaw) ? count($ySeriesRaw) : null,
+                    'xSeriesRaw_count' => is_array($xSeriesRaw) ? count($xSeriesRaw) : null,
+                    'ySeriesRaw_sample' => is_array($ySeriesRaw) ? array_slice($ySeriesRaw, 0, 5, true) : null,
+                    'xSeriesRaw_sample' => is_array($xSeriesRaw) ? array_slice($xSeriesRaw, 0, 5, true) : null,
+                ]);
+                
                 if (is_array($ySeriesRaw) && is_array($xSeriesRaw)) {
+                    // Normalize page URL keys across different sources (e.g. GA4 stores
+                    // relative paths like "/es/" while GSC stores full URLs like
+                    // "https://anibalalvarez.com/es/"). Extract just the path component
+                    // from full URLs so keys match across channels, and strip query
+                    // parameters that GA4 may include (e.g. "/es/?gad_source=1").
+                    $normalizeKey = function (string $key): string {
+                        if (preg_match('#^https?://[^/]+(/.*)?$#', $key, $matches)) {
+                            $key = !empty($matches[1]) ? $matches[1] : '/';
+                        } elseif (preg_match('#^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}(/.*)?$#', $key, $matches)) {
+                            $key = !empty($matches[1]) ? $matches[1] : '/';
+                        }
+                        $queryPos = strpos($key, '?');
+                        if ($queryPos !== false) {
+                            $key = substr($key, 0, $queryPos);
+                        }
+                        return $key;
+                    };
+                    $mergeNormalized = function (array $data, callable $normalizeKey): array {
+                        $merged = [];
+                        foreach ($data as $key => $value) {
+                            $nKey = $normalizeKey((string)$key);
+                            if (!isset($merged[$nKey])) {
+                                $merged[$nKey] = ['sum' => 0.0, 'count' => 0];
+                            }
+                            $merged[$nKey]['sum'] += (float)$value;
+                            $merged[$nKey]['count']++;
+                        }
+                        $result = [];
+                        foreach ($merged as $nKey => $item) {
+                            $result[$nKey] = $item['sum'] / $item['count'];
+                        }
+                        return $result;
+                    };
+                    $ySeriesRaw = $mergeNormalized($ySeriesRaw, $normalizeKey);
+                    $xSeriesRaw = $mergeNormalized($xSeriesRaw, $normalizeKey);
+
                     $originalYSize = count($ySeriesRaw);
                     $originalXSize = count($xSeriesRaw);
 
                     $dates = array_intersect(array_keys($ySeriesRaw), array_keys($xSeriesRaw));
                     $zeroHandling = $payload['zero_handling'] ?? 'remove';
+
+                    $logger->info('[DIAGNOSTIC APIS-HUB] Key alignment after mergeNormalized', [
+                        'originalYSize' => $originalYSize,
+                        'originalXSize' => $originalXSize,
+                        'intersected_dates_count' => count($dates),
+                        'intersected_dates_sample' => array_slice(array_values($dates), 0, 5),
+                    ]);
 
                     // Collect all aligned points (including zeros) in order
                     $alignedDates = [];
@@ -118,10 +200,14 @@ class AnalyticsController extends BaseController
                         $alignedX[] = (float)$xSeriesRaw[$date];
                     }
 
+                    $finalDates = [];
+                    $yValues = [];
+                    $xValues = [];
+
                     // Apply the chosen zero-handling strategy
                     switch ($zeroHandling) {
                         case 'keep':
-                            $finalDates = $alignedDates;
+                            $finalDates = array_map('strval', $alignedDates);
                             $yValues = $alignedY;
                             $xValues = $alignedX;
                             break;
@@ -130,7 +216,7 @@ class AnalyticsController extends BaseController
                             $firstNonZero = null;
                             $lastNonZero = null;
                             foreach ($alignedY as $i => $yVal) {
-                                if (!empty($yVal) && !empty($alignedX[$i])) {
+                                if (!empty($yVal) || !empty($alignedX[$i])) {
                                     if ($firstNonZero === null) $firstNonZero = $i;
                                     $lastNonZero = $i;
                                 }
@@ -140,7 +226,7 @@ class AnalyticsController extends BaseController
                                 $yValues = [];
                                 $xValues = [];
                             } else {
-                                $finalDates = array_slice($alignedDates, $firstNonZero, $lastNonZero - $firstNonZero + 1);
+                                $finalDates = array_map('strval', array_slice($alignedDates, $firstNonZero, $lastNonZero - $firstNonZero + 1));
                                 $yValues = array_slice($alignedY, $firstNonZero, $lastNonZero - $firstNonZero + 1);
                                 $xValues = array_slice($alignedX, $firstNonZero, $lastNonZero - $firstNonZero + 1);
                             }
@@ -150,7 +236,7 @@ class AnalyticsController extends BaseController
                         default:
                             foreach ($alignedDates as $i => $date) {
                                 if (!empty($alignedY[$i]) && !empty($alignedX[$i])) {
-                                    $finalDates[] = $date;
+                                    $finalDates[] = (string)$date;
                                     $yValues[] = $alignedY[$i];
                                     $xValues[] = $alignedX[$i];
                                 }
@@ -158,20 +244,120 @@ class AnalyticsController extends BaseController
                             break;
                     }
 
+                    // Apply dimension-based grouping for bivariate stats (e.g., group low-frequency queries/pages into "others")
+                    if (!empty($payload['grouping']['enabled']) && $requiresBivariate) {
+                        $grouped = $this->applyGroupByDimensionGrouping(
+                            $finalDates, $yValues, $xValues, $payload['grouping']
+                        );
+                        $finalDates = $grouped['dates'];
+                        $yValues = $grouped['y'];
+                        $xValues = $grouped['x'];
+                    }
+
                     $finalSize = count($finalDates);
                     $removedY = $originalYSize - $finalSize;
                     $removedX = $originalXSize - $finalSize;
 
+                    $logger->info('[DIAGNOSTIC APIS-HUB] Aligned series evaluation', [
+                        'sdk_method' => $sdkMethod,
+                        'zero_handling' => $zeroHandling,
+                        'originalYSize' => $originalYSize,
+                        'originalXSize' => $originalXSize,
+                        'datesCount' => count($dates),
+                        'finalSize' => $finalSize,
+                        'yValues_sample' => array_slice($yValues, 0, 5),
+                        'xValues_sample' => array_slice($xValues, 0, 5),
+                    ]);
+
                     if ($finalSize < 2) {
-                        return $this->errorResponse(
-                            "Not enough overlapping non-zero data points for regression. Found: {$finalSize}. " .
-                            "Original Dependent (Y) size: {$originalYSize} (Removed: {$removedY}). " .
-                            "Original Independent (X) size: {$originalXSize} (Removed: {$removedX}).",
-                            500
-                        );
+                        $logger->warning('[DIAGNOSTIC APIS-HUB] Not enough overlapping points', [
+                            'finalSize' => $finalSize,
+                            'originalYSize' => $originalYSize,
+                            'originalXSize' => $originalXSize,
+                        ]);
+                        return new JsonResponse([
+                            'success' => true,
+                            'data' => [
+                                'labels' => [],
+                                'datasets' => [],
+                                '_debug' => "Not enough overlapping non-zero data points for regression. Found: {$finalSize}. " .
+                                    "Original Dependent (Y) size: {$originalYSize} (Removed: {$removedY}). " .
+                                    "Original Independent (X) size: {$originalXSize} (Removed: {$removedX})."
+                            ]
+                        ]);
+                    }
+
+                    // Check for zero variance (constant values) in bivariate statistics before calling Python
+                    if ($requiresBivariate) {
+                        $xFloats = array_map(fn($v) => (float)$v, $xValues);
+                        $xMin = !empty($xFloats) ? min($xFloats) : 0;
+                        $xMax = !empty($xFloats) ? max($xFloats) : 0;
+                        $xRange = abs($xMax - $xMin);
+
+                        $yFloats = array_map(fn($v) => (float)$v, $yValues);
+                        $yMin = !empty($yFloats) ? min($yFloats) : 0;
+                        $yMax = !empty($yFloats) ? max($yFloats) : 0;
+                        $yRange = abs($yMax - $yMin);
+
+                        $logger->info('[DIAGNOSTIC APIS-HUB] Variance check on X and Y', [
+                            'xMin' => $xMin,
+                            'xMax' => $xMax,
+                            'xRange' => $xRange,
+                            'x_is_constant' => $xRange < 1e-9,
+                            'yMin' => $yMin,
+                            'yMax' => $yMax,
+                            'yRange' => $yRange,
+                            'y_is_constant' => $yRange < 1e-9,
+                        ]);
+
+                        if ($xRange < 1e-9) {
+                            $logger->warning('[DIAGNOSTIC APIS-HUB] Constant X values detected, short circuiting', [
+                                'xMin' => $xMin,
+                                'xMax' => $xMax,
+                            ]);
+                            return new JsonResponse([
+                                'success' => true,
+                                'data' => [
+                                    'labels' => [],
+                                    'datasets' => [],
+                                    '_debug' => "The independent variable (X) contains constant values (all {$xMin}) across the selected date range. Statistical calculation cannot be computed."
+                                ]
+                            ]);
+                        }
+
+                        if ($yRange < 1e-9) {
+                            $logger->warning('[DIAGNOSTIC APIS-HUB] Constant Y values detected, short circuiting', [
+                                'yMin' => $yMin,
+                                'yMax' => $yMax,
+                            ]);
+                            return new JsonResponse([
+                                'success' => true,
+                                'data' => [
+                                    'labels' => [],
+                                    'datasets' => [],
+                                    '_debug' => "The dependent variable (Y) contains constant values (all {$yMin}) across the selected date range. Statistical calculation cannot be computed."
+                                ]
+                            ]);
+                        }
                     }
                         
-                        $regressionPayload = [
+                    // Python engine schema varies by endpoint:
+                    //   /trend/* endpoints expect a flat 'series' key
+                    //   all others (macd, anomaly, autocorrelation, regression, etc.) expect dependent_var/independent_vars
+                    $isTrendStat = str_starts_with($sdkMethod, 'calculateTrend');
+                    if ($isTrendStat) {
+                        $enginePayload = [
+                            'series' => [
+                                'dates' => $finalDates,
+                                'values' => $yValues,
+                            ],
+                        ];
+                    } else {
+                        $edgeCaseHandling = $payload['edge_case_handling'] ?? $payload['grouping'] ?? [
+                            'weighted' => true,
+                            'grouping' => 'none',
+                        ];
+                        $enginePayload = [
                             'dependent_var' => [
                                 'dates' => $finalDates,
                                 'values' => $yValues
@@ -181,17 +367,36 @@ class AnalyticsController extends BaseController
                                     'dates' => $finalDates,
                                     'values' => $xValues
                                 ]
-                            ]
+                            ],
+                            'edge_case_handling' => $edgeCaseHandling,
                         ];
-                        if (!$requiresBivariate) {
-                            // Strip dummy independent vars for univariate payloads to keep it clean
-                            $regressionPayload['independent_vars'] = (object)[];
-                        }
-                        $pythonResponse = $this->forwardToPythonEngine($regressionPayload, $sdkMethod, $engineHost, $apiKey);
-                        $result = $pythonResponse['data'] ?? $pythonResponse;
-                    } else {
-                        return $this->errorResponse("The mathematical payload requires time-series array evaluation. Pass groupBy: ['daily'] in filters.", 500);
                     }
+
+                    try {
+                        $pythonResponse = $this->forwardToPythonEngine($enginePayload, $sdkMethod, $engineHost, $apiKey);
+                        $result = $pythonResponse['data'] ?? $pythonResponse;
+                    } catch (\Throwable $pe) {
+                        $logger->warning('[DIAGNOSTIC APIS-HUB] Python engine returned error: ' . $pe->getMessage());
+                        return new JsonResponse([
+                            'success' => true,
+                            'data' => [
+                                'labels' => [],
+                                'datasets' => [],
+                                '_debug' => "Statistical calculation error: " . $pe->getMessage()
+                            ]
+                        ]);
+                    }
+                    
+                    if (isset($result['scatter_data']) && !empty($finalDates)) {
+                        // Use Python's labels if available (correctly ordered after histogram grouping),
+                        // otherwise fall back to original $finalDates order
+                        if (empty($result['scatter_data']['labels'])) {
+                            $result['scatter_data']['labels'] = array_values($finalDates);
+                        }
+                    }
+                } else {
+                    return $this->errorResponse("The mathematical payload requires time-series array evaluation. Pass groupBy: ['daily'] in filters.", 500);
+                }
 
                 $logger->info("Python engine request completed in " . round((microtime(true) - $tPythonStart) * 1000, 2) . "ms");
             }
@@ -224,15 +429,69 @@ class AnalyticsController extends BaseController
             throw new \Exception("Analytics Engine SDK Error: Method {$sdkMethod} does not exist.");
         }
         
-        try {
-            // The SDK inherently injects the API key and routes to the correct endpoint
-            $response = call_user_func([$api, $sdkMethod], $data);
-            
-            return $response;
-        } catch (\Exception $e) {
-            // Forward the Python engine's HTTP error message if possible
-            throw new \Exception("Analytics Engine Error: " . $e->getMessage());
+        // The SDK inherently injects the API key and routes to the correct endpoint
+        return call_user_func([$api, $sdkMethod], $data);
+    }
+
+    /**
+     * Group low-frequency dimension values (queries, pages, etc.) into a single "others" point
+     * so outliers with very few events don't skew the regression line.
+     *
+     * Supported methods:
+     *  - 'percentile' (default): groups the bottom N% of points sorted by the independent variable (x).
+     *    The grouped points are replaced by their centroid (mean x, mean y) labeled as $label.
+     *
+     * @param array $dates  Dimension labels (query strings, page URLs, etc.)
+     * @param array $y      Dependent variable values
+     * @param array $x      Independent variable values (used as frequency proxy)
+     * @param array $config Grouping configuration
+     * @return array  ['dates' => string[], 'y' => float[], 'x' => float[]]
+     */
+    protected function applyGroupByDimensionGrouping(array $dates, array $y, array $x, array $config): array
+    {
+        $n = count($dates);
+        if ($n < 3) {
+            return ['dates' => $dates, 'y' => $y, 'x' => $x];
         }
+
+        $method = $config['method'] ?? 'percentile';
+        $value  = (float)($config['value'] ?? 25);
+        $label  = $config['label'] ?? 'others';
+
+        if ($method === 'percentile') {
+            // Clamp percentile between 5 and 50
+            $value = max(5, min(50, $value));
+            $thresholdIndex = (int)ceil($n * $value / 100);
+            $thresholdIndex = max(1, min($thresholdIndex, $n - 1));
+
+            // Build combined tuple, sort by x ascending
+            $combined = [];
+            for ($i = 0; $i < $n; $i++) {
+                $combined[] = ['date' => $dates[$i], 'y' => $y[$i], 'x' => $x[$i]];
+            }
+            usort($combined, fn($a, $b) => $a['x'] <=> $b['x']);
+
+            $low  = array_slice($combined, 0, $thresholdIndex);
+            $high = array_slice($combined, $thresholdIndex);
+
+            // Single aggregated centroid for the low-frequency tail
+            $meanX = array_sum(array_column($low, 'x')) / count($low);
+            $meanY = array_sum(array_column($low, 'y')) / count($low);
+
+            $result = array_merge(
+                [['date' => $label, 'y' => $meanY, 'x' => $meanX]],
+                $high
+            );
+            usort($result, fn($a, $b) => $a['x'] <=> $b['x']);
+
+            return [
+                'dates' => array_column($result, 'date'),
+                'y'     => array_column($result, 'y'),
+                'x'     => array_column($result, 'x'),
+            ];
+        }
+
+        return ['dates' => $dates, 'y' => $y, 'x' => $x];
     }
 
     protected function errorResponse(string $message, int $code): JsonResponse
@@ -279,8 +538,13 @@ class AnalyticsController extends BaseController
                         $result = $qb->getQuery()->getResult();
 
                         // Some channels (e.g. GSC) store platformId as MD5 hash of the URL
-                        if (empty($result) && !$isArray) {
-                            $qb->setParameter('platformId', md5(trim($platformId)));
+                        if (empty($result)) {
+                            if ($isArray) {
+                                $hashedIds = array_map(fn($id) => md5(trim($id)), $platformId);
+                                $qb->setParameter('platformId', $hashedIds);
+                            } else {
+                                $qb->setParameter('platformId', md5(trim($platformId)));
+                            }
                             $result = $qb->getQuery()->getResult();
                         }
 

@@ -366,6 +366,37 @@
                             // 2. Delegate YAML processing to Driver
                             $currentConfig = file_exists($attrs['path']) ? (Yaml::parseFile($attrs['path']) ?: []) : [];
                             $updatedConfig = $driver->updateConfiguration($data, $currentConfig);
+
+                            // Inject cron_time globally if present in payload, according to tenant's native format
+                            if (isset($data['cron_time']) && preg_match('/^(\d{1,2}):(\d{2})(?::\d{2})?$/', $data['cron_time'], $matches)) {
+                                $hour = (int)$matches[1];
+                                $minute = (int)$matches[2];
+                                
+                                // Entities sync must run before recent data to ensure entities exist in DB
+                                // Offset by 4 hours to match standard YAML (e.g. entities at 2:00, recent at 6:00)
+                                $entitiesHour = ($hour - 4 + 24) % 24;
+                                
+                                $isNested = isset($updatedConfig['channels'][$chan]);
+                                $target = $isNested ? $updatedConfig['channels'][$chan] : $updatedConfig;
+                                $originalTarget = $isNested ? ($currentConfig['channels'][$chan] ?? []) : $currentConfig;
+
+                                if (array_key_exists('cron_entities_hour', $originalTarget)) {
+                                    $target['cron_entities_hour'] = $entitiesHour;
+                                    $target['cron_entities_minute'] = $minute;
+                                }
+
+                                if (array_key_exists('cron_recent_hour', $originalTarget)) {
+                                    $target['cron_recent_hour'] = $hour;
+                                    $target['cron_recent_minute'] = $minute;
+                                }
+
+                                if ($isNested) {
+                                    $updatedConfig['channels'][$chan] = $target;
+                                } else {
+                                    $updatedConfig = $target;
+                                }
+                            }
+
                             file_put_contents($attrs['path'], Yaml::dump($updatedConfig, 10, 2));
                             
                             if (isset($updatedConfig['channels'][$chan])) {
@@ -448,6 +479,13 @@
                         }
 
                         $driver = DriverFactory::get($chan, $logger, $chanConfig);
+                        
+                        // Disable retries for validation so it fails fast
+                        $api = method_exists($driver, 'getApi') ? $driver->getApi() : null;
+                        if ($api && method_exists($api, 'setMaxRetries')) {
+                            $api->setMaxRetries(0);
+                        }
+
                         $authProvider = $driver->getAuthProvider();
                         if ($authProvider && !$authProvider->hasCredentials()) {
                             $validation = [
@@ -459,8 +497,18 @@
                             $validation = $driver->validateAuthentication();
                         }
 
+                        $status = $validation['success'] ? 'valid' : 'error';
+                        $msgLower = strtolower($validation['message'] ?? '');
+                        if (!$validation['success'] && (
+                            str_contains($msgLower, 'rate limit') || 
+                            str_contains($msgLower, 'too many requests') ||
+                            str_contains($msgLower, 'max retries')
+                        )) {
+                            $status = 'warning';
+                        }
+
                         $result = [
-                            'status'  => $validation['success'] ? 'valid' : 'error',
+                            'status'  => $status,
                             'message' => $validation['message'],
                             'details' => $validation['details'] ?? [],
                         ];

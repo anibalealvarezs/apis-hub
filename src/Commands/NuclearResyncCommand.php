@@ -29,68 +29,115 @@ class NuclearResyncCommand extends Command
 
     protected function configure(): void
     {
-        $this->addOption('channel', null, InputOption::VALUE_OPTIONAL, 'Target channel (omit for all channels)', 'all');
+        $this->addOption('channel', null, InputOption::VALUE_REQUIRED, 'Target channels (comma-separated)');
+        $this->addOption('asset', null, InputOption::VALUE_OPTIONAL, 'Target single asset/account ID');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $channel = $input->getOption('channel') ?: 'all';
-        $isAll = $channel === 'all';
+        $logger = Helpers::setLogger('nuclear_resync.log');
+        $channelArg = $input->getOption('channel');
+        $assetArg = $input->getOption('asset');
+        
+        if (empty($channelArg)) {
+            $logger->error("No channels provided for resync.");
+            $output->writeln("<error>No channels provided for resync.</error>");
+            return Command::FAILURE;
+        }
 
-        $output->writeln("<info>Nuclear Resync starting for: <comment>" . ($isAll ? 'ALL channels' : $channel) . "</comment></info>");
+        $channels = array_filter(array_map('trim', explode(',', $channelArg)));
+        if (empty($channels)) {
+            $logger->error("Invalid channel list provided.");
+            $output->writeln("<error>Invalid channel list provided.</error>");
+            return Command::FAILURE;
+        }
+
+        $assetInfo = $assetArg ? " (Asset: {$assetArg})" : "";
+        $logger->info("Nuclear Resync starting for channels: " . implode(', ', $channels) . $assetInfo);
+        $output->writeln("<info>Nuclear Resync starting for channels: <comment>" . implode(', ', $channels) . "</comment>{$assetInfo}</info>");
 
         // 1. Delete jobs
         try {
             $conn = $this->entityManager->getConnection();
-            if ($isAll) {
-                $isPostgres = Helpers::isPostgres($this->entityManager);
-                if ($isPostgres) {
-                    $conn->executeStatement("TRUNCATE TABLE jobs RESTART IDENTITY CASCADE");
-                } else {
-                    $conn->executeStatement("DELETE FROM jobs");
-                }
-                $output->writeln("<info>✓ All jobs deleted.</info>");
-            } else {
-                $deleted = $conn->executeStatement("DELETE FROM jobs WHERE channel = :channel", ['channel' => $channel]);
-                $output->writeln("<info>✓ Deleted $deleted jobs for channel '$channel'.</info>");
-            }
-        } catch (\Throwable $e) {
-            $output->writeln("<error>✗ DB error: " . $e->getMessage() . "</error>");
+            if ($assetArg) {
+                $cleanAsset = str_replace(['act_', 'properties/', 'sc-domain:', 'https://', 'http://'], '', $assetArg);
+                $cleanAsset = rtrim($cleanAsset, '/');
+                $md5Asset = md5($assetArg);
+                $md5Clean = md5($cleanAsset);
 
+                $deleted = $conn->executeStatement(
+                    "DELETE FROM jobs WHERE channel IN (?) AND (
+                        CAST(payload AS text) LIKE ? 
+                        OR CAST(payload AS text) LIKE ?
+                        OR CAST(payload AS text) LIKE ?
+                        OR CAST(payload AS text) LIKE ?
+                        OR CAST(payload AS JSONB)->'params'->>'account_id' IN (?, ?, ?, ?, ?) 
+                        OR CAST(payload AS JSONB)->>'account_id' IN (?, ?, ?, ?, ?)
+                    )",
+                    [
+                        array_values($channels),
+                        '%' . $assetArg . '%',
+                        '%' . $cleanAsset . '%',
+                        '%' . $md5Asset . '%',
+                        '%' . $md5Clean . '%',
+                        $assetArg, 'act_' . $cleanAsset, 'properties/' . $cleanAsset, $md5Asset, $md5Clean,
+                        $assetArg, 'act_' . $cleanAsset, 'properties/' . $cleanAsset, $md5Asset, $md5Clean
+                    ],
+                    [
+                        \Doctrine\DBAL\ArrayParameterType::STRING,
+                        \Doctrine\DBAL\ParameterType::STRING,
+                        \Doctrine\DBAL\ParameterType::STRING,
+                        \Doctrine\DBAL\ParameterType::STRING,
+                        \Doctrine\DBAL\ParameterType::STRING,
+                        \Doctrine\DBAL\ParameterType::STRING, \Doctrine\DBAL\ParameterType::STRING, \Doctrine\DBAL\ParameterType::STRING, \Doctrine\DBAL\ParameterType::STRING, \Doctrine\DBAL\ParameterType::STRING,
+                        \Doctrine\DBAL\ParameterType::STRING, \Doctrine\DBAL\ParameterType::STRING, \Doctrine\DBAL\ParameterType::STRING, \Doctrine\DBAL\ParameterType::STRING, \Doctrine\DBAL\ParameterType::STRING
+                    ]
+                );
+            } else {
+                $deleted = $conn->executeStatement(
+                    "DELETE FROM jobs WHERE channel IN (?)",
+                    [array_values($channels)],
+                    [\Doctrine\DBAL\ArrayParameterType::STRING]
+                );
+            }
+            $logger->info("Deleted $deleted jobs for targeted channels{$assetInfo}.");
+            $output->writeln("<info>✓ Deleted $deleted jobs for targeted channels{$assetInfo}.</info>");
+        } catch (\Throwable $e) {
+            $logger->error("DB error deleting jobs: " . $e->getMessage());
+            $output->writeln("<error>✗ DB error: " . $e->getMessage() . "</error>");
             return Command::FAILURE;
         }
 
         // 2. Clear telemetry Redis cache
-        $cacheCleared = false;
-
-        try {
-            $redis = Helpers::getRedisClient();
-            $pattern = $isAll ? 'sync_telemetry:*' : "sync_telemetry:{$channel}:*";
-            $keys = $redis->keys($pattern);
-            if (! empty($keys)) {
-                $cacheCleared = true;
-                $redis->del($keys);
-                $output->writeln("<info>✓ Cleared " . count($keys) . " Redis telemetry keys.</info>");
-            } else {
-                $output->writeln("<comment>No Redis telemetry keys found for pattern: $pattern</comment>");
+        foreach ($channels as $channel) {
+            try {
+                $redis = Helpers::getRedisClient();
+                $pattern = "sync_telemetry:{$channel}:*";
+                $keys = $redis->keys($pattern);
+                if (! empty($keys)) {
+                    $redis->del($keys);
+                    $logger->info("Cleared " . count($keys) . " Redis telemetry keys for $channel.");
+                    $output->writeln("<info>✓ Cleared " . count($keys) . " Redis telemetry keys for $channel.</info>");
+                } else {
+                    $output->writeln("<comment>No Redis telemetry keys found for pattern: $pattern</comment>");
+                }
+            } catch (\Throwable $e) {
+                $logger->error("Redis telemetry cache clear error for $channel: " . $e->getMessage());
+                $output->writeln("<error>✗ Redis telemetry cache clear error for $channel: " . $e->getMessage() . "</error>");
             }
-        } catch (\Throwable $e) {
-            $output->writeln("<error>✗ Redis telemetry cache clear error: " . $e->getMessage() . "</error>");
-
-            return Command::FAILURE;
         }
 
         // 2.5. Fallback telemetry cache clear
-        if (! $cacheCleared) {
+        foreach ($channels as $channel) {
             try {
                 $invalidateSyncCacheCmd = new InvalidateSyncCacheCommand();
-                $invalidateSyncCacheInput = new ArrayInput($isAll ? [] : ['--channel' => $channel]);
+                $invalidateSyncCacheInput = new ArrayInput(['--channel' => $channel]);
                 $invalidateSyncCacheCmd->run($invalidateSyncCacheInput, $output);
-                $output->writeln("<info>✓ Fallback Redis telemetry cache cleared.</info>");
+                $logger->info("Fallback Redis telemetry cache cleared for $channel.");
+                $output->writeln("<info>✓ Fallback Redis telemetry cache cleared for $channel.</info>");
             } catch (\Throwable $e) {
-                $output->writeln("<error>✗ Fallback Redis telemetry cache clear error: " . $e->getMessage() . "</error>");
-
-                return Command::FAILURE;
+                $logger->error("Fallback Redis telemetry cache clear error for $channel: " . $e->getMessage());
+                $output->writeln("<error>✗ Fallback Redis telemetry cache clear error for $channel: " . $e->getMessage() . "</error>");
             }
         }
 
@@ -100,8 +147,10 @@ class NuclearResyncCommand extends Command
             $refreshCmd = new \Commands\RefreshInstancesCommand();
             $refreshInput = new ArrayInput([]);
             $refreshCmd->run($refreshInput, $output);
+            $logger->info("Instances configuration refreshed.");
             $output->writeln("<info>✓ Instances configuration refreshed.</info>");
         } catch (\Throwable $e) {
+            $logger->error("Refresh instances error: " . $e->getMessage());
             $output->writeln("<error>✗ Refresh instances error: " . $e->getMessage() . "</error>");
             return Command::FAILURE;
         }
@@ -109,30 +158,43 @@ class NuclearResyncCommand extends Command
         // 3. Schedule initial jobs
         $output->writeln("<info>Scheduling initial jobs...</info>");
 
-        try {
-            $scheduleCmd = new ScheduleInitialJobsCommand($this->entityManager);
-            $scheduleInput = new ArrayInput($isAll ? [] : ['--channel' => $channel]);
-            $scheduleCmd->run($scheduleInput, $output);
-            $output->writeln("<info>✓ Initial jobs scheduled.</info>");
-        } catch (\Throwable $e) {
-            $output->writeln("<error>✗ Schedule error: " . $e->getMessage() . "</error>");
-
-            return Command::FAILURE;
+        foreach ($channels as $channel) {
+            try {
+                $scheduleCmd = new ScheduleInitialJobsCommand($this->entityManager);
+                $scheduleInputParams = ['--channel' => $channel];
+                if ($assetArg) {
+                    $scheduleInputParams['--asset'] = $assetArg;
+                }
+                $scheduleInput = new ArrayInput($scheduleInputParams);
+                $scheduleCmd->run($scheduleInput, $output);
+                $logger->info("Initial jobs scheduled for $channel{$assetInfo}.");
+                $output->writeln("<info>✓ Initial jobs scheduled for $channel{$assetInfo}.</info>");
+            } catch (\Throwable $e) {
+                $logger->error("Schedule error for $channel: " . $e->getMessage());
+                $output->writeln("<error>✗ Schedule error for $channel: " . $e->getMessage() . "</error>");
+            }
         }
 
         $output->writeln("<comment>Worker restart is now handled externally by bin/nuclear-sync.sh to ensure graceful container lifecycle management.</comment>");
 
         // 4. Force invalidate telemetry cache at the end of the process
-        try {
-            $output->writeln("<info>Invalidating telemetry cache...</info>");
-            $invalidateSyncCacheCmd = new InvalidateSyncCacheCommand();
-            $invalidateSyncCacheInput = new ArrayInput($isAll ? [] : ['--channel' => $channel]);
-            $invalidateSyncCacheCmd->run($invalidateSyncCacheInput, $output);
-            $output->writeln("<info>✓ Telemetry cache successfully invalidated.</info>");
-        } catch (\Throwable $e) {
-            $output->writeln("<error>✗ Telemetry cache invalidation error: " . $e->getMessage() . "</error>");
+        $telemetryService = new \Services\Sync\SyncTelemetryService(new \Services\CacheService(Helpers::getRedisClient()));
+        foreach ($channels as $channel) {
+            try {
+                $output->writeln("<info>Invalidating telemetry cache for $channel...</info>");
+                $telemetryService->invalidate($channel, $assetArg);
+                $invalidateSyncCacheCmd = new InvalidateSyncCacheCommand();
+                $invalidateSyncCacheInput = new ArrayInput(['--channel' => $channel]);
+                $invalidateSyncCacheCmd->run($invalidateSyncCacheInput, $output);
+                $logger->info("Telemetry cache successfully invalidated for $channel.");
+                $output->writeln("<info>✓ Telemetry cache successfully invalidated for $channel.</info>");
+            } catch (\Throwable $e) {
+                $logger->error("Telemetry cache invalidation error for $channel: " . $e->getMessage());
+                $output->writeln("<error>✗ Telemetry cache invalidation error for $channel: " . $e->getMessage() . "</error>");
+            }
         }
 
+        $logger->info("Nuclear Resync complete for channels: " . implode(', ', $channels) . $assetInfo);
         $output->writeln("<info>✓ Nuclear Resync complete.</info>");
 
         return Command::SUCCESS;

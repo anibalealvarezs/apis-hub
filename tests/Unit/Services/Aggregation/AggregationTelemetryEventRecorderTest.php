@@ -19,7 +19,9 @@
 
         protected function tearDown(): void
         {
-            @unlink($this->outputPath);
+            $date = date('Y-m-d');
+            $suffixedPath = substr($this->outputPath, 0, -6) . '-' . $date . '.jsonl';
+            @unlink($suffixedPath);
             parent::tearDown();
         }
 
@@ -33,9 +35,12 @@
                 'planner_diagnostics' => ['profile_channel' => 'google_search_console'],
             ]);
 
+            $date = date('Y-m-d');
+            $suffixedPath = substr($this->outputPath, 0, -6) . '-' . $date . '.jsonl';
+
             $this->assertTrue($written);
-            $this->assertFileExists($this->outputPath);
-            $contents = file($this->outputPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+            $this->assertFileExists($suffixedPath);
+            $contents = file($suffixedPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
             $this->assertIsArray($contents);
             $this->assertCount(1, $contents);
             $decoded = json_decode((string)$contents[0], true, 512, JSON_THROW_ON_ERROR);

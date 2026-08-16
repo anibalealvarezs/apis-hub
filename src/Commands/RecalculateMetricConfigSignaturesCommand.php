@@ -320,7 +320,7 @@ class RecalculateMetricConfigSignaturesCommand extends Command
     {
         return KeyGenerator::generateMetricConfigKey(
             channel: (int) $row['channel'],
-            name: $row['name'],
+            name: (string) $row['name'],
             period: $row['period'],
             account: $row['account_name'],
             channeledAccount: $row['channeled_account_platform_id'],

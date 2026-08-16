@@ -47,6 +47,7 @@ use Enums\JobStatus;
         {
             $this->em = $em ?? Helpers::getManager();
             $this->logger = Helpers::setLogger('jobs.log');
+            $this->logger->info("ProcessJobsCommand INSTANTIATED by " . getenv('INSTANCE_NAME'));
             parent::__construct();
 
         }
@@ -89,6 +90,7 @@ use Enums\JobStatus;
          */
         protected function execute(InputInterface $input, OutputInterface $output): int
         {
+            $this->logger->info("WORKER IS EXECUTING: " . getenv('INSTANCE_NAME'));
             Helpers::clearConfigCache();
             $channelsConfig = Helpers::getChannelsConfig();
             $envInstance = getenv('INSTANCE_NAME') ?: gethostname();
@@ -137,54 +139,52 @@ use Enums\JobStatus;
                     $this->logger->info("Resumption: Reset ".($resetByInstance + $resetByWorker)." jobs previously held by this instance ({$envInstance}).");
                 }
 
-                // Global recovery: If this is the Master (has docker socket), detect dead containers
-                $isMaster = file_exists('/var/run/docker.sock');
+                // Global recovery: If this is the Master (identified by INSTANCE_NAME containing 'master')
+                $isMaster = str_contains($envInstance, 'master') && file_exists('/var/run/docker.sock');
 
                 if ($isMaster) {
-                    // 1. Reset by Timeout (Safety net for other issues, increased to 2 hours)
-                    $jobRepo->resetAllOrphanedJobs(120);
+                    // 1. Reset by Timeout (Safety net for other issues, using configurable timeout)
+                    $jobRepo->resetAllOrphanedJobs($timeoutMinutes);
 
-                    // 2. Reset by Dead Containers (Accurate detection via Docker Socket API)
-                    $activeContainersStr = '';
-                    $ch = curl_init('http://localhost/containers/json');
-                    curl_setopt($ch, CURLOPT_UNIX_SOCKET_PATH, '/var/run/docker.sock');
-                    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                    $response = curl_exec($ch);
-                    curl_close($ch);
+                    // 2. Reset by Dead Containers (Accurate detection via Docker CLI)
+                    exec('docker ps --format "{{.ID}}|{{.Names}}" 2>&1', $dockerOutput, $dockerReturn);
 
-                    if ($response) {
-                        $containers = json_decode($response, true);
-                        if (is_array($containers)) {
-                            $activeIds = [];
-                            foreach ($containers as $container) {
-                                $shortId = substr($container['Id'], 0, 12);
+                    if ($dockerReturn === 0 && !empty($dockerOutput)) {
+                        $activeIds = [];
+                        foreach ($dockerOutput as $line) {
+                            $parts = explode('|', trim($line));
+                            if (count($parts) >= 2) {
+                                $shortId = $parts[0];
+                                $nameStr = $parts[1]; // Comma-separated if multiple names
+                                
                                 $activeIds[] = $shortId;
-                                $activeIds[] = "worker-".$shortId;
+                                $activeIds[] = "worker-" . $shortId;
 
-                                if (!empty($container['Names'])) {
-                                    foreach ($container['Names'] as $name) {
-                                        $cleanName = ltrim($name, '/');
-                                        $activeIds[] = $cleanName;
+                                $names = explode(',', $nameStr);
+                                foreach ($names as $name) {
+                                    $cleanName = ltrim(trim($name), '/');
+                                    $activeIds[] = $cleanName;
 
-                                        // Dynamically support all suffix matches to avoid deployment prefix mismatches
-                                        $parts = explode('-', $cleanName);
-                                        $numParts = count($parts);
-                                        for ($i = 1; $i < $numParts; $i++) {
-                                            $suffix = implode('-', array_slice($parts, $i));
-                                            $activeIds[] = $suffix;
-                                        }
+                                    // Dynamically support all suffix matches to avoid deployment prefix mismatches
+                                    $nameParts = explode('-', $cleanName);
+                                    $numParts = count($nameParts);
+                                    for ($i = 1; $i < $numParts; $i++) {
+                                        $suffix = implode('-', array_slice($nameParts, $i));
+                                        $activeIds[] = $suffix;
                                     }
                                 }
                             }
-
-                            // Also include ourselves and known master/specific instances
-                            $activeIds[] = $envInstance;
-
-                            $resetDead = $jobRepo->resetJobsByDeadWorkers($activeIds);
-                            if ($resetDead > 0) {
-                                $this->logger->info("Cleanup: Reset {$resetDead} jobs from dead containers.");
-                            }
                         }
+
+                        // Also include ourselves and known master/specific instances
+                        $activeIds[] = $envInstance;
+
+                        $resetDead = $jobRepo->resetJobsByDeadWorkers($activeIds);
+                        if ($resetDead > 0) {
+                            $this->logger->info("Cleanup: Reset {$resetDead} jobs from dead containers.");
+                        }
+                    } else {
+                        $this->logger->warning("Cleanup: Failed to run docker ps for container discovery. Return code: $dockerReturn");
                     }
                     
                     $this->logger->info("Master watchdog routine complete. Master instance will not process jobs.");
@@ -223,6 +223,7 @@ use Enums\JobStatus;
                 if ($jobId) {
                     $job = $jobRepo->find($jobId);
                 } else {
+                    $this->logger->info("WORKER DEBUG ($envInstance): Attempting to claim job... [Tier: " . ($workerTier ?? 'none') . " | Channel: " . ($envChannel ?? 'none') . "]");
                     $job = $jobRepo->claimAvailableJob(
                         status: [JobStatus::scheduled->value, JobStatus::delayed->value],
                         workerId: $envInstance,
@@ -230,6 +231,11 @@ use Enums\JobStatus;
                         instanceName: ($forceAll || $isGenericWorker ? null : $envInstance),
                         workerTier: $workerTier
                     );
+                    if (!$job) {
+                        $this->logger->info("WORKER DEBUG ($envInstance): Found no jobs! Queue empty or locked.");
+                    } else {
+                        $this->logger->info("WORKER DEBUG ($envInstance): CLAIMED job " . $job->getUuid() . " successfully.");
+                    }
                 }
 
                 if (!$job) {
@@ -248,20 +254,23 @@ use Enums\JobStatus;
                     $requiredInstances = array_map('trim', explode(',', $requires));
                     $allMet = true;
                     $accountId = $params['account_id'] ?? null;
+                    $missingDependency = '';
                     foreach ($requiredInstances as $requiredInstance) {
                         // Historical chunks (e.g. 2026-1) might have completed more than 24 hours ago.
                         // We pass 87600 hours (10 years) to ensure they are recognized regardless of completion date.
                         if (!$jobRepo->hasSuccessfulRecentJob($requiredInstance, 87600, $accountId)) {
                             $allMet = false;
-
+                            $missingDependency = $requiredInstance;
                             break;
                         }
                     }
                     if (!$allMet) {
+                        $msg = "Job depends on '{$missingDependency}' which has no successful recent execution.";
+                        $this->logger->warning("Job {$job->getUuid()} (Channel: {$job->getChannel()}) depends on '{$missingDependency}' which has no successful recent execution. Skipping.");
                         if (Helpers::isDebug() || $output->isVerbose()) {
                             $output->writeln("<comment>Job {$job->getUuid()} dependencies not met. Moving to delayed.</comment>");
                         }
-                        $jobRepo->update($job->getId(), (object)['status' => JobStatus::delayed->value]);
+                        $jobRepo->update($job->getId(), (object)['status' => JobStatus::delayed->value, 'message' => $msg]);
                         $stats['skipped']++;
 
                         continue;
