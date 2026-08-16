@@ -51,7 +51,7 @@
     "anibalealvarezs/linkedin-hub-driver": "^0.1.0",
     "anibalealvarezs/tiktok-hub-driver": "^0.1.0",
     "anibalealvarezs/x-hub-driver": "^0.1.0",
-    "anibalealvarezs/analytics-api": "*@dev",
+    "anibalealvarezs/analytics-api": "^1.0.0@dev",
     "php": ">=8.3"
   },
   "conflict": {
