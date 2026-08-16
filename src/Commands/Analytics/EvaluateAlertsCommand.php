@@ -85,7 +85,13 @@ class EvaluateAlertsCommand extends Command
         foreach ($alerts as $alert) {
             $alertId = $alert['id'] ?? null;
             $alertName = $alert['name'] ?? 'Alert #' . $alertId;
+            $isActive = $alert['is_active'] ?? true;
             $nextEval = $alert['next_evaluation_at'] ?? null;
+
+            if (!$isActive && !$force && $alertIdFilter === null) {
+                $output->writeln("  [Skip] Alert '{$alertName}' (ID {$alertId}) is disabled");
+                continue;
+            }
 
             if (!$force && $nextEval) {
                 $nextTs = strtotime($nextEval);
