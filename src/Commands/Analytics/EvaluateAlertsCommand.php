@@ -75,7 +75,14 @@ class EvaluateAlertsCommand extends Command
 
         $facadeUrl = $_ENV['ALERT_FACADE_URL'] ?? null;
         if (!$facadeUrl && !empty($_ENV['MONITOR_FACADE_URL'])) {
-            $facadeUrl = rtrim(dirname($_ENV['MONITOR_FACADE_URL']), '/') . '/api/alerts/triggered';
+            $parsedUrl = parse_url($_ENV['MONITOR_FACADE_URL']);
+            $scheme = $parsedUrl['scheme'] ?? 'https';
+            $host = $parsedUrl['host'] ?? 'localhost';
+            $port = isset($parsedUrl['port']) ? ':' . $parsedUrl['port'] : '';
+            $facadeUrl = "{$scheme}://{$host}{$port}/api/alerts/triggered";
+        }
+        if ($facadeUrl && str_ends_with($facadeUrl, '/api/heartbeat/api/alerts/triggered')) {
+            $facadeUrl = str_replace('/api/heartbeat/api/alerts/triggered', '/api/alerts/triggered', $facadeUrl);
         }
         $monitorToken = $_ENV['MONITOR_TOKEN'] ?? null;
 
