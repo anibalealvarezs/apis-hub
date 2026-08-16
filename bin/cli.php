@@ -22,6 +22,7 @@
     use Commands\Analytics\RetryFailedJobCommand;
     use Commands\Analytics\RetryFailedJobsCommand;
     use Commands\Analytics\SwooleWorkerCommand;
+    use Commands\Analytics\EvaluateAlertsCommand;
     use Commands\HealthCheckCommand;
     use Commands\Crud\AggregateEntityCommand;
     use Commands\Crud\CreateEntityCommand;
@@ -117,6 +118,7 @@
             new RetryFailedJobsCommand($entityManager),
             new NuclearResyncCommand($entityManager),
             new UpgradeVersionCommand($entityManager),
+            new EvaluateAlertsCommand($entityManager),
         ];
 
         foreach ($commands as $command) {
