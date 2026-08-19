@@ -89,7 +89,9 @@ class EvaluateAlertsCommand extends Command
         $nowIso = date('c');
         $nowTs = time();
 
-        foreach ($alerts as $alert) {
+        $configUpdated = false;
+
+        foreach ($alerts as $idx => $alert) {
             $alertId = $alert['id'] ?? null;
             $alertName = $alert['name'] ?? 'Alert #' . $alertId;
             $isActive = $alert['is_active'] ?? true;
@@ -119,6 +121,8 @@ class EvaluateAlertsCommand extends Command
             $lines = $alert['calculation_lines'] ?? [
                 ['id' => null, 'label' => 'Default Line', 'asset_filter' => ['asset_platform_id' => 'all']]
             ];
+
+            $lastReturnedNextEval = null;
 
             foreach ($lines as $line) {
                 $lineId = $line['id'] ?? null;
@@ -193,7 +197,10 @@ class EvaluateAlertsCommand extends Command
                     ];
 
                     if (!$dryRun && $facadeUrl && $monitorToken) {
-                        $this->postResultToFacade($facadeUrl, $monitorToken, $payload);
+                        $res = $this->postResultToFacade($facadeUrl, $monitorToken, $payload);
+                        if (!empty($res['next_evaluation_at'])) {
+                            $lastReturnedNextEval = $res['next_evaluation_at'];
+                        }
                     } elseif ($dryRun) {
                         $output->writeln("     [Dry Run] Skipping HTTP callback");
                     }
@@ -214,14 +221,71 @@ class EvaluateAlertsCommand extends Command
                             'warning_message' => $e->getMessage(),
                             'triggered_at' => $nowIso,
                         ];
-                        $this->postResultToFacade($facadeUrl, $monitorToken, $errorPayload);
+                        $res = $this->postResultToFacade($facadeUrl, $monitorToken, $errorPayload);
+                        if (!empty($res['next_evaluation_at'])) {
+                            $lastReturnedNextEval = $res['next_evaluation_at'];
+                        }
                     }
                 }
             }
+
+            // Advance next_evaluation_at timestamp for evaluated alert
+            $nextTimestamp = $lastReturnedNextEval ?: $this->computeFallbackNextEvaluationAt($alert);
+            $alerts[$idx]['next_evaluation_at'] = $nextTimestamp;
+            $alerts[$idx]['last_evaluated_at'] = $nowIso;
+            $configUpdated = true;
+        }
+
+        if ($configUpdated && file_exists($configPath) && is_writable($configPath)) {
+            file_put_contents($configPath, json_encode($alerts, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
         }
 
         $logger->info("--- Alert Evaluation Run Complete ---");
         return Command::SUCCESS;
+    }
+
+    /**
+     * Compute fallback next evaluation timestamp when not returned by Facade.
+     */
+    protected function computeFallbackNextEvaluationAt(array $alert): ?string
+    {
+        $scheduleType = $alert['schedule_type'] ?? 'daily';
+        $config = $alert['schedule_config'] ?? [];
+        $timeStr = $config['time'] ?? '08:00';
+        $timeParts = explode(':', $timeStr);
+        $hour = (int) ($timeParts[0] ?? 8);
+        $minute = (int) ($timeParts[1] ?? 0);
+
+        $now = new \DateTime();
+        switch ($scheduleType) {
+            case 'daily':
+                $next = (clone $now)->setTime($hour, $minute, 0);
+                if ($next <= $now) {
+                    $next->modify('+1 day');
+                }
+                return $next->format('c');
+
+            case 'weekly':
+                $dayOfWeek = (int) ($config['day_of_week'] ?? 1); // 1 = Mon, 7 = Sun
+                $dayName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][$dayOfWeek % 7];
+                $next = (clone $now)->modify("next {$dayName}")->setTime($hour, $minute, 0);
+                return $next->format('c');
+
+            case 'biweekly':
+                $dayOfWeek = (int) ($config['day_of_week'] ?? 1);
+                $dayName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][$dayOfWeek % 7];
+                $next = (clone $now)->modify("next {$dayName}")->setTime($hour, $minute, 0);
+                $next->modify('+1 week');
+                return $next->format('c');
+
+            case 'monthly':
+                $next = (clone $now)->modify('+1 month')->setTime($hour, $minute, 0);
+                return $next->format('c');
+
+            case 'once':
+            default:
+                return null;
+        }
     }
 
     /**
@@ -271,7 +335,7 @@ class EvaluateAlertsCommand extends Command
     /**
      * Post evaluation result payload to Facade webhook endpoint.
      */
-    protected function postResultToFacade(string $url, string $token, array $payload): void
+    protected function postResultToFacade(string $url, string $token, array $payload): ?array
     {
         $ch = curl_init($url);
         $json = json_encode($payload);
@@ -294,5 +358,7 @@ class EvaluateAlertsCommand extends Command
         if ($code < 200 || $code >= 300) {
             throw new \Exception("Facade webhook returned status {$code}: {$response}");
         }
+
+        return is_string($response) ? json_decode($response, true) : null;
     }
 }
