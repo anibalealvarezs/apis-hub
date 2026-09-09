@@ -59,28 +59,24 @@
                 'channeledaccount', 'channeledcampaign',
             ];
             if (count($normalized) === 2) {
-                $temporalPart  = null;
-                $entityPart    = null;
-                $rawEntityPart = null;
-                foreach ($rawFields as $idx => $rawField) {
-                    $norm = $normalized[$idx];
+                $temporalPart = null;
+                $entityPart   = null;
+                foreach ($normalized as $idx => $norm) {
                     if (in_array($norm, $temporalFields, true)) {
                         $temporalPart = $norm;
                     } elseif (in_array($norm, $knownCombinableFields, true)) {
-                        $entityPart    = $norm;
-                        $rawEntityPart = $rawField;
+                        $entityPart = $norm;
                     } elseif (str_starts_with($norm, 'dimensions.') && strlen($norm) > 11) {
-                        $entityPart    = $norm;
-                        $rawEntityPart = $rawField;
+                        $entityPart = $norm;
                     }
                 }
 
                 if ($temporalPart !== null && $entityPart !== null) {
                     // Preserve original casing for known camelCase identifiers (e.g. channeledCampaign)
                     $entityLabel = match ($entityPart) {
-                        'channeledcampaign'  => 'channeledCampaign',
-                        'channeledaccount'   => 'channeledAccount',
-                        default             => $entityPart,
+                        'channeledcampaign' => 'channeledCampaign',
+                        'channeledaccount'  => 'channeledAccount',
+                        default            => $entityPart,
                     };
 
                     return $temporalPart . '+' . $entityLabel;
