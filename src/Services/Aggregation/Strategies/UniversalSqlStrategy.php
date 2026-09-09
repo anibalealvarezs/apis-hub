@@ -398,7 +398,13 @@
                 $groupSql
                 $orderSql";
 
-            return $connection->fetchAllAssociative($sql, $sqlParams);
+            error_log("[UniversalSqlDebug] Executing SQL: " . preg_replace('/\s+/', ' ', $sql) . " | Params: " . json_encode($sqlParams));
+
+            $rows = $connection->fetchAllAssociative($sql, $sqlParams);
+
+            error_log("[UniversalSqlDebug] Rows returned: " . count($rows) . " | Sample: " . json_encode(array_slice($rows, 0, 2)));
+
+            return $rows;
         }
 
         /**
