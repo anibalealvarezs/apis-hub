@@ -208,7 +208,7 @@
                     $whereClauses[] = $this->buildFilterClause('fpost.post_id', $condition, $paramName);
 
                     if ($condition['value'] !== null) {
-                        if ($condition['operator'] === 'in' && is_array($condition['value'])) {
+                        if (in_array($condition['operator'], ['in', 'not_in'], true) && is_array($condition['value'])) {
                             foreach ($condition['value'] as $i => $v) {
                                 $sqlParams["{$paramName}_{$i}"] = $this->formatFilterValue($v);
                             }
@@ -236,7 +236,7 @@
                     }
 
                     if ($condition['value'] !== null) {
-                        if ($condition['operator'] === 'in' && is_array($condition['value'])) {
+                        if (in_array($condition['operator'], ['in', 'not_in'], true) && is_array($condition['value'])) {
                             foreach ($condition['value'] as $i => $v) {
                                 $sqlParams["{$paramName}_{$i}"] = $this->formatFilterValue($v);
                             }
@@ -265,7 +265,7 @@
 
                     $whereClauses[] = $this->buildFilterClause("dv_$dimAlias.value", $condition, $paramName);
                     if ($condition['value'] !== null) {
-                        if ($condition['operator'] === 'in' && is_array($condition['value'])) {
+                        if (in_array($condition['operator'], ['in', 'not_in'], true) && is_array($condition['value'])) {
                             foreach ($condition['value'] as $i => $v) {
                                 $sqlParams["{$paramName}_{$i}"] = $this->formatFilterValue($v);
                             }
@@ -703,11 +703,24 @@
                 return "$col IN (" . implode(', ', $placeholders) . ")";
             }
 
+            if ($condition['operator'] === 'not_in' && is_array($condition['value'])) {
+                if (empty($condition['value'])) {
+                    return "1 = 1";
+                }
+                $placeholders = [];
+                foreach (array_keys($condition['value']) as $i) {
+                    $placeholders[] = ":{$alias}_{$i}";
+                }
+                return "($col IS NULL OR $col NOT IN (" . implode(', ', $placeholders) . "))";
+            }
+
             return match ($condition['operator']) {
                 'neq'         => "$col <> :$alias",
+                'like'        => "$col LIKE :$alias",
                 'is_null'     => "$col IS NULL",
                 'is_not_null' => "$col IS NOT NULL",
                 'in'          => "$col IN (:$alias)",
+                'not_in'      => "($col IS NULL OR $col NOT IN (:$alias))",
                 'eq'          => "$col = :$alias",
                 default       => "$col = :$alias",
             };

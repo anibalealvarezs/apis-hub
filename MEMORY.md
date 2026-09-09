@@ -268,3 +268,11 @@
 - **Cause**: Standard log rotation policies or scheduled cron tasks were likely overwriting or purging the fixed `aggregation-telemetry.jsonl` file.
 - **Fix**: Updated `AggregationTelemetryEventRecorder` to implement atomic daily file rotation by appending a date suffix (`aggregation-telemetry-YYYY-MM-DD.jsonl`) to the log path.
 - **Support**: Enhanced `ReportAggregationTelemetryCommand`'s `--input` flag to accept a directory as input, automatically discovering and concatenating multiple daily `.jsonl` files for aggregate snapshot generation without breaking backward file compatibility.
+
+### 2026-09-08 - Aggregation Filter Operators Enhancement (`not_in`, `like`)
+- **Context**: Added support for advanced widget series and breakdown filtering capabilities from APIs Hub Facade.
+- **Components**:
+    - `FilterConditionResolver`: Added operator normalization for `not_in`, `not in`, and `!in` returning `['operator' => 'not_in', 'value' => ...]`.
+    - `UniversalSqlStrategy`: Added `not_in` and `like` handling in `buildFilterClause()`.
+    - For `not_in`: Implemented array placeholder expansion with NULL safety (`($col IS NULL OR $col NOT IN (:param_0, ...))`) and guard against empty lists (`1 = 1`). Supported across relational entity columns, ad accounts, and EAV dimension values.
+    - For `like`: Added standard `$col LIKE :alias` clause generation and parameter binding.
