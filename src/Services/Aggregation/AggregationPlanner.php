@@ -614,6 +614,12 @@
                     continue;
                 }
 
+                if (is_array($value) && array_key_exists('operator', $value)) {
+                    $op = strtolower(trim((string)$value['operator']));
+                    $operators[] = $op !== '' ? $op : 'eq';
+                    continue;
+                }
+
                 if (is_string($value)) {
                     $trimmed = trim($value);
                     if ($trimmed === 'N/A' || $trimmed === 'NULL') {

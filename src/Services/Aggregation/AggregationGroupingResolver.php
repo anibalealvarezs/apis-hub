@@ -51,8 +51,40 @@
                 return implode('+', $normalized);
             }
 
-            if (count($normalized) === 2 && in_array('daily', $normalized) && in_array('channeledcampaign', $normalized)) {
-                return 'daily+channeledCampaign';
+            // Handle temporal (daily/weekly/monthly/etc.) combined with a single known entity or dimension field.
+            $temporalFields = ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'];
+            $knownCombinableFields = [
+                'query', 'page', 'country', 'device', 'age', 'gender',
+                'ad', 'adgroup', 'account', 'campaign',
+                'channeledaccount', 'channeledcampaign',
+            ];
+            if (count($normalized) === 2) {
+                $temporalPart  = null;
+                $entityPart    = null;
+                $rawEntityPart = null;
+                foreach ($rawFields as $idx => $rawField) {
+                    $norm = $normalized[$idx];
+                    if (in_array($norm, $temporalFields, true)) {
+                        $temporalPart = $norm;
+                    } elseif (in_array($norm, $knownCombinableFields, true)) {
+                        $entityPart    = $norm;
+                        $rawEntityPart = $rawField;
+                    } elseif (str_starts_with($norm, 'dimensions.') && strlen($norm) > 11) {
+                        $entityPart    = $norm;
+                        $rawEntityPart = $rawField;
+                    }
+                }
+
+                if ($temporalPart !== null && $entityPart !== null) {
+                    // Preserve original casing for known camelCase identifiers (e.g. channeledCampaign)
+                    $entityLabel = match ($entityPart) {
+                        'channeledcampaign'  => 'channeledCampaign',
+                        'channeledaccount'   => 'channeledAccount',
+                        default             => $entityPart,
+                    };
+
+                    return $temporalPart . '+' . $entityLabel;
+                }
             }
 
             return null;
