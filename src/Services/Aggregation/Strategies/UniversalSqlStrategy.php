@@ -205,15 +205,15 @@
 
                 if (in_array($key, ['post', 'post_id'], true) && $this->shouldFilterPostByPlatformId($condition)) {
                     $safeLeftJoin('posts', 'fpost', 'fpost.id = mc.post_id');
-                    $whereClauses[] = $this->buildFilterClause('fpost.post_id', $condition, $paramName);
+                    $whereClauses[] = $this->buildFilterClause('fpost.post_id', $condition, $paramName, $isPostgres);
 
                     if ($condition['value'] !== null) {
                         if (in_array($condition['operator'], ['in', 'not_in'], true) && is_array($condition['value'])) {
                             foreach ($condition['value'] as $i => $v) {
-                                $sqlParams["{$paramName}_{$i}"] = $this->formatFilterValue($v);
+                                $sqlParams["{$paramName}_{$i}"] = $this->formatFilterValue($v, $condition['operator']);
                             }
                         } else {
-                            $sqlParams[$paramName] = $this->formatFilterValue($condition['value']);
+                            $sqlParams[$paramName] = $this->formatFilterValue($condition['value'], $condition['operator']);
                         }
                     }
                     continue;
@@ -230,18 +230,34 @@
                 if ($relationKey !== null) {
                     if ($relationKey === 'post' && $this->shouldFilterPostByPlatformId($condition)) {
                         $safeLeftJoin('posts', 'fpost', 'fpost.id = mc.post_id');
-                        $whereClauses[] = $this->buildFilterClause('fpost.post_id', $condition, $paramName);
+                        $whereClauses[] = $this->buildFilterClause('fpost.post_id', $condition, $paramName, $isPostgres);
                     } else {
-                        $whereClauses[] = $this->buildFilterClause("mc.{$relationMap[$relationKey]['fk']}", $condition, $paramName);
+                        $map = $relationMap[$relationKey];
+                        $isLike = ($condition['operator'] ?? null) === 'like';
+                        $isNonNumericString = is_string($condition['value']) && !is_numeric($condition['value']) && !in_array($condition['operator'], ['is_null', 'is_not_null'], true);
+
+                        if (!str_ends_with($key, '_id') && ($isLike || $isNonNumericString)) {
+                            $alias = $map['alias'];
+                            $safeLeftJoin($map['table'], $alias, "$alias.id = mc.{$map['fk']}");
+                            if (!empty($map['isJSON'])) {
+                                $jsonPath = $map['jsonPath'] ?? 'name';
+                                $targetCol = $isPostgres ? "$alias.data->>'$jsonPath'" : "JSON_UNQUOTE(JSON_EXTRACT($alias.data, '$.$jsonPath'))";
+                            } else {
+                                $targetCol = "$alias.{$map['field']}";
+                            }
+                            $whereClauses[] = $this->buildFilterClause($targetCol, $condition, $paramName, $isPostgres);
+                        } else {
+                            $whereClauses[] = $this->buildFilterClause("mc.{$map['fk']}", $condition, $paramName, $isPostgres);
+                        }
                     }
 
                     if ($condition['value'] !== null) {
                         if (in_array($condition['operator'], ['in', 'not_in'], true) && is_array($condition['value'])) {
                             foreach ($condition['value'] as $i => $v) {
-                                $sqlParams["{$paramName}_{$i}"] = $this->formatFilterValue($v);
+                                $sqlParams["{$paramName}_{$i}"] = $this->formatFilterValue($v, $condition['operator']);
                             }
                         } else {
-                            $sqlParams[$paramName] = $this->formatFilterValue($condition['value']);
+                            $sqlParams[$paramName] = $this->formatFilterValue($condition['value'], $condition['operator']);
                         }
                     }
                     continue;
@@ -263,14 +279,14 @@
                 )");
                     $safeLeftJoin('dimension_values', "dv_$dimAlias", "dsi_$dimAlias.dimension_value_id = dv_$dimAlias.id");
 
-                    $whereClauses[] = $this->buildFilterClause("dv_$dimAlias.value", $condition, $paramName);
+                    $whereClauses[] = $this->buildFilterClause("dv_$dimAlias.value", $condition, $paramName, $isPostgres);
                     if ($condition['value'] !== null) {
                         if (in_array($condition['operator'], ['in', 'not_in'], true) && is_array($condition['value'])) {
                             foreach ($condition['value'] as $i => $v) {
-                                $sqlParams["{$paramName}_{$i}"] = $this->formatFilterValue($v);
+                                $sqlParams["{$paramName}_{$i}"] = $this->formatFilterValue($v, $condition['operator']);
                             }
                         } else {
-                            $sqlParams[$paramName] = $this->formatFilterValue($condition['value']);
+                            $sqlParams[$paramName] = $this->formatFilterValue($condition['value'], $condition['operator']);
                         }
                     }
                     continue;
@@ -690,7 +706,7 @@
             return 'daily';
         }
 
-        private function buildFilterClause(string $col, array $condition, string $alias): string
+        private function buildFilterClause(string $col, array $condition, string $alias, bool $isPostgres = false): string
         {
             if ($condition['operator'] === 'in' && is_array($condition['value'])) {
                 if (empty($condition['value'])) {
@@ -714,9 +730,11 @@
                 return "($col IS NULL OR $col NOT IN (" . implode(', ', $placeholders) . "))";
             }
 
+            $likeClause = $isPostgres ? "$col ILIKE :$alias" : "LOWER($col) LIKE LOWER(:$alias)";
+
             return match ($condition['operator']) {
                 'neq'         => "$col <> :$alias",
-                'like'        => "$col LIKE :$alias",
+                'like'        => $likeClause,
                 'is_null'     => "$col IS NULL",
                 'is_not_null' => "$col IS NOT NULL",
                 'in'          => "$col IN (:$alias)",
@@ -726,7 +744,7 @@
             };
         }
 
-        private function formatFilterValue(mixed $value): mixed
+        private function formatFilterValue(mixed $value, ?string $operator = null): mixed
         {
             if (is_array($value)) {
                 // DBAL can handle arrays for IN clauses if connection is properly configured, 
@@ -736,6 +754,9 @@
             }
             if (is_bool($value)) {
                 return $value ? 1 : 0;
+            }
+            if ($operator === 'like' && is_string($value)) {
+                return str_contains($value, '%') ? $value : "%{$value}%";
             }
             return $value;
         }

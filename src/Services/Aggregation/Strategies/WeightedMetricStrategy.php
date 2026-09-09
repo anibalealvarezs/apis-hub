@@ -203,6 +203,16 @@
                         continue;
                     }
 
+                    if ($condition['operator'] === 'like') {
+                        $matchColSql = $isPostgres ? "$matchCol" : "LOWER($matchCol)";
+                        $likeOp = $isPostgres ? "ILIKE" : "LIKE";
+                        $likeParamSql = $isPostgres ? ":$alias" : "LOWER(:$alias)";
+                        $configWhere[] = "mc.$col IN (SELECT id FROM $table WHERE $matchColSql $likeOp $likeParamSql)";
+                        $valStr = (string)$condition['value'];
+                        $configParams[$alias] = str_contains($valStr, '%') ? $valStr : "%{$valStr}%";
+                        continue;
+                    }
+
                     $values = is_array($condition['value']) ? array_values($condition['value']) : [$condition['value']];
                     $hasNA = false;
                     $actualVals = [];
@@ -273,8 +283,10 @@
                     $alias = "dim_".preg_replace('/[^a-z0-9]/i', '_', $dk);
                     $condition = $filterResolver->resolve($value);
 
+                    $dimLike = $isPostgres ? "dv_$alias.value ILIKE :{$alias}_val" : "LOWER(dv_$alias.value) LIKE LOWER(:{$alias}_val)";
                     $valuePredicate = match ($condition['operator']) {
                         'neq' => "dv_$alias.value <> :{$alias}_val",
+                        'like' => $dimLike,
                         'is_null' => "dv_$alias.value IS NULL",
                         'is_not_null' => "dv_$alias.value IS NOT NULL",
                         'eq' => "dv_$alias.value = :{$alias}_val",
@@ -297,7 +309,11 @@
                     AND {$valuePredicate}
                 )";
                     $sqlParams["{$alias}_key"] = $dk;
-                    $sqlParams["{$alias}_val"] = $condition['value'];
+                    if ($condition['operator'] === 'like' && is_string($condition['value'])) {
+                        $sqlParams["{$alias}_val"] = str_contains($condition['value'], '%') ? $condition['value'] : "%{$condition['value']}%";
+                    } else {
+                        $sqlParams["{$alias}_val"] = $condition['value'];
+                    }
                     if (in_array($condition['operator'], ['in', 'not_in'], true)) {
                         $sqlTypes["{$alias}_val"] = \Doctrine\DBAL\ArrayParameterType::STRING;
                     }

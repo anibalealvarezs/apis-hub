@@ -139,14 +139,16 @@ class AstDataHydrator
                     $seriesData = [];
                     foreach ($rows as $row) {
                         $key = $row[$groupField] ?? $row['date'] ?? 'unknown';
-                        $seriesData[$key] = $row[$metric] ?? 0;
+                        $val = $row[$metric] ?? 0;
+                        $seriesData[$key] = is_numeric($val) ? (float)$val : 0.0;
                     }
                     $metricData[$hashKey] = $seriesData;
                 } else {
                     if (!empty($rows) && isset($rows[0])) {
-                        $metricData[$hashKey] = $rows[0][$metric] ?? 0;
+                        $val = $rows[0][$metric] ?? 0;
+                        $metricData[$hashKey] = is_numeric($val) ? (float)$val : 0.0;
                     } else {
-                        $metricData[$hashKey] = 0;
+                        $metricData[$hashKey] = 0.0;
                     }
                 }
             }

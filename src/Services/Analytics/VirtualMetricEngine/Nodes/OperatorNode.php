@@ -74,19 +74,22 @@ class OperatorNode implements AstNodeInterface
         return $result;
     }
 
-    protected function operateScalars(float|int $left, float|int $right): float|int
+    protected function operateScalars(mixed $left, mixed $right): float|int
     {
+        $left = is_numeric($left) ? (float)$left : 0.0;
+        $right = is_numeric($right) ? (float)$right : 0.0;
+
         return match ($this->operator) {
             '+' => $left + $right,
             '-' => $left - $right,
             '*' => $left * $right,
-            '/' => $right == 0 ? 0 : $left / $right,
-            'ratio' => ($left + $right) == 0 ? 0 : $left / ($left + $right),
+            '/' => $right == 0.0 ? 0 : $left / $right,
+            'ratio' => ($left + $right) == 0.0 ? 0 : $left / ($left + $right),
             'avg' => ($left + $right) / 2,
             'min' => min($left, $right),
             'max' => max($left, $right),
             'abs_diff' => abs($left - $right),
-            'pct_change' => $right == 0 ? 0 : (($left - $right) / abs($right)) * 100,
+            'pct_change' => $right == 0.0 ? 0 : (($left - $right) / abs($right)) * 100,
             default => 0,
         };
     }

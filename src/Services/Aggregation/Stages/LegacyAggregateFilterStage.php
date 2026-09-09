@@ -67,8 +67,11 @@
                         $qb->andWhere("dv_$dimAlias.value IN (:val_$dimAlias)")
                             ->setParameter("val_$dimAlias", $condition['value'], \Doctrine\DBAL\ArrayParameterType::STRING);
                     } elseif ($condition['operator'] === 'like') {
-                        $qb->andWhere("dv_$dimAlias.value LIKE :val_$dimAlias")
-                            ->setParameter("val_$dimAlias", $condition['value']);
+                        $valStr = (string)$condition['value'];
+                        $valPattern = str_contains($valStr, '%') ? $valStr : "%{$valStr}%";
+                        $likeClause = $context->isPostgres() ? "dv_$dimAlias.value ILIKE :val_$dimAlias" : "LOWER(dv_$dimAlias.value) LIKE LOWER(:val_$dimAlias)";
+                        $qb->andWhere($likeClause)
+                            ->setParameter("val_$dimAlias", $valPattern);
                     } elseif ($condition['operator'] === 'is_null') {
                         $qb->andWhere("dv_$dimAlias.value IS NULL");
                     } elseif ($condition['operator'] === 'is_not_null') {
@@ -117,19 +120,57 @@
                             $qb->andWhere("$sqlKeyComparable NOT IN (:$paramName)")
                                 ->setParameter($paramName, $condition['value'], \Doctrine\DBAL\ArrayParameterType::STRING);
                         } elseif ($condition['operator'] === 'like') {
-                            $qb->andWhere("$sqlKeyComparable LIKE :$paramName")
-                                ->setParameter($paramName, (string)$condition['value']);
+                            $valStr = (string)$condition['value'];
+                            $valPattern = str_contains($valStr, '%') ? $valStr : "%{$valStr}%";
+                            $likeClause = $context->isPostgres() ? "$sqlKeyComparable ILIKE :$paramName" : "LOWER($sqlKeyComparable) LIKE LOWER(:$paramName)";
+                            $qb->andWhere($likeClause)
+                                ->setParameter($paramName, $valPattern);
                         } else {
                             $qb->andWhere("$sqlKeyComparable = :$paramName")
                                 ->setParameter($paramName, (string)$condition['value']);
                         }
                     } else {
-                        $targetCol = ($key === 'page') ? 'mc.page_id' : "mc.$fk";
-                        if (is_numeric($value)) {
-                            $qb->andWhere("$targetCol = :f_$key")
-                                ->setParameter("f_$key", (int)$value);
+                        $condition = $resolveFilterCondition($value);
+                        $isLike = ($condition['operator'] ?? null) === 'like';
+                        $isNonNumericString = is_string($condition['value']) && !is_numeric($condition['value']) && !in_array($condition['operator'], ['is_null', 'is_not_null'], true);
+
+                        if ($isLike || $isNonNumericString) {
+                            $joinRelation($realKey);
+                            $sqlKey = $mapFieldToSql($key);
+                            $sqlKeyComparable = $context->isPostgres() ? "CAST($sqlKey AS TEXT)" : "CAST($sqlKey AS CHAR)";
+                            $paramName = 'f_'.preg_replace('/[^a-z0-9]/i', '_', $key);
+
+                            if ($condition['operator'] === 'is_null') {
+                                $qb->andWhere("$sqlKey IS NULL");
+                            } elseif ($condition['operator'] === 'is_not_null') {
+                                $qb->andWhere("$sqlKey IS NOT NULL");
+                            } elseif ($condition['operator'] === 'neq') {
+                                $qb->andWhere("$sqlKeyComparable <> :$paramName")
+                                    ->setParameter($paramName, (string)$condition['value']);
+                            } elseif ($condition['operator'] === 'in') {
+                                $qb->andWhere("$sqlKeyComparable IN (:$paramName)")
+                                    ->setParameter($paramName, (array)$condition['value'], \Doctrine\DBAL\ArrayParameterType::STRING);
+                            } elseif ($condition['operator'] === 'not_in') {
+                                $qb->andWhere("$sqlKeyComparable NOT IN (:$paramName)")
+                                    ->setParameter($paramName, (array)$condition['value'], \Doctrine\DBAL\ArrayParameterType::STRING);
+                            } elseif ($condition['operator'] === 'like') {
+                                $valStr = (string)$condition['value'];
+                                $valPattern = str_contains($valStr, '%') ? $valStr : "%{$valStr}%";
+                                $likeClause = $context->isPostgres() ? "$sqlKeyComparable ILIKE :$paramName" : "LOWER($sqlKeyComparable) LIKE LOWER(:$paramName)";
+                                $qb->andWhere($likeClause)
+                                    ->setParameter($paramName, $valPattern);
+                            } else {
+                                $qb->andWhere("$sqlKeyComparable = :$paramName")
+                                    ->setParameter($paramName, (string)$condition['value']);
+                            }
                         } else {
-                            $qb->andWhere('1 = 0');
+                            $targetCol = ($key === 'page') ? 'mc.page_id' : "mc.$fk";
+                            if (is_numeric($value)) {
+                                $qb->andWhere("$targetCol = :f_$key")
+                                    ->setParameter("f_$key", (int)$value);
+                            } else {
+                                $qb->andWhere('1 = 0');
+                            }
                         }
                     }
 
@@ -151,8 +192,11 @@
                     $qb->andWhere("$sqlKey IN (:$paramName)")
                         ->setParameter($paramName, $condition['value'], \Doctrine\DBAL\ArrayParameterType::STRING);
                 } elseif ($condition['operator'] === 'like') {
-                    $qb->andWhere("$sqlKey LIKE :$paramName")
-                        ->setParameter($paramName, $condition['value']);
+                    $valStr = (string)$condition['value'];
+                    $valPattern = str_contains($valStr, '%') ? $valStr : "%{$valStr}%";
+                    $likeClause = $context->isPostgres() ? "$sqlKey ILIKE :$paramName" : "LOWER($sqlKey) LIKE LOWER(:$paramName)";
+                    $qb->andWhere($likeClause)
+                        ->setParameter($paramName, $valPattern);
                 } else {
                     $qb->andWhere("$sqlKey = :$paramName")
                         ->setParameter($paramName, $condition['value']);
