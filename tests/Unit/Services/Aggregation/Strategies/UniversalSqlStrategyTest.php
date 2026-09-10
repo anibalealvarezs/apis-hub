@@ -455,4 +455,51 @@ final class UniversalSqlStrategyTest extends BaseUnitTestCase
         $this->assertStringContainsString('rq.query ILIKE :filter_query', (string)$capturedSql);
         $this->assertSame('%marc%', $capturedParams['filter_query'] ?? null);
     }
+
+    public function testQueryNotLikeFilterJoinsQueriesTable(): void
+    {
+        $capturedSql = null;
+        $capturedParams = null;
+
+        $connection = $this->createMock(Connection::class);
+        $connection->method('fetchAllAssociative')
+            ->willReturnCallback(function (string $sql, array $params) use (&$capturedSql, &$capturedParams) {
+                $capturedSql = $sql;
+                $capturedParams = $params;
+                return [[
+                    'daily' => '2026-09-01',
+                    'clicks' => 10,
+                ]];
+            });
+
+        $repository = $this->createMock(BaseRepository::class);
+        $repository->expects($this->once())->method('appendOptimizedStrategyMeta');
+
+        $plan = new AggregationPlan(
+            aggregations: ['clicks' => 'clicks'],
+            groupBy: ['daily'],
+            filters: (object)[
+                'channel' => 'google_search_console',
+                'query' => ['operator' => 'not_like', 'value' => 'marc'],
+            ],
+            startDate: '2026-09-01',
+            endDate: '2026-09-08',
+            context: [
+                'repository' => $repository,
+            ],
+            stages: [
+                'grouping' => ['normalized_pattern' => 'daily'],
+            ],
+            candidateOptimizedStrategies: ['universal_sql']
+        );
+
+        $strategy = new UniversalSqlStrategy();
+        $rows = $strategy->execute($connection, $plan, true);
+
+        $this->assertIsArray($rows);
+        $this->assertNotNull($capturedSql);
+        $this->assertStringContainsString('LEFT JOIN queries rq ON rq.id = mc.query_id', (string)$capturedSql);
+        $this->assertStringContainsString('(rq.query IS NULL OR rq.query NOT ILIKE :filter_query)', (string)$capturedSql);
+        $this->assertSame('%marc%', $capturedParams['filter_query'] ?? null);
+    }
 }

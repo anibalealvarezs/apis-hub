@@ -23,6 +23,7 @@
                     'is_not_null', 'not_null' => ['operator' => 'is_not_null', 'value' => null],
                     'not_in', 'not in', '!in' => ['operator' => 'not_in', 'value' => is_array($val) ? array_values($val) : [$val]],
                     'in' => ['operator' => 'in', 'value' => is_array($val) ? array_values($val) : [$val]],
+                    'not_like', 'not like', '!like' => ['operator' => 'not_like', 'value' => $val],
                     'like' => ['operator' => 'like', 'value' => $val],
                     default => ['operator' => 'eq', 'value' => $val],
                 };

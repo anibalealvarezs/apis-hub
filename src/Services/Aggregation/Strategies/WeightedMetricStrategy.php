@@ -203,11 +203,15 @@
                         continue;
                     }
 
-                    if ($condition['operator'] === 'like') {
+                    if (in_array($condition['operator'], ['like', 'not_like'], true)) {
                         $matchColSql = $isPostgres ? "$matchCol" : "LOWER($matchCol)";
                         $likeOp = $isPostgres ? "ILIKE" : "LIKE";
                         $likeParamSql = $isPostgres ? ":$alias" : "LOWER(:$alias)";
-                        $configWhere[] = "mc.$col IN (SELECT id FROM $table WHERE $matchColSql $likeOp $likeParamSql)";
+                        if ($condition['operator'] === 'not_like') {
+                            $configWhere[] = "(mc.$col IS NULL OR mc.$col NOT IN (SELECT id FROM $table WHERE $matchColSql $likeOp $likeParamSql))";
+                        } else {
+                            $configWhere[] = "mc.$col IN (SELECT id FROM $table WHERE $matchColSql $likeOp $likeParamSql)";
+                        }
                         $valStr = (string)$condition['value'];
                         $configParams[$alias] = str_contains($valStr, '%') ? $valStr : "%{$valStr}%";
                         continue;
@@ -284,9 +288,11 @@
                     $condition = $filterResolver->resolve($value);
 
                     $dimLike = $isPostgres ? "dv_$alias.value ILIKE :{$alias}_val" : "LOWER(dv_$alias.value) LIKE LOWER(:{$alias}_val)";
+                    $dimNotLike = $isPostgres ? "dv_$alias.value NOT ILIKE :{$alias}_val" : "LOWER(dv_$alias.value) NOT LIKE LOWER(:{$alias}_val)";
                     $valuePredicate = match ($condition['operator']) {
                         'neq' => "dv_$alias.value <> :{$alias}_val",
                         'like' => $dimLike,
+                        'not_like' => $dimNotLike,
                         'is_null' => "dv_$alias.value IS NULL",
                         'is_not_null' => "dv_$alias.value IS NOT NULL",
                         'eq' => "dv_$alias.value = :{$alias}_val",
@@ -309,7 +315,7 @@
                     AND {$valuePredicate}
                 )";
                     $sqlParams["{$alias}_key"] = $dk;
-                    if ($condition['operator'] === 'like' && is_string($condition['value'])) {
+                    if (in_array($condition['operator'], ['like', 'not_like'], true) && is_string($condition['value'])) {
                         $sqlParams["{$alias}_val"] = str_contains($condition['value'], '%') ? $condition['value'] : "%{$condition['value']}%";
                     } else {
                         $sqlParams["{$alias}_val"] = $condition['value'];

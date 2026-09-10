@@ -52,7 +52,7 @@
             $filtersArr = $this->normalizeFilters($filters);
             $groupPattern = $this->resolveGroupPattern($groupBy);
             $filterOperators = $this->collectFilterOperators($filtersArr);
-            $unsupportedFilterOperators = array_values(array_diff($filterOperators, ['eq', 'neq', 'is_null', 'is_not_null', 'like', 'in', 'not_in']));
+            $unsupportedFilterOperators = array_values(array_diff($filterOperators, ['eq', 'neq', 'is_null', 'is_not_null', 'like', 'not_like', 'in', 'not_in']));
             $reducerAnalysis = $this->analyzeReducers($aggregations, $isMetric || $isChanneledMetric);
 
             $requestedPeriod = null;
@@ -525,6 +525,9 @@
         {
             if (in_array($op, ['not_equal', 'not_eq', 'neq', '!=', '<>'], true)) {
                 return 'neq';
+            }
+            if (in_array($op, ['not_like', 'not like', '!like'], true)) {
+                return 'not_like';
             }
             if (in_array($op, ['equal', 'eq', '='], true)) {
                 return 'eq';

@@ -233,7 +233,7 @@
                         $whereClauses[] = $this->buildFilterClause('fpost.post_id', $condition, $paramName, $isPostgres);
                     } else {
                         $map = $relationMap[$relationKey];
-                        $isLike = ($condition['operator'] ?? null) === 'like';
+                        $isLike = in_array($condition['operator'] ?? null, ['like', 'not_like'], true);
                         $isNonNumericString = is_string($condition['value']) && !is_numeric($condition['value']) && !in_array($condition['operator'], ['is_null', 'is_not_null'], true);
 
                         if (!str_ends_with($key, '_id') && ($isLike || $isNonNumericString)) {
@@ -737,10 +737,14 @@
             }
 
             $likeClause = $isPostgres ? "$col ILIKE :$alias" : "LOWER($col) LIKE LOWER(:$alias)";
+            $notLikeClause = $isPostgres
+                ? "($col IS NULL OR $col NOT ILIKE :$alias)"
+                : "($col IS NULL OR LOWER($col) NOT LIKE LOWER(:$alias))";
 
             return match ($condition['operator']) {
                 'neq'         => "$col <> :$alias",
                 'like'        => $likeClause,
+                'not_like'    => $notLikeClause,
                 'is_null'     => "$col IS NULL",
                 'is_not_null' => "$col IS NOT NULL",
                 'in'          => "$col IN (:$alias)",
@@ -761,7 +765,7 @@
             if (is_bool($value)) {
                 return $value ? 1 : 0;
             }
-            if ($operator === 'like' && is_string($value)) {
+            if (in_array($operator, ['like', 'not_like'], true) && is_string($value)) {
                 return str_contains($value, '%') ? $value : "%{$value}%";
             }
             return $value;
