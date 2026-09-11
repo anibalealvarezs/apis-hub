@@ -284,6 +284,7 @@
             foreach ($filtersArr as $key => $value) {
                 if (str_starts_with($key, 'dimensions.')) {
                     $dk = trim((string)str_replace('dimensions.', '', $key));
+                    $cleanDk = preg_replace('/__\d+$/', '', $dk);
                     $alias = "dim_".preg_replace('/[^a-z0-9]/i', '_', $dk);
                     $condition = $filterResolver->resolve($value);
 
@@ -314,7 +315,7 @@
                     AND LOWER(dk_$alias.name) = LOWER(:{$alias}_key)
                     AND {$valuePredicate}
                 )";
-                    $sqlParams["{$alias}_key"] = $dk;
+                    $sqlParams["{$alias}_key"] = $cleanDk;
                     if (in_array($condition['operator'], ['like', 'not_like'], true) && is_string($condition['value'])) {
                         $sqlParams["{$alias}_val"] = str_contains($condition['value'], '%') ? $condition['value'] : "%{$condition['value']}%";
                     } else {

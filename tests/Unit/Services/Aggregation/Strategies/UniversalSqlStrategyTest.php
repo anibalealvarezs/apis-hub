@@ -502,4 +502,104 @@ final class UniversalSqlStrategyTest extends BaseUnitTestCase
         $this->assertStringContainsString('(rq.query IS NULL OR rq.query NOT ILIKE :filter_query)', (string)$capturedSql);
         $this->assertSame('%marc%', $capturedParams['filter_query'] ?? null);
     }
+
+    public function testGoogleSearchConsoleMultipleRulesOnSameDimensionConnectWithAnd(): void
+    {
+        $capturedSql = null;
+        $capturedParams = null;
+
+        $connection = $this->createMock(Connection::class);
+        $connection->method('fetchAllAssociative')
+            ->willReturnCallback(function (string $sql, array $params) use (&$capturedSql, &$capturedParams) {
+                $capturedSql = $sql;
+                $capturedParams = $params;
+                return [[
+                    'daily' => '2026-09-01',
+                    'clicks' => 10,
+                ]];
+            });
+
+        $repository = $this->createMock(BaseRepository::class);
+        $repository->expects($this->once())->method('appendOptimizedStrategyMeta');
+
+        $plan = new AggregationPlan(
+            aggregations: ['clicks' => 'clicks'],
+            groupBy: ['daily'],
+            filters: (object)[
+                'channel' => 'google_search_console',
+                'query' => ['operator' => 'not_like', 'value' => 'marc'],
+                'query__1' => ['operator' => 'neq', 'value' => 'unknown'],
+            ],
+            startDate: '2026-09-01',
+            endDate: '2026-09-08',
+            context: [
+                'repository' => $repository,
+            ],
+            stages: [
+                'grouping' => ['normalized_pattern' => 'daily'],
+            ],
+            candidateOptimizedStrategies: ['universal_sql']
+        );
+
+        $strategy = new UniversalSqlStrategy();
+        $rows = $strategy->execute($connection, $plan, true);
+
+        $this->assertIsArray($rows);
+        $this->assertNotNull($capturedSql);
+        $this->assertStringContainsString('(rq.query IS NULL OR rq.query NOT ILIKE :filter_query)', (string)$capturedSql);
+        $this->assertStringContainsString('rq.query <> :filter_query__1', (string)$capturedSql);
+        $this->assertSame('%marc%', $capturedParams['filter_query'] ?? null);
+        $this->assertSame('unknown', $capturedParams['filter_query__1'] ?? null);
+    }
+
+    public function testDynamicDimensionMultipleRulesOnSameDimensionConnectWithAnd(): void
+    {
+        $capturedSql = null;
+        $capturedParams = null;
+
+        $connection = $this->createMock(Connection::class);
+        $connection->method('fetchAllAssociative')
+            ->willReturnCallback(function (string $sql, array $params) use (&$capturedSql, &$capturedParams) {
+                $capturedSql = $sql;
+                $capturedParams = $params;
+                return [[
+                    'daily' => '2026-09-01',
+                    'reach' => 10,
+                ]];
+            });
+
+        $repository = $this->createMock(BaseRepository::class);
+        $repository->expects($this->once())->method('appendOptimizedStrategyMeta');
+
+        $plan = new AggregationPlan(
+            aggregations: ['reach' => 'reach'],
+            groupBy: ['daily'],
+            filters: (object)[
+                'channel' => 'facebook_organic',
+                'dimensions.reaction_type' => ['operator' => 'neq', 'value' => 'like'],
+                'dimensions.reaction_type__1' => ['operator' => 'neq', 'value' => 'love'],
+            ],
+            startDate: '2026-09-01',
+            endDate: '2026-09-08',
+            context: [
+                'repository' => $repository,
+            ],
+            stages: [
+                'grouping' => ['normalized_pattern' => 'daily'],
+            ],
+            candidateOptimizedStrategies: ['universal_sql']
+        );
+
+        $strategy = new UniversalSqlStrategy();
+        $rows = $strategy->execute($connection, $plan, true);
+
+        $this->assertIsArray($rows);
+        $this->assertNotNull($capturedSql);
+        $this->assertStringContainsString('WHERE LOWER(sub_dk.name) = :key_dim_filter_reaction_type', (string)$capturedSql);
+        $this->assertStringContainsString('dv_dim_filter_reaction_type.value <> :filter_dimensions_reaction_type', (string)$capturedSql);
+        $this->assertStringContainsString('dv_dim_filter_reaction_type.value <> :filter_dimensions_reaction_type__1', (string)$capturedSql);
+        $this->assertSame('reaction_type', $capturedParams['key_dim_filter_reaction_type'] ?? null);
+        $this->assertSame('like', $capturedParams['filter_dimensions_reaction_type'] ?? null);
+        $this->assertSame('love', $capturedParams['filter_dimensions_reaction_type__1'] ?? null);
+    }
 }

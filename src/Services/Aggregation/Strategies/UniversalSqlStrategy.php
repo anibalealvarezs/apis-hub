@@ -192,18 +192,20 @@
 
             // Handle Filters
             foreach ($filtersArr as $key => $value) {
-                $isDimension = str_starts_with($key, 'dimensions.');
-                $dimKey = $isDimension ? substr($key, 11) : $key;
+                $baseKey = preg_replace('/__\d+$/', '', (string)$key);
+                $isDimension = str_starts_with($key, 'dimensions.') || str_starts_with($baseKey, 'dimensions.');
+                $rawDimKey = $isDimension ? substr($key, 11) : $key;
+                $dimKey = preg_replace('/__\d+$/', '', $rawDimKey);
 
                 $paramName = 'filter_'.preg_replace('/[^a-z0-9]/i', '_', $key);
                 $condition = $filterResolver->resolve($value);
 
                 // Exclude some internal filters that shouldn't generate SQL WHERE clauses directly
-                if (in_array($key, ['snapshot_delta', 'latest_snapshot', 'period'], true)) {
+                if (in_array($baseKey, ['snapshot_delta', 'latest_snapshot', 'period'], true)) {
                     continue;
                 }
 
-                if (in_array($key, ['post', 'post_id'], true) && $this->shouldFilterPostByPlatformId($condition)) {
+                if (in_array($baseKey, ['post', 'post_id'], true) && $this->shouldFilterPostByPlatformId($condition)) {
                     $safeLeftJoin('posts', 'fpost', 'fpost.id = mc.post_id');
                     $whereClauses[] = $this->buildFilterClause('fpost.post_id', $condition, $paramName, $isPostgres);
 
@@ -219,10 +221,10 @@
                     continue;
                 }
 
-                if (isset($relationMap[$key])) {
-                    $relationKey = $key;
-                } elseif (str_ends_with($key, '_id') && isset($relationMap[substr($key, 0, -3)])) {
-                    $relationKey = substr($key, 0, -3);
+                if (isset($relationMap[$baseKey])) {
+                    $relationKey = $baseKey;
+                } elseif (str_ends_with($baseKey, '_id') && isset($relationMap[substr($baseKey, 0, -3)])) {
+                    $relationKey = substr($baseKey, 0, -3);
                 } else {
                     $relationKey = null;
                 }
@@ -236,7 +238,7 @@
                         $isLike = in_array($condition['operator'] ?? null, ['like', 'not_like'], true);
                         $isNonNumericString = is_string($condition['value']) && !is_numeric($condition['value']) && !in_array($condition['operator'], ['is_null', 'is_not_null'], true);
 
-                        if (!str_ends_with($key, '_id') && ($isLike || $isNonNumericString)) {
+                        if (!str_ends_with($baseKey, '_id') && ($isLike || $isNonNumericString)) {
                             $alias = $map['alias'];
                             $safeLeftJoin($map['table'], $alias, "$alias.id = mc.{$map['fk']}");
                             if (!empty($map['isJSON'])) {
@@ -264,9 +266,9 @@
                 }
 
                 // Dynamic dimension filter
-                $isStandardRelation = in_array($key, ['account_type', 'metric_date', 'daily', 'weekly', 'monthly', 'quarterly', 'yearly', 'channel'], true)
-                                      || isset($relationMap[$key])
-                                      || str_ends_with($key, '_id');
+                $isStandardRelation = in_array($baseKey, ['account_type', 'metric_date', 'daily', 'weekly', 'monthly', 'quarterly', 'yearly', 'channel'], true)
+                                      || isset($relationMap[$baseKey])
+                                      || str_ends_with($baseKey, '_id');
 
                 if (!$isStandardRelation || $isDimension) {
                     $dimAlias = 'dim_filter_'.preg_replace('/[^a-z0-9]/i', '_', $dimKey);

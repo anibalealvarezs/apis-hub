@@ -43,11 +43,14 @@
                     continue;
                 }
 
-                $isDimension = str_starts_with($key, 'dimensions.');
-                $dimKey = $isDimension ? substr($key, 11) : $key;
+                $baseKey = preg_replace('/__\d+$/', '', (string)$key);
+                $isDimension = str_starts_with($key, 'dimensions.') || str_starts_with($baseKey, 'dimensions.');
+                $rawDimKey = $isDimension ? substr($key, 11) : $key;
+                $dimKey = preg_replace('/__\d+$/', '', $rawDimKey);
 
-                if ($isChanneledMetric && ($isDimension || ($key !== 'account_type' && !in_array($key, $standardRelations, true) && !in_array($key, $dateFields, true) && !$hasEntityField($key)))) {
+                if ($isChanneledMetric && ($isDimension || ($baseKey !== 'account_type' && !in_array($baseKey, $standardRelations, true) && !in_array($baseKey, $dateFields, true) && !$hasEntityField($baseKey)))) {
                     $dimAlias = 'f_dim_'.preg_replace('/[^a-z0-9]/i', '_', $dimKey);
+                    $valParam = 'val_'.preg_replace('/[^a-z0-9]/i', '_', $key);
                     $condition = $resolveFilterCondition($value);
                     $safeLeftJoin('e', 'dimension_set_items', "dsi_$dimAlias", "e.dimension_set_id = dsi_$dimAlias.dimension_set_id AND dsi_$dimAlias.dimension_value_id IN (
                     SELECT sub_dv.id FROM dimension_values sub_dv 
@@ -58,26 +61,26 @@
 
                     $qb->setParameter("key_$dimAlias", $dimKey);
                     if ($condition['operator'] === 'eq') {
-                        $qb->andWhere("dv_$dimAlias.value = :val_$dimAlias")
-                            ->setParameter("val_$dimAlias", $condition['value']);
+                        $qb->andWhere("dv_$dimAlias.value = :$valParam")
+                            ->setParameter($valParam, $condition['value']);
                     } elseif ($condition['operator'] === 'neq') {
-                        $qb->andWhere("dv_$dimAlias.value <> :val_$dimAlias")
-                            ->setParameter("val_$dimAlias", $condition['value']);
+                        $qb->andWhere("dv_$dimAlias.value <> :$valParam")
+                            ->setParameter($valParam, $condition['value']);
                     } elseif ($condition['operator'] === 'in') {
-                        $qb->andWhere("dv_$dimAlias.value IN (:val_$dimAlias)")
-                            ->setParameter("val_$dimAlias", $condition['value'], \Doctrine\DBAL\ArrayParameterType::STRING);
+                        $qb->andWhere("dv_$dimAlias.value IN (:$valParam)")
+                            ->setParameter($valParam, $condition['value'], \Doctrine\DBAL\ArrayParameterType::STRING);
                     } elseif ($condition['operator'] === 'like') {
                         $valStr = (string)$condition['value'];
                         $valPattern = str_contains($valStr, '%') ? $valStr : "%{$valStr}%";
-                        $likeClause = $context->isPostgres() ? "dv_$dimAlias.value ILIKE :val_$dimAlias" : "LOWER(dv_$dimAlias.value) LIKE LOWER(:val_$dimAlias)";
+                        $likeClause = $context->isPostgres() ? "dv_$dimAlias.value ILIKE :$valParam" : "LOWER(dv_$dimAlias.value) LIKE LOWER(:$valParam)";
                         $qb->andWhere($likeClause)
-                            ->setParameter("val_$dimAlias", $valPattern);
+                            ->setParameter($valParam, $valPattern);
                     } elseif ($condition['operator'] === 'not_like') {
                         $valStr = (string)$condition['value'];
                         $valPattern = str_contains($valStr, '%') ? $valStr : "%{$valStr}%";
-                        $notLikeClause = $context->isPostgres() ? "(dv_$dimAlias.value IS NULL OR dv_$dimAlias.value NOT ILIKE :val_$dimAlias)" : "(dv_$dimAlias.value IS NULL OR LOWER(dv_$dimAlias.value) NOT LIKE LOWER(:val_$dimAlias))";
+                        $notLikeClause = $context->isPostgres() ? "(dv_$dimAlias.value IS NULL OR dv_$dimAlias.value NOT ILIKE :$valParam)" : "(dv_$dimAlias.value IS NULL OR LOWER(dv_$dimAlias.value) NOT LIKE LOWER(:$valParam))";
                         $qb->andWhere($notLikeClause)
-                            ->setParameter("val_$dimAlias", $valPattern);
+                            ->setParameter($valParam, $valPattern);
                     } elseif ($condition['operator'] === 'is_null') {
                         $qb->andWhere("dv_$dimAlias.value IS NULL");
                     } elseif ($condition['operator'] === 'is_not_null') {

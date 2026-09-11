@@ -111,7 +111,8 @@
                     continue;
                 }
 
-                $dimensionKeys[] = trim(substr((string)$key, 11));
+                $rawKey = trim(substr((string)$key, 11));
+                $dimensionKeys[] = preg_replace('/__\d+$/', '', $rawKey);
             }
 
             $excludedKeys = $this->getOptimizedDimensionSetExcludedKeys($relationMap);

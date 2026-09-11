@@ -161,4 +161,57 @@
 
             $this->assertNull($rows);
         }
+
+        public function testAppliesMultipleRulesOnSameDimensionConnectWithAnd(): void
+        {
+            $capturedSql = null;
+            $capturedParams = [];
+
+            $connection = $this->createMock(Connection::class);
+            $connection->expects($this->once())
+                ->method('fetchAllAssociative')
+                ->willReturnCallback(static function (string $sql, array $params = []) use (&$capturedSql, &$capturedParams): array {
+                    $capturedSql = $sql;
+                    $capturedParams = $params;
+
+                    return [['daily' => '2026-04-01', 'position' => 2.1]];
+                });
+
+            $repository = $this->createMock(BaseRepository::class);
+            $repository->expects($this->once())->method('appendOptimizedStrategyMeta');
+
+            $plan = new AggregationPlan(
+                aggregations: [
+                    'position' => 'position',
+                ],
+                groupBy: ['daily'],
+                filters: (object)[
+                    'channel' => 'google_search_console',
+                    'dimensions.query' => ['operator' => 'not_like', 'value' => 'marc'],
+                    'dimensions.query__1' => ['operator' => 'neq', 'value' => 'unknown'],
+                ],
+                startDate: '2026-04-01',
+                endDate: '2026-04-30',
+                context: [
+                    'repository' => $repository,
+                ],
+                stages: [
+                    'grouping' => ['normalized_pattern' => 'daily'],
+                ],
+            );
+
+            $strategy = new WeightedMetricStrategy(new CanonicalMetricSqlResolver());
+            $rows = $strategy->execute($connection, $plan, true);
+
+            $this->assertIsArray($rows);
+            $this->assertNotNull($capturedSql);
+            $this->assertStringContainsString('LOWER(dk_dim_query.name) = LOWER(:dim_query_key)', (string)$capturedSql);
+            $this->assertStringContainsString('LOWER(dk_dim_query__1.name) = LOWER(:dim_query__1_key)', (string)$capturedSql);
+            $this->assertStringContainsString('dv_dim_query.value NOT ILIKE :dim_query_val', (string)$capturedSql);
+            $this->assertStringContainsString('dv_dim_query__1.value <> :dim_query__1_val', (string)$capturedSql);
+            $this->assertSame('query', $capturedParams['dim_query_key'] ?? null);
+            $this->assertSame('query', $capturedParams['dim_query__1_key'] ?? null);
+            $this->assertSame('%marc%', $capturedParams['dim_query_val'] ?? null);
+            $this->assertSame('unknown', $capturedParams['dim_query__1_val'] ?? null);
+        }
     }
