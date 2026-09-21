@@ -79,10 +79,10 @@ class QueryClassificationService
             LIMIT :limit
         ";
 
-        $stmt = $this->connection->prepare($sql);
-        $stmt->bindValue('asset_id', $channeledAccountId);
-        $stmt->bindValue('limit', $batchSize, \PDO::PARAM_INT);
-        $result = $stmt->executeQuery();
+        $result = $this->connection->executeQuery($sql, [
+            'asset_id' => $channeledAccountId,
+            'limit' => (int) $batchSize,
+        ]);
         $candidates = $result->fetchAllAssociative();
 
         if (empty($candidates)) {
