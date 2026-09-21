@@ -3,7 +3,6 @@
 namespace Services\Sync;
 
 use Anibalealvarezs\TypeSafeApi\TypeSafeApi;
-use Core\Database;
 use DateTime;
 use Doctrine\DBAL\Connection;
 use Exception;
@@ -19,7 +18,7 @@ class QueryClassificationService
     public function __construct(?LoggerInterface $logger = null)
     {
         $this->logger = $logger ?: Helpers::setLogger('query_classification.log');
-        $this->connection = Database::getConnection();
+        $this->connection = Helpers::getManager()->getConnection();
 
         $apiKey = getenv('TYPESAFE_API_KEY');
         if (!empty($apiKey)) {
