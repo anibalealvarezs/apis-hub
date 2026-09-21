@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "4b1bd37f1f8eadf70f7e9f2d65c361ed",
+    "content-hash": "0537ba2f8e95b2cad28aae3d0fe69726",
     "packages": [
         {
             "name": "anibalealvarezs/amazon-api",
@@ -8022,8 +8022,6 @@
     "aliases": [],
     "minimum-stability": "dev",
     "stability-flags": {
-        "anibalealvarezs/analytics-api": 20,
-        "anibalealvarezs/typesafe-api": 20,
         "mikey179/vfsstream": 20
     },
     "prefer-stable": true,
