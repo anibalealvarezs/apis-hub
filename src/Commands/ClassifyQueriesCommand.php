@@ -58,7 +58,7 @@ class ClassifyQueriesCommand extends Command
         $conn = $this->entityManager->getConnection();
 
         // Retrieve active GSC assets from metric_configs
-        $sql = "SELECT DISTINCT channeled_account_id FROM metric_configs WHERE channeled_account_id IS NOT NULL";
+        $sql = "SELECT DISTINCT channeled_account_id FROM metric_configs WHERE channeled_account_id IS NOT NULL AND query_id IS NOT NULL";
         if (!empty($assetFilter)) {
             $sql .= " AND channeled_account_id = " . ((int) $assetFilter);
         }
