@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "8364738c27b722853efbffec2239fab9",
+    "content-hash": "4b1bd37f1f8eadf70f7e9f2d65c361ed",
     "packages": [
         {
             "name": "anibalealvarezs/amazon-api",
@@ -201,17 +201,17 @@
         },
         {
             "name": "anibalealvarezs/api-driver-core",
-            "version": "v1.1.0",
+            "version": "v1.1.1",
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/api-driver-core.git",
-                "reference": "1cf531976d35d64bad6f0e2cb6ca1d1fafcd6835"
+                "reference": "040f2d2f7018f6998691cc19a436c0f677511573"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/api-driver-core/anibalealvarezs-api-driver-core-1cf531976d35d64bad6f0e2cb6ca1d1fafcd6835-zip-bfb526.zip",
-                "reference": "1cf531976d35d64bad6f0e2cb6ca1d1fafcd6835",
-                "shasum": "33c04afdd03cd89702540b0340ff550819fd918e"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/api-driver-core/anibalealvarezs-api-driver-core-040f2d2f7018f6998691cc19a436c0f677511573-zip-6f5311.zip",
+                "reference": "040f2d2f7018f6998691cc19a436c0f677511573",
+                "shasum": "d46da0f66300fb7467f92804ea6b2f33754bcf27"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "^1.0.0",
@@ -245,7 +245,7 @@
                 }
             ],
             "description": "Core interfaces and orchestration logic for APIs Hub drivers.",
-            "time": "2026-07-23T17:07:38+00:00"
+            "time": "2026-09-21T15:02:32+00:00"
         },
         {
             "name": "anibalealvarezs/facebook-graph-api",
@@ -385,21 +385,21 @@
         },
         {
             "name": "anibalealvarezs/google-hub-driver",
-            "version": "v1.1.0",
+            "version": "v1.1.1",
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/google-hub-driver.git",
-                "reference": "62f86ed45264e6c0622479e97b4392dd373c67c3"
+                "reference": "00228db9a12849fdb4f3f142e875c3046808fbf6"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/google-hub-driver/anibalealvarezs-google-hub-driver-62f86ed45264e6c0622479e97b4392dd373c67c3-zip-fee3d2.zip",
-                "reference": "62f86ed45264e6c0622479e97b4392dd373c67c3",
-                "shasum": "83d45b1f012a797cde52c9084c9e5284e819dadb"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/google-hub-driver/anibalealvarezs-google-hub-driver-00228db9a12849fdb4f3f142e875c3046808fbf6-zip-289bb7.zip",
+                "reference": "00228db9a12849fdb4f3f142e875c3046808fbf6",
+                "shasum": "0e0e6e6c4731ba8e73a9592107afb5c0c5663218"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "^1.0.0",
-                "anibalealvarezs/api-driver-core": "^1.1.0",
+                "anibalealvarezs/api-driver-core": "^1.1.1",
                 "anibalealvarezs/google-api": "^1.0.0",
                 "doctrine/orm": "^2.12.3 || ^3.0",
                 "fakerphp/faker": "^1.20",
@@ -428,7 +428,7 @@
                 }
             ],
             "description": "APIs-Hub driver for Google (Search Console & Analytics) integration.",
-            "time": "2026-07-23T17:11:37+00:00"
+            "time": "2026-09-21T16:19:48+00:00"
         },
         {
             "name": "anibalealvarezs/klaviyo-api",
