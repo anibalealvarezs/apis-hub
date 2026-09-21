@@ -5,6 +5,7 @@
     use Anibalealvarezs\ApiDriverCore\Classes\UniversalEntity;
     use Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory;
     use Anibalealvarezs\ApiDriverCore\Enums\AssetCategory;
+    use Anibalealvarezs\ApiDriverCore\Interfaces\QueryClassifiableInterface;
     use Classes\DriverInitializer;
     use Classes\MarketingProcessor;
     use Classes\ProductionEntityMapper;
@@ -347,20 +348,21 @@
                     return $result; // Return the original error response
                 }
 
-                // 4. Post-Sync Enrichment: If channel is Search Console, run query classification
-                if ($channelName === 'google_search_console') {
+                // 4. Post-Sync Enrichment: Check if driver/channel supports semantic query classification
+                if ($driver instanceof QueryClassifiableInterface && $driver::supportsQueryClassification()) {
                     try {
                         $classificationService = new \Services\Sync\QueryClassificationService($this->logger);
                         if ($classificationService->isAvailable()) {
-                            $this->logger->info("[SyncService] Starting post-sync semantic query classification for Google Search Console.");
+                            $driverLabel = method_exists($driver, 'getProviderLabel') ? $driver::getProviderLabel() : $channelName;
+                            $this->logger->info("[SyncService] Starting post-sync semantic query classification for {$driverLabel}.");
                             // Retrieve channeled_account_ids for this sync
                             $assetId = $finalConfig['channeled_account_id'] ?? null;
                             if ($assetId) {
                                 $classificationService->classifyForAsset((int) $assetId);
                             } else {
-                                // Process all assets associated with GSC
+                                // Process all assets associated with queries
                                 $conn = Helpers::getManager()->getConnection();
-                                $assets = $conn->fetchFirstColumn("SELECT DISTINCT channeled_account_id FROM metric_configs WHERE channeled_account_id IS NOT NULL");
+                                $assets = $conn->fetchFirstColumn("SELECT DISTINCT channeled_account_id FROM metric_configs WHERE channeled_account_id IS NOT NULL AND query_id IS NOT NULL");
                                 foreach ($assets as $aId) {
                                     $classificationService->classifyForAsset((int) $aId);
                                 }
