@@ -4,14 +4,13 @@ namespace Entities\Analytics;
 
 use DateTime;
 use Doctrine\ORM\Mapping as ORM;
-use Entities\Entity;
+use JsonSerializable;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'query_classifications')]
 #[ORM\Index(name: 'idx_qc_intent_query', columns: ['intent', 'query_id'])]
 #[ORM\Index(name: 'idx_qc_lang_query', columns: ['language', 'query_id'])]
-#[ORM\HasLifecycleCallbacks]
-class QueryClassification extends Entity
+class QueryClassification implements JsonSerializable
 {
     #[ORM\Id]
     #[ORM\Column(type: 'bigint')]
@@ -82,5 +81,16 @@ class QueryClassification extends Entity
     {
         $this->classified_at = $classified_at;
         return $this;
+    }
+
+    public function jsonSerialize(): mixed
+    {
+        return [
+            'query_id' => $this->query_id,
+            'intent' => $this->intent,
+            'language' => $this->language,
+            'confidence' => $this->confidence,
+            'classified_at' => $this->classified_at?->format('Y-m-d H:i:s'),
+        ];
     }
 }
