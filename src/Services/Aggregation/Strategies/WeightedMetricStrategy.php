@@ -281,12 +281,54 @@
 
             $filterResolver = new FilterConditionResolver();
             $dimWhereSql = "";
+            $semanticDimensions = ['intent', 'language', 'brand_relation', 'business_relevance'];
             foreach ($filtersArr as $key => $value) {
                 if (str_starts_with($key, 'dimensions.')) {
                     $dk = trim((string)str_replace('dimensions.', '', $key));
                     $cleanDk = preg_replace('/__\d+$/', '', $dk);
                     $alias = "dim_".preg_replace('/[^a-z0-9]/i', '_', $dk);
                     $condition = $filterResolver->resolve($value);
+
+                    if (in_array($cleanDk, $semanticDimensions, true)) {
+                        $isAccountSemantic = in_array($cleanDk, ['brand_relation', 'business_relevance'], true);
+                        $semTable = $isAccountSemantic ? 'account_query_classifications' : 'query_classifications';
+                        $semCol = $cleanDk;
+                        $semColSql = $isPostgres ? "sem.$semCol" : "LOWER(sem.$semCol)";
+                        $likeOp = $isPostgres ? "ILIKE" : "LIKE";
+                        $likeParamSql = $isPostgres ? ":{$alias}_val" : "LOWER(:{$alias}_val)";
+
+                        $accountScope = $isAccountSemantic ? " AND sem.channeled_account_id = mc.channeled_account_id" : "";
+
+                        if ($condition['operator'] === 'is_null') {
+                            $dimWhereSql .= "\n                    AND (mc.query_id IS NULL OR mc.query_id NOT IN (SELECT sem.query_id FROM $semTable sem WHERE sem.$semCol IS NOT NULL$accountScope))";
+                            continue;
+                        }
+
+                        if ($condition['operator'] === 'is_not_null') {
+                            $dimWhereSql .= "\n                    AND mc.query_id IN (SELECT sem.query_id FROM $semTable sem WHERE sem.$semCol IS NOT NULL$accountScope)";
+                            continue;
+                        }
+
+                        if (in_array($condition['operator'], ['like', 'not_like'], true)) {
+                            $predicate = $condition['operator'] === 'not_like'
+                                ? "(mc.query_id IS NULL OR mc.query_id NOT IN (SELECT sem.query_id FROM $semTable sem WHERE $semColSql $likeOp $likeParamSql$accountScope))"
+                                : "mc.query_id IN (SELECT sem.query_id FROM $semTable sem WHERE $semColSql $likeOp $likeParamSql$accountScope)";
+                            $dimWhereSql .= "\n                    AND $predicate";
+
+                            $valStr = (string)$condition['value'];
+                            $sqlParams["{$alias}_val"] = str_contains($valStr, '%') ? $valStr : "%{$valStr}%";
+                            continue;
+                        }
+
+                        $isNegative = in_array($condition['operator'], ['neq', 'not_in'], true);
+                        $op = $isNegative ? 'NOT IN' : 'IN';
+                        $dimWhereSql .= "\n                    AND (mc.query_id IS NOT NULL AND " . ($isNegative ? "(mc.query_id NOT IN" : "mc.query_id IN") . " (SELECT sem.query_id FROM $semTable sem WHERE sem.$semCol IN (:{$alias}_val)$accountScope))";
+
+                        $values = is_array($condition['value']) ? array_values($condition['value']) : [$condition['value']];
+                        $sqlParams["{$alias}_val"] = $values;
+                        $sqlTypes["{$alias}_val"] = \Doctrine\DBAL\ArrayParameterType::STRING;
+                        continue;
+                    }
 
                     $dimLike = $isPostgres ? "dv_$alias.value ILIKE :{$alias}_val" : "LOWER(dv_$alias.value) LIKE LOWER(:{$alias}_val)";
                     $dimNotLike = $isPostgres ? "dv_$alias.value NOT ILIKE :{$alias}_val" : "LOWER(dv_$alias.value) NOT LIKE LOWER(:{$alias}_val)";

@@ -121,6 +121,64 @@ class SyncStatusController extends BaseController
     }
 
     /**
+     * GET /api/v1/classification-coverage
+     *
+     * Params:
+     * - asset_id: int (channeled_account_id)
+     */
+    public function getClassificationCoverage(Request $request): JsonResponse
+    {
+        if (!$this->isAuthorized($request)) {
+            return new JsonResponse(['error' => 'Unauthorized'], 401);
+        }
+
+        $assetId = $request->query->get('asset_id');
+        if (!$assetId) {
+            return new JsonResponse(['error' => 'asset_id parameter is required'], 400);
+        }
+
+        try {
+            $conn = Helpers::getManager()->getConnection();
+
+            // Total queries for this asset
+            $totalQueries = (int) $conn->fetchOne("
+                SELECT COUNT(DISTINCT query_id)
+                FROM metric_configs
+                WHERE channeled_account_id = :asset_id
+                  AND query_id IS NOT NULL
+            ", ['asset_id' => $assetId]);
+
+            // Classified queries for this asset
+            $classifiedQueries = (int) $conn->fetchOne("
+                SELECT COUNT(DISTINCT query_id)
+                FROM account_query_classifications
+                WHERE channeled_account_id = :asset_id
+            ", ['asset_id' => $assetId]);
+
+            $coveragePercentage = $totalQueries > 0 ? round(($classifiedQueries / $totalQueries) * 100, 2) : 100.0;
+            $hasKey = !empty(getenv('TYPESAFE_API_KEY'));
+
+            return new JsonResponse([
+                'status' => 'success',
+                'data' => [
+                    'account_id' => (int) $assetId,
+                    'total_queries' => $totalQueries,
+                    'classified_queries' => $classifiedQueries,
+                    'unclassified_queries' => max(0, $totalQueries - $classifiedQueries),
+                    'query_coverage_percentage' => $coveragePercentage,
+                    'is_fully_classified' => $classifiedQueries >= $totalQueries,
+                    'has_active_key' => $hasKey,
+                ]
+            ]);
+        } catch (\Throwable $e) {
+            return new JsonResponse([
+                'error' => 'Failed to calculate classification coverage',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Basic API Key authorization check
      *
      * @param Request $request

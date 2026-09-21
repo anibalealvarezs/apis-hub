@@ -48,6 +48,42 @@
                 $rawDimKey = $isDimension ? substr($key, 11) : $key;
                 $dimKey = preg_replace('/__\d+$/', '', $rawDimKey);
 
+                if ($isDimension && in_array($dimKey, ['intent', 'language', 'brand_relation', 'business_relevance'], true)) {
+                    $isAccountSemantic = in_array($dimKey, ['brand_relation', 'business_relevance'], true);
+                    $semTable = $isAccountSemantic ? 'account_query_classifications' : 'query_classifications';
+                    $valParam = 'val_'.preg_replace('/[^a-z0-9]/i', '_', $key);
+                    $condition = $resolveFilterCondition($value);
+                    $semCol = $dimKey;
+                    $semColSql = $context->isPostgres() ? "sem.$semCol" : "LOWER(sem.$semCol)";
+                    $likeOp = $context->isPostgres() ? "ILIKE" : "LIKE";
+                    $likeParamSql = $context->isPostgres() ? ":$valParam" : "LOWER(:$valParam)";
+                    $accountScope = $isAccountSemantic ? " AND sem.channeled_account_id = e.channeled_account_id" : "";
+
+                    if ($condition['operator'] === 'is_null') {
+                        $qb->andWhere("(e.query_id IS NULL OR e.query_id NOT IN (SELECT sem.query_id FROM $semTable sem WHERE sem.$semCol IS NOT NULL$accountScope))");
+                    } elseif ($condition['operator'] === 'is_not_null') {
+                        $qb->andWhere("e.query_id IN (SELECT sem.query_id FROM $semTable sem WHERE sem.$semCol IS NOT NULL$accountScope)");
+                    } elseif (in_array($condition['operator'], ['like', 'not_like'], true)) {
+                        $valStr = (string)$condition['value'];
+                        $valPattern = str_contains($valStr, '%') ? $valStr : "%{$valStr}%";
+                        if ($condition['operator'] === 'not_like') {
+                            $qb->andWhere("(e.query_id IS NULL OR e.query_id NOT IN (SELECT sem.query_id FROM $semTable sem WHERE $semColSql $likeOp $likeParamSql$accountScope))")
+                                ->setParameter($valParam, $valPattern);
+                        } else {
+                            $qb->andWhere("e.query_id IN (SELECT sem.query_id FROM $semTable sem WHERE $semColSql $likeOp $likeParamSql$accountScope)")
+                                ->setParameter($valParam, $valPattern);
+                        }
+                    } else {
+                        $isNegative = in_array($condition['operator'], ['neq', 'not_in'], true);
+                        $op = $isNegative ? 'NOT IN' : 'IN';
+                        $sub = "(SELECT sem.query_id FROM $semTable sem WHERE sem.$semCol IN (:$valParam)$accountScope)";
+                        $qb->andWhere($isNegative ? "(e.query_id IS NULL OR e.query_id NOT IN $sub)" : "e.query_id IN $sub");
+                        $values = is_array($condition['value']) ? array_values($condition['value']) : [$condition['value']];
+                        $qb->setParameter($valParam, $values, \Doctrine\DBAL\ArrayParameterType::STRING);
+                    }
+                    continue;
+                }
+
                 if ($isChanneledMetric && ($isDimension || ($baseKey !== 'account_type' && !in_array($baseKey, $standardRelations, true) && !in_array($baseKey, $dateFields, true) && !$hasEntityField($baseKey)))) {
                     $dimAlias = 'f_dim_'.preg_replace('/[^a-z0-9]/i', '_', $dimKey);
                     $valParam = 'val_'.preg_replace('/[^a-z0-9]/i', '_', $key);

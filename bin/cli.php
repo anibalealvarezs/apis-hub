@@ -41,6 +41,7 @@
     use Commands\InstallDriversCommand;
     use Commands\NuclearResyncCommand;
     use Commands\UpgradeVersionCommand;
+    use Commands\ClassifyQueriesCommand;
     use Doctrine\ORM\Tools\Console\ConsoleRunner;
     use Doctrine\ORM\Tools\Console\EntityManagerProvider\SingleManagerProvider;
     use Exceptions\ConfigurationException;
@@ -119,6 +120,7 @@
             new NuclearResyncCommand($entityManager),
             new UpgradeVersionCommand($entityManager),
             new EvaluateAlertsCommand($entityManager),
+            new ClassifyQueriesCommand($entityManager),
         ];
 
         foreach ($commands as $command) {

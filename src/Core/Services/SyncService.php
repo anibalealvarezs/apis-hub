@@ -347,6 +347,31 @@
                     return $result; // Return the original error response
                 }
 
+                // 4. Post-Sync Enrichment: If channel is Search Console, run query classification
+                if ($channelName === 'google_search_console') {
+                    try {
+                        $classificationService = new \Services\Sync\QueryClassificationService($this->logger);
+                        if ($classificationService->isAvailable()) {
+                            $this->logger->info("[SyncService] Starting post-sync semantic query classification for Google Search Console.");
+                            // Retrieve channeled_account_ids for this sync
+                            $assetId = $finalConfig['channeled_account_id'] ?? null;
+                            if ($assetId) {
+                                $classificationService->classifyForAsset((int) $assetId);
+                            } else {
+                                // Process all assets associated with GSC
+                                $conn = Helpers::getManager()->getConnection();
+                                $assets = $conn->fetchFirstColumn("SELECT DISTINCT channeled_account_id FROM metric_configs WHERE channeled_account_id IS NOT NULL");
+                                foreach ($assets as $aId) {
+                                    $classificationService->classifyForAsset((int) $aId);
+                                }
+                            }
+                            $this->logger->info("[SyncService] Post-sync semantic query classification completed.");
+                        }
+                    } catch (\Throwable $aiEx) {
+                        $this->logger->warning("[SyncService] Non-blocking AI classification error: " . $aiEx->getMessage());
+                    }
+                }
+
                 return new Response(json_encode([
                     'success' => true,
                     'message' => 'Sync completed successfully',

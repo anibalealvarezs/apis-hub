@@ -33,4 +33,13 @@ return [
         'public' => false,
         'admin' => true
     ],
+    '/api/v1/classification-coverage' => [
+        'httpMethod' => 'GET',
+        'callable' => function (...$args) {
+            $request = $args['request'] ?? Request::createFromGlobals();
+            return (new SyncStatusController())->getClassificationCoverage($request);
+        },
+        'public' => false,
+        'admin' => true
+    ],
 ];

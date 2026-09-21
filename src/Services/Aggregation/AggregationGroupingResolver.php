@@ -132,7 +132,7 @@
 
         public function getOptimizedDimensionSetExcludedKeys(array $relationMap): array
         {
-            return [];
+            return ['intent', 'language', 'brand_relation', 'business_relevance'];
         }
 
         /**
@@ -275,10 +275,30 @@
             $configsSelect = [];
             $configsJoins = [];
 
+            $semanticDimensions = ['intent', 'language', 'brand_relation', 'business_relevance'];
+
             foreach ($fields as $field) {
                 $dkName = str_replace('dimensions.', '', $field);
                 $alias = $quoteChar.$field.$quoteChar;
                 $safeDk = preg_replace('/[^a-z0-9]/i', '_', $dkName);
+
+                if (in_array($dkName, $semanticDimensions, true)) {
+                    $isAccountSemantic = in_array($dkName, ['brand_relation', 'business_relevance'], true);
+                    $tAlias = "t_sem_$safeDk";
+                    if ($isAccountSemantic) {
+                        $configsJoins[] = "LEFT JOIN account_query_classifications $tAlias ON $tAlias.query_id = mc.query_id AND $tAlias.channeled_account_id = mc.channeled_account_id";
+                    } else {
+                        $configsJoins[] = "LEFT JOIN query_classifications $tAlias ON $tAlias.query_id = mc.query_id";
+                    }
+
+                    $configsSelect[] = "COALESCE($tAlias.$dkName, 'unclassified') AS $alias";
+                    $finalSelect[] = "mc.$alias";
+                    $groupBy[] = $alias;
+                    $outerSelect[] = $alias;
+                    $orderMap[$field] = "f.$alias";
+                    continue;
+                }
+
                 $dvAlias = "dv_$safeDk";
                 $dsiAlias = "dsi_$safeDk";
                 $dkAlias = "dk_$safeDk";

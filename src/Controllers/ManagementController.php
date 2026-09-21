@@ -36,7 +36,9 @@ class ManagementController extends BaseController
             $allowedKeys = [
                 'APP_API_KEY',
                 'MONITOR_FACADE_URL',
-                'MONITOR_TOKEN'
+                'MONITOR_TOKEN',
+                'TYPESAFE_API_KEY',
+                'TYPESAFE_BASE_URL',
             ];
 
             // Merge with channel-specific credentials from drivers

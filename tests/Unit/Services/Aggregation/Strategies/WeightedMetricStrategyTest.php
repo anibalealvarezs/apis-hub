@@ -214,4 +214,105 @@
             $this->assertSame('%marc%', $capturedParams['dim_query_val'] ?? null);
             $this->assertSame('unknown', $capturedParams['dim_query__1_val'] ?? null);
         }
+
+        public function testAppliesSemanticDimensionSemiJoinFilters(): void
+        {
+            $capturedSql = null;
+            $capturedParams = [];
+
+            $connection = $this->createMock(Connection::class);
+            $connection->expects($this->once())
+                ->method('fetchAllAssociative')
+                ->willReturnCallback(static function (string $sql, array $params = []) use (&$capturedSql, &$capturedParams): array {
+                    $capturedSql = $sql;
+                    $capturedParams = $params;
+
+                    return [['daily' => '2026-04-01', 'position' => 1.8]];
+                });
+
+            $repository = $this->createMock(BaseRepository::class);
+            $repository->expects($this->once())->method('appendOptimizedStrategyMeta');
+
+            $plan = new AggregationPlan(
+                aggregations: [
+                    'position' => 'position',
+                ],
+                groupBy: ['daily'],
+                filters: (object)[
+                    'channel' => 'google_search_console',
+                    'dimensions.intent' => 'transactional',
+                    'dimensions.brand_relation' => ['operator' => 'eq', 'value' => 'brand'],
+                ],
+                startDate: '2026-04-01',
+                endDate: '2026-04-30',
+                context: [
+                    'repository' => $repository,
+                ],
+                stages: [
+                    'grouping' => ['normalized_pattern' => 'daily'],
+                ],
+            );
+
+            $strategy = new WeightedMetricStrategy(new CanonicalMetricSqlResolver());
+            $rows = $strategy->execute($connection, $plan, true);
+
+            $this->assertIsArray($rows);
+            $this->assertNotNull($capturedSql);
+
+            // Verify query_classifications semi-join
+            $this->assertStringContainsString('SELECT sem.query_id FROM query_classifications sem WHERE sem.intent IN (:dim_intent_val)', (string)$capturedSql);
+            // Verify account_query_classifications semi-join with account scope
+            $this->assertStringContainsString('SELECT sem.query_id FROM account_query_classifications sem WHERE sem.brand_relation IN (:dim_brand_relation_val) AND sem.channeled_account_id = mc.channeled_account_id', (string)$capturedSql);
+            // Verify NOT falling back to dimension_set_items
+            $this->assertStringNotContainsString('dk_dim_intent', (string)$capturedSql);
+            $this->assertStringNotContainsString('dk_dim_brand_relation', (string)$capturedSql);
+
+            $this->assertSame(['transactional'], $capturedParams['dim_intent_val'] ?? null);
+            $this->assertSame(['brand'], $capturedParams['dim_brand_relation_val'] ?? null);
+        }
+
+        public function testSupportsSemanticDimensionGrouping(): void
+        {
+            $capturedSql = null;
+
+            $connection = $this->createMock(Connection::class);
+            $connection->expects($this->once())
+                ->method('fetchAllAssociative')
+                ->willReturnCallback(static function (string $sql) use (&$capturedSql): array {
+                    $capturedSql = $sql;
+
+                    return [['dimensions.intent' => 'commercial', 'position' => 3.2]];
+                });
+
+            $repository = $this->createMock(BaseRepository::class);
+            $repository->expects($this->once())->method('appendOptimizedStrategyMeta');
+
+            $plan = new AggregationPlan(
+                aggregations: [
+                    'position' => 'position',
+                ],
+                groupBy: ['dimensions.intent'],
+                filters: (object)[
+                    'channel' => 'google_search_console',
+                ],
+                startDate: '2026-04-01',
+                endDate: '2026-04-30',
+                context: [
+                    'repository' => $repository,
+                ],
+                stages: [
+                    'grouping' => ['normalized_pattern' => 'dimensions.intent'],
+                ],
+            );
+
+            $strategy = new WeightedMetricStrategy(new CanonicalMetricSqlResolver());
+            $rows = $strategy->execute($connection, $plan, true);
+
+            $this->assertIsArray($rows);
+            $this->assertNotNull($capturedSql);
+
+            // Verify LEFT JOIN query_classifications in configs CTE
+            $this->assertStringContainsString('LEFT JOIN query_classifications t_sem_intent ON t_sem_intent.query_id = mc.query_id', (string)$capturedSql);
+            $this->assertStringContainsString("COALESCE(t_sem_intent.intent, 'unclassified') AS \"dimensions.intent\"", (string)$capturedSql);
+        }
     }
