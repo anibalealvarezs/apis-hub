@@ -192,3 +192,7 @@ test_cleanup.php
 test_validation_time.php
 
 check_root_page.php
+
+ARCHITECTURAL_AUDIT.md
+
+mailchimp-integration-insights.md
