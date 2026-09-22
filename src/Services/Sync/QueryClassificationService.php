@@ -96,37 +96,10 @@ class QueryClassificationService
         $totalClassified = 0;
         $now = (new DateTime())->format('Y-m-d H:i:s');
 
-        // Prepare context strings by querying channeled_accounts if not provided
-        $brand = $assetContext['brand'] ?? null;
-        $businessDescription = $assetContext['description'] ?? null;
-
-        if (!$brand || !$businessDescription) {
-            $accountData = $this->connection->fetchAssociative(
-                "SELECT name, platform_id, data FROM channeled_accounts WHERE id = :id",
-                ['id' => $channeledAccountId]
-            );
-
-            if ($accountData) {
-                $rawName = (string) ($accountData['name'] ?? '');
-                // Clean common prefixes and domain extensions (e.g. sc-domain:, http://, .com, .ec)
-                $cleanDomain = preg_replace('/^(sc-domain:|https?:\/\/|www\.)/i', '', $rawName);
-                $cleanDomain = rtrim($cleanDomain, '/');
-                $brandBase = preg_replace('/\.(com|org|net|es|ec|io|co|me|cloud|ai|dev)(\.[a-z]{2})?$/i', '', $cleanDomain);
-                // Turn dashes or dots into spaces: marcelacrodriguezabogadoinmigracion or crea-comunicaciones -> crea comunicaciones
-                $brandFormatted = ucwords(str_replace(['-', '.', '_'], ' ', $brandBase));
-
-                if (!$brand) {
-                    $brand = "{$brandFormatted} ({$cleanDomain})";
-                }
-
-                if (!$businessDescription) {
-                    $businessDescription = "Business, brand, official website and digital services for {$cleanDomain} ({$brandFormatted})";
-                }
-            } else {
-                $brand = $brand ?: 'Official Brand';
-                $businessDescription = $businessDescription ?: 'Online products, brand and services';
-            }
-        }
+        // Resolve rich deterministic context (Explicit -> Live Site Metadata -> Page Slugs -> Domain Inference)
+        $context = $this->resolveAssetContext($channeledAccountId, $assetContext);
+        $brand = $context['brand'];
+        $businessDescription = $context['description'];
 
         foreach ($candidates as $row) {
             $queryId = (int) $row['query_id'];
@@ -238,5 +211,188 @@ class QueryClassificationService
             'candidates' => count($candidates),
             'classified' => $totalClassified,
         ];
+    }
+
+    /**
+     * Resolves the deterministic semantic context (Brand & Business Description) for an asset.
+     * Hierarchy:
+     *   1. Explicitly provided context ($providedContext / channeled_accounts.data->'ai_context')
+     *   2. Native website homepage metadata (<title> & <meta name="description">)
+     *   3. Deterministic frequency extraction from synced page paths/slugs
+     *   4. Lexical domain segmentation fallback
+     */
+    public function resolveAssetContext(int $channeledAccountId, array $providedContext = []): array
+    {
+        // 1. Check if fully provided
+        $brand = !empty($providedContext['brand']) ? trim((string) $providedContext['brand']) : null;
+        $description = !empty($providedContext['description']) ? trim((string) $providedContext['description']) : null;
+
+        // Fetch channeled_account record
+        $accountData = $this->connection->fetchAssociative(
+            "SELECT name, platform_id, data FROM channeled_accounts WHERE id = :id",
+            ['id' => $channeledAccountId]
+        );
+
+        // Check if custom ai_context is stored in channeled_accounts.data
+        if ($accountData && !empty($accountData['data'])) {
+            $meta = is_string($accountData['data']) ? json_decode($accountData['data'], true) : $accountData['data'];
+            if (is_array($meta) && !empty($meta['ai_context'])) {
+                $brand = $brand ?: ($meta['ai_context']['brand'] ?? null);
+                $description = $description ?: ($meta['ai_context']['description'] ?? null);
+            }
+        }
+
+        $rawName = (string) ($accountData['name'] ?? '');
+        $cleanDomain = preg_replace('/^(sc-domain:|https?:\/\/|www\.)/i', '', $rawName);
+        $cleanDomain = rtrim($cleanDomain, '/');
+        $brandBase = preg_replace('/\.(com|org|net|es|ec|io|co|me|cloud|ai|dev)(\.[a-z]{2})?$/i', '', $cleanDomain);
+        $brandFormatted = ucwords(str_replace(['-', '.', '_'], ' ', $brandBase));
+
+        if (!$brand) {
+            $brand = !empty($brandFormatted) ? "{$brandFormatted} ({$cleanDomain})" : 'Official Brand';
+        }
+
+        if ($description) {
+            return [
+                'brand' => $brand,
+                'description' => $description,
+            ];
+        }
+
+        // 2. Native Website Homepage Metadata (Zero-Touch HTTP inspection with 2s timeout)
+        $metaDescription = $this->fetchHomepageMetadata($cleanDomain);
+        if ($metaDescription) {
+            return [
+                'brand' => $brand,
+                'description' => "{$brand}. " . $metaDescription,
+            ];
+        }
+
+        // 3. Deterministic Frequency Extraction from Synced Pages
+        $pageTopics = $this->extractTopicsFromPages($channeledAccountId, $cleanDomain);
+        if (!empty($pageTopics)) {
+            $topicsStr = implode(', ', $pageTopics);
+            return [
+                'brand' => $brand,
+                'description' => "Official website and services for {$cleanDomain} ({$brandFormatted}). Core topics: {$topicsStr}",
+            ];
+        }
+
+        // 4. Default Domain-based fallback
+        return [
+            'brand' => $brand,
+            'description' => "Official brand, website and digital services for {$cleanDomain} ({$brandFormatted})",
+        ];
+    }
+
+    /**
+     * Performs a lightweight HTTP GET to the homepage to extract title and meta description.
+     */
+    protected function fetchHomepageMetadata(string $domain): ?string
+    {
+        if (empty($domain) || !str_contains($domain, '.')) {
+            return null;
+        }
+
+        try {
+            $url = "https://{$domain}";
+            $ctx = stream_context_create([
+                'http' => [
+                    'method' => 'GET',
+                    'timeout' => 2,
+                    'follow_location' => 1,
+                    'max_redirects' => 2,
+                    'user_agent' => 'APIs-Hub-Crawler/1.0',
+                    'header' => "Accept: text/html\r\n",
+                ],
+                'ssl' => [
+                    'verify_peer' => false,
+                    'verify_peer_name' => false,
+                ]
+            ]);
+
+            // Read only the first 16KB of the HTML response to avoid downloading assets/body
+            $stream = @fopen($url, 'r', false, $ctx);
+            if (!$stream) {
+                return null;
+            }
+
+            $html = @stream_get_contents($stream, 16384);
+            @fclose($stream);
+
+            if (empty($html)) {
+                return null;
+            }
+
+            $title = '';
+            if (preg_match('/<title[^>]*>(.*?)<\/title>/is', $html, $m)) {
+                $title = trim(html_entity_decode(strip_tags($m[1])));
+            }
+
+            $metaDesc = '';
+            if (preg_match('/<meta[^>]+name=[\'"]description[\'"][^>]+content=[\'"]([^\'"]+)[\'"]/is', $html, $m)) {
+                $metaDesc = trim(html_entity_decode(strip_tags($m[1])));
+            }
+
+            $combined = trim("{$title} - {$metaDesc}", " -");
+            return !empty($combined) ? substr($combined, 0, 250) : null;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Extracts top distinct keyword stems from synced page slugs for an asset.
+     */
+    protected function extractTopicsFromPages(int $channeledAccountId, string $domain): array
+    {
+        try {
+            $sql = "
+                SELECT DISTINCT p.url
+                FROM pages p
+                JOIN metric_configs mc ON mc.page_id = p.id
+                WHERE mc.channeled_account_id = :asset_id
+                  AND p.url IS NOT NULL
+                LIMIT 40
+            ";
+
+            $urls = $this->connection->fetchFirstColumn($sql, ['asset_id' => $channeledAccountId]);
+            if (empty($urls)) {
+                return [];
+            }
+
+            $stopwords = [
+                'http', 'https', 'www', 'com', 'org', 'net', 'es', 'ec', 'html', 'php',
+                'page', 'tag', 'category', 'categoria', 'servicios', 'services', 'author',
+                'inicio', 'home', 'blog', 'contacto', 'contact', 'terminos', 'privacidad',
+                'politica', 'index', 'item', 'product', 'post', 'articulo', 'sobre', 'about'
+            ];
+
+            $wordCounts = [];
+            foreach ($urls as $u) {
+                $path = parse_url($u, PHP_URL_PATH);
+                if (!$path || $path === '/' || $path === '') {
+                    continue;
+                }
+
+                // Split path by slashes, dashes, dots, underscores
+                $tokens = preg_split('/[\/\-_\.\?&=]+/', strtolower($path));
+                foreach ($tokens as $t) {
+                    $t = trim($t);
+                    if (strlen($t) >= 4 && !in_array($t, $stopwords) && !is_numeric($t)) {
+                        $wordCounts[$t] = ($wordCounts[$t] ?? 0) + 1;
+                    }
+                }
+            }
+
+            if (empty($wordCounts)) {
+                return [];
+            }
+
+            arsort($wordCounts);
+            return array_slice(array_keys($wordCounts), 0, 8);
+        } catch (\Throwable $e) {
+            return [];
+        }
     }
 }
