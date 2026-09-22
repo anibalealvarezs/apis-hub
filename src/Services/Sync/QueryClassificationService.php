@@ -232,77 +232,109 @@ class QueryClassificationService
      */
     public function resolveAssetContext(int $channeledAccountId, array $providedContext = []): array
     {
-        // 1. Check if fully provided
-        $brand = !empty($providedContext['brand']) ? trim((string) $providedContext['brand']) : null;
-        $description = !empty($providedContext['description']) ? trim((string) $providedContext['description']) : null;
-        $competitors = !empty($providedContext['competitors']) ? $providedContext['competitors'] : null;
-
-        // Fetch channeled_account record
+        // 1. Fetch channeled_account record to read asset-level custom ai_context
         $accountData = $this->connection->fetchAssociative(
             "SELECT name, platform_id, data FROM channeled_accounts WHERE id = :id",
             ['id' => $channeledAccountId]
         );
 
-        // Check if custom ai_context is stored in channeled_accounts.data
+        $assetMeta = [];
         if ($accountData && !empty($accountData['data'])) {
-            $meta = is_string($accountData['data']) ? json_decode($accountData['data'], true) : $accountData['data'];
-            if (is_array($meta) && !empty($meta['ai_context'])) {
-                $brand = $brand ?: ($meta['ai_context']['brand'] ?? null);
-                $description = $description ?: ($meta['ai_context']['description'] ?? null);
-                $competitors = $competitors ?: ($meta['ai_context']['competitors'] ?? null);
+            $assetMeta = is_string($accountData['data']) ? json_decode($accountData['data'], true) : $accountData['data'];
+        }
+        $assetAiContext = $assetMeta['ai_context'] ?? [];
+
+        // 2. Fetch global channel-level ai_context from google_search_console config
+        $globalAiContext = [];
+        try {
+            $gscConfig = \Helpers\Helpers::getCustomConfig('google_search_console') ?? [];
+            if (!empty($gscConfig['ai_context']) && is_array($gscConfig['ai_context'])) {
+                $globalAiContext = $gscConfig['ai_context'];
             }
+        } catch (\Throwable $e) {
+            // Non-blocking if config is not yet loaded
         }
 
-        $competitorsList = [];
-        if (!empty($competitors)) {
-            $competitorsList = is_array($competitors) ? $competitors : array_map('trim', explode(',', (string) $competitors));
-            $competitorsList = array_values(array_filter($competitorsList));
-        }
+        // 3. Resolve Brand:
+        // Asset brand overrides or complements global parent brand
+        $globalBrand = trim((string)($providedContext['global_brand'] ?? $globalAiContext['brand'] ?? ''));
+        $assetBrand = trim((string)($providedContext['brand'] ?? $assetAiContext['brand'] ?? ''));
 
+        // Derive domain-inferred brand name as baseline
         $rawName = (string) ($accountData['name'] ?? '');
         $cleanDomain = preg_replace('/^(sc-domain:|https?:\/\/|www\.)/i', '', $rawName);
         $cleanDomain = rtrim($cleanDomain, '/');
         $brandBase = preg_replace('/\.(com|org|net|es|ec|io|co|me|cloud|ai|dev)(\.[a-z]{2})?$/i', '', $cleanDomain);
-        $brandFormatted = ucwords(str_replace(['-', '.', '_'], ' ', $brandBase));
+        $inferredBrand = ucwords(str_replace(['-', '.', '_'], ' ', $brandBase));
 
-        if (!$brand) {
-            $brand = !empty($brandFormatted) ? "{$brandFormatted} ({$cleanDomain})" : 'Official Brand';
+        if (!empty($assetBrand) && !empty($globalBrand) && strcasecmp($assetBrand, $globalBrand) !== 0) {
+            $resolvedBrand = "{$assetBrand} ({$globalBrand})";
+        } elseif (!empty($assetBrand)) {
+            $resolvedBrand = $assetBrand;
+        } elseif (!empty($globalBrand)) {
+            $resolvedBrand = "{$inferredBrand} ({$globalBrand})";
+        } else {
+            $resolvedBrand = !empty($inferredBrand) ? "{$inferredBrand} ({$cleanDomain})" : 'Official Brand';
         }
 
-        if ($description) {
+        // 4. Resolve Competitors: Combine Global competitors + Asset-specific competitors (deduplicated)
+        $globalCompetitors = $globalAiContext['competitors'] ?? [];
+        $assetCompetitors = $providedContext['competitors'] ?? $assetAiContext['competitors'] ?? [];
+        if (is_string($globalCompetitors)) {
+            $globalCompetitors = array_map('trim', explode(',', $globalCompetitors));
+        }
+        if (is_string($assetCompetitors)) {
+            $assetCompetitors = array_map('trim', explode(',', $assetCompetitors));
+        }
+        $combinedCompetitors = array_values(array_unique(array_filter(array_merge(
+            (array)$globalCompetitors,
+            (array)$assetCompetitors
+        ))));
+
+        // 5. Resolve Business Description:
+        // Concatenate Global Context + Asset Context.
+        // If both are empty, fallback to Inferred (Homepage metadata -> Slugs -> Domain)
+        $globalDesc = trim((string)($providedContext['global_description'] ?? $globalAiContext['description'] ?? ''));
+        $assetDesc = trim((string)($providedContext['description'] ?? $assetAiContext['description'] ?? ''));
+
+        $explicitDescParts = array_filter([$globalDesc, $assetDesc]);
+
+        if (!empty($explicitDescParts)) {
+            $finalDescription = implode(' - ', $explicitDescParts);
             return [
-                'brand' => $brand,
-                'description' => $description,
-                'competitors' => $competitorsList,
+                'brand' => $resolvedBrand,
+                'description' => $finalDescription,
+                'competitors' => $combinedCompetitors,
             ];
         }
 
-        // 2. Native Website Homepage Metadata (Zero-Touch HTTP inspection with 2s timeout)
+        // Both Global and Asset descriptions are empty -> Fallback to Inferred Level 2-4:
+        // Inferred 2: Native Website Homepage Metadata (title & meta description)
         $metaDescription = $this->fetchHomepageMetadata($cleanDomain);
         if ($metaDescription) {
             return [
-                'brand' => $brand,
-                'description' => "{$brand}. " . $metaDescription,
-                'competitors' => $competitorsList,
+                'brand' => $resolvedBrand,
+                'description' => "{$resolvedBrand}. " . $metaDescription,
+                'competitors' => $combinedCompetitors,
             ];
         }
 
-        // 3. Deterministic Frequency Extraction from Synced Pages
+        // Inferred 3: Deterministic Frequency Extraction from Synced Pages
         $pageTopics = $this->extractTopicsFromPages($channeledAccountId, $cleanDomain);
         if (!empty($pageTopics)) {
             $topicsStr = implode(', ', $pageTopics);
             return [
-                'brand' => $brand,
-                'description' => "Official website and services for {$cleanDomain} ({$brandFormatted}). Core topics: {$topicsStr}",
-                'competitors' => $competitorsList,
+                'brand' => $resolvedBrand,
+                'description' => "Official website and services for {$cleanDomain} ({$inferredBrand}). Core topics: {$topicsStr}",
+                'competitors' => $combinedCompetitors,
             ];
         }
 
-        // 4. Default Domain-based fallback
+        // Inferred 4: Default Domain-based fallback
         return [
-            'brand' => $brand,
-            'description' => "Official brand, website and digital services for {$cleanDomain} ({$brandFormatted})",
-            'competitors' => $competitorsList,
+            'brand' => $resolvedBrand,
+            'description' => "Official brand, website and digital services for {$cleanDomain} ({$inferredBrand})",
+            'competitors' => $combinedCompetitors,
         ];
     }
 
