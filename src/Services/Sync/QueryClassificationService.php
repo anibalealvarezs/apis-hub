@@ -67,15 +67,18 @@ class QueryClassificationService
             ];
         }
 
-        // 1. Fetch queries associated with this asset that are missing either universal or asset-specific classification
+        // 1. Fetch queries associated with this asset that are missing classification,
+        // ordered by occurrence frequency in metric_configs (highest traffic/volume first)
         $sql = "
-            SELECT DISTINCT q.id AS query_id, q.query
+            SELECT q.id AS query_id, q.query, COUNT(mc.id) AS occurrences
             FROM queries q
             JOIN metric_configs mc ON mc.query_id = q.id
             LEFT JOIN account_query_classifications aqc 
                 ON aqc.query_id = q.id AND aqc.channeled_account_id = :asset_id
             WHERE mc.channeled_account_id = :asset_id
               AND aqc.query_id IS NULL
+            GROUP BY q.id, q.query
+            ORDER BY occurrences DESC, q.id ASC
             LIMIT :limit
         ";
 

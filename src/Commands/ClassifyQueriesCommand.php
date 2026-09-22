@@ -75,16 +75,33 @@ class ClassifyQueriesCommand extends Command
             $assetId = (int) $assetId;
             $output->writeln("<info>Processing asset #{$assetId}...</info>");
 
-            $result = $service->classifyForAsset(
-                channeledAccountId: $assetId,
-                batchSize: $batchSize,
-                minImpressions: $minImpressions
-            );
+            $assetTotal = 0;
+            while (true) {
+                $result = $service->classifyForAsset(
+                    channeledAccountId: $assetId,
+                    batchSize: $batchSize,
+                    minImpressions: $minImpressions
+                );
 
-            $classifiedCount = $result['classified'] ?? 0;
-            $totalClassified += $classifiedCount;
+                $classifiedCount = $result['classified'] ?? 0;
+                $candidatesCount = $result['candidates'] ?? 0;
 
-            $output->writeln("  - Candidates: " . ($result['candidates'] ?? 0) . " | Classified: {$classifiedCount}");
+                if ($candidatesCount === 0 || $classifiedCount === 0) {
+                    break;
+                }
+
+                $assetTotal += $classifiedCount;
+                $totalClassified += $classifiedCount;
+
+                $output->writeln("  - Batch processed: {$classifiedCount} queries (Asset total: {$assetTotal})");
+
+                // If less than full batch was candidates, we reached the end
+                if ($candidatesCount < $batchSize) {
+                    break;
+                }
+            }
+
+            $output->writeln("  [Asset #{$assetId} complete. Total classified: {$assetTotal}]");
         }
 
         $output->writeln("<info>Classification completed. Total classified queries: {$totalClassified}</info>");
