@@ -96,9 +96,37 @@ class QueryClassificationService
         $totalClassified = 0;
         $now = (new DateTime())->format('Y-m-d H:i:s');
 
-        // Prepare context strings
-        $brand = $assetContext['brand'] ?? 'Official Brand';
-        $businessDescription = $assetContext['description'] ?? 'E-commerce and online services';
+        // Prepare context strings by querying channeled_accounts if not provided
+        $brand = $assetContext['brand'] ?? null;
+        $businessDescription = $assetContext['description'] ?? null;
+
+        if (!$brand || !$businessDescription) {
+            $accountData = $this->connection->fetchAssociative(
+                "SELECT name, platform_id, data FROM channeled_accounts WHERE id = :id",
+                ['id' => $channeledAccountId]
+            );
+
+            if ($accountData) {
+                $rawName = (string) ($accountData['name'] ?? '');
+                // Clean common prefixes and domain extensions (e.g. sc-domain:, http://, .com, .ec)
+                $cleanDomain = preg_replace('/^(sc-domain:|https?:\/\/|www\.)/i', '', $rawName);
+                $cleanDomain = rtrim($cleanDomain, '/');
+                $brandBase = preg_replace('/\.(com|org|net|es|ec|io|co|me|cloud|ai|dev)(\.[a-z]{2})?$/i', '', $cleanDomain);
+                // Turn dashes or dots into spaces: marcelacrodriguezabogadoinmigracion or crea-comunicaciones -> crea comunicaciones
+                $brandFormatted = ucwords(str_replace(['-', '.', '_'], ' ', $brandBase));
+
+                if (!$brand) {
+                    $brand = "{$brandFormatted} ({$cleanDomain})";
+                }
+
+                if (!$businessDescription) {
+                    $businessDescription = "Business, brand, official website and digital services for {$cleanDomain} ({$brandFormatted})";
+                }
+            } else {
+                $brand = $brand ?: 'Official Brand';
+                $businessDescription = $businessDescription ?: 'Online products, brand and services';
+            }
+        }
 
         foreach ($candidates as $row) {
             $queryId = (int) $row['query_id'];
