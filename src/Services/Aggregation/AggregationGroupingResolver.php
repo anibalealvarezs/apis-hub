@@ -203,37 +203,103 @@
                 ];
             }
 
-            $isAllDimensions = array_reduce($fields, static fn(bool $carry, string $field): bool => $carry && str_starts_with($field, 'dimensions.'), true);
-            if ($isAllDimensions) {
-                return $this->buildDimensionSetCombinationGroupingConfig($fields, $isPostgres, $quoteChar);
+            $temporalFields = ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'];
+            $knownEntities = ['query', 'page', 'country', 'device', 'channeledCampaign', 'channeledAccount'];
+
+            $allSupported = array_reduce($fields, static fn(bool $carry, string $field): bool => 
+                $carry && (
+                    in_array($field, $temporalFields, true) ||
+                    in_array($field, $knownEntities, true) ||
+                    str_starts_with($field, 'dimensions.') ||
+                    isset($relationMap[$field])
+                ), true
+            );
+
+            if (!$allSupported) {
+                return null;
             }
 
-            $isAllEntities = array_reduce($fields, static fn(bool $carry, string $field): bool => $carry && (in_array($field, ['query', 'page', 'country', 'device', 'daily', 'channeledCampaign'], true)), true);
-            if ($isAllEntities) {
-                return $this->buildEntityCombinationGroupingConfig($fields, $isPostgres, $quoteChar, $relationMap);
-            }
-
-            return null;
+            return $this->buildCombinationGroupingConfig($fields, $isPostgres, $quoteChar, $relationMap);
         }
 
-        private function buildEntityCombinationGroupingConfig(array $fields, bool $isPostgres, string $quoteChar, array $relationMap): array
+        private function buildCombinationGroupingConfig(array $fields, bool $isPostgres, string $quoteChar, array $relationMap): array
         {
             $finalSelect = [];
             $groupBy = [];
-            $joins = [];
             $outerSelect = [];
             $orderMap = [];
             $configsSelect = [];
             $configsJoins = [];
 
+            $semanticDimensions = ['intent', 'language', 'brand_relation', 'business_relevance'];
+            $temporalFields = ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'];
+
             foreach ($fields as $field) {
-                if ($field === 'daily') {
-                    $alias = $quoteChar.'daily'.$quoteChar;
+                if (in_array($field, $temporalFields, true)) {
+                    $alias = $quoteChar.$field.$quoteChar;
                     $finalSelect[] = "m.metric_date AS $alias";
                     $groupBy[] = $alias;
                     $outerSelect[] = $alias;
-                    $orderMap['daily'] = "f.$alias";
-                    $orderMap['date'] = "f.$alias";
+                    $orderMap[$field] = "f.$alias";
+                    if ($field === 'daily') {
+                        $orderMap['date'] = "f.$alias";
+                    }
+                    continue;
+                }
+
+                if (str_starts_with($field, 'dimensions.')) {
+                    $dkName = str_replace('dimensions.', '', $field);
+                    $alias = $quoteChar.$field.$quoteChar;
+                    $safeDk = preg_replace('/[^a-z0-9]/i', '_', $dkName);
+
+                    if (in_array($dkName, $semanticDimensions, true)) {
+                        $isAccountSemantic = in_array($dkName, ['brand_relation', 'business_relevance'], true);
+                        $tAlias = "t_sem_$safeDk";
+                        if ($isAccountSemantic) {
+                            $configsJoins[] = "LEFT JOIN account_query_classifications $tAlias ON $tAlias.query_id = mc.query_id AND $tAlias.channeled_account_id = mc.channeled_account_id";
+                        } else {
+                            $configsJoins[] = "LEFT JOIN query_classifications $tAlias ON $tAlias.query_id = mc.query_id";
+                        }
+
+                        $configsSelect[] = "COALESCE($tAlias.$dkName, 'unclassified') AS $alias";
+                        $finalSelect[] = "mc.$alias";
+                        $groupBy[] = $alias;
+                        $outerSelect[] = $alias;
+                        $orderMap[$field] = "f.$alias";
+                        continue;
+                    }
+
+                    $dvAlias = "dv_$safeDk";
+                    $dsiAlias = "dsi_$safeDk";
+                    $dkAlias = "dk_$safeDk";
+
+                    $tAlias = "t_$safeDk";
+                    $configsJoins[] = "LEFT JOIN (
+                    SELECT dsi.dimension_set_id, dv.value
+                    FROM dimension_set_items dsi
+                    JOIN dimension_values dv ON dv.id = dsi.dimension_value_id
+                    JOIN dimension_keys dk ON dk.id = dv.dimension_key_id
+                    WHERE LOWER(dk.name) = LOWER('".str_replace("'", "''", $dkName)."')
+                ) $tAlias ON $tAlias.dimension_set_id = mc.dimension_set_id";
+
+                    $fbExpr = "'N/A'";
+                    if ($dkName === 'page') {
+                        $fbAlias = "t_landing_page";
+                        $configsJoins[] = "LEFT JOIN (
+                        SELECT dsi.dimension_set_id, dv.value
+                        FROM dimension_set_items dsi
+                        JOIN dimension_values dv ON dv.id = dsi.dimension_value_id
+                        JOIN dimension_keys dk ON dk.id = dv.dimension_key_id
+                        WHERE LOWER(dk.name) = LOWER('landing_page')
+                    ) $fbAlias ON $fbAlias.dimension_set_id = mc.dimension_set_id";
+                        $fbExpr = "$fbAlias.value, 'N/A'";
+                    }
+
+                    $configsSelect[] = "COALESCE($tAlias.value, $fbExpr) AS $alias";
+                    $finalSelect[] = "mc.$alias";
+                    $groupBy[] = $alias;
+                    $outerSelect[] = $alias;
+                    $orderMap[$field] = "f.$alias";
                     continue;
                 }
 
@@ -258,7 +324,7 @@
             return [
                 'final_select'   => $finalSelect,
                 'group_by'       => $groupBy,
-                'joins'          => [], // Joins are now in configs_joins
+                'joins'          => [],
                 'outer_select'   => $outerSelect,
                 'order_map'      => $orderMap,
                 'configs_select' => $configsSelect,
