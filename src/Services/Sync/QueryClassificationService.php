@@ -48,7 +48,7 @@ class QueryClassificationService
      *
      * @param int $channeledAccountId The asset ID (channeled_account_id)
      * @param array $assetContext Optional contextual details (e.g. brand names, description, industry)
-     * @param int $batchSize Number of queries to process per chunk
+     * @param int $batchSize Number of queries to process per chunk (use 0 or -1 for all pending)
      * @param int $minImpressions Filter to prioritize queries with traffic
      * @return array Summary of processed, classified, and skipped counts
      */

@@ -355,16 +355,27 @@
                         if ($classificationService->isAvailable()) {
                             $driverLabel = method_exists($driver, 'getProviderLabel') ? $driver::getProviderLabel() : $channelName;
                             $this->logger->info("[SyncService] Starting post-sync semantic query classification for {$driverLabel}.");
+                            $processAsset = function (int $id) use ($classificationService) {
+                                while (true) {
+                                    $res = $classificationService->classifyForAsset($id, batchSize: 100);
+                                    $candidates = $res['candidates'] ?? 0;
+                                    $classified = $res['classified'] ?? 0;
+                                    if ($candidates === 0 || $classified === 0 || $candidates < 100) {
+                                        break;
+                                    }
+                                }
+                            };
+
                             // Retrieve channeled_account_ids for this sync
                             $assetId = $finalConfig['channeled_account_id'] ?? null;
                             if ($assetId) {
-                                $classificationService->classifyForAsset((int) $assetId);
+                                $processAsset((int) $assetId);
                             } else {
                                 // Process all assets associated with queries
                                 $conn = Helpers::getManager()->getConnection();
                                 $assets = $conn->fetchFirstColumn("SELECT DISTINCT channeled_account_id FROM metric_configs WHERE channeled_account_id IS NOT NULL AND query_id IS NOT NULL");
                                 foreach ($assets as $aId) {
-                                    $classificationService->classifyForAsset((int) $aId);
+                                    $processAsset((int) $aId);
                                 }
                             }
                             $this->logger->info("[SyncService] Post-sync semantic query classification completed.");
