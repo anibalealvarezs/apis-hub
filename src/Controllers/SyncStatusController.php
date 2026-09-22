@@ -133,39 +133,83 @@ class SyncStatusController extends BaseController
         }
 
         $assetId = $request->query->get('asset_id');
-        if (!$assetId) {
-            return new JsonResponse(['error' => 'asset_id parameter is required'], 400);
-        }
 
         try {
             $conn = Helpers::getManager()->getConnection();
 
-            // Total queries for this asset
-            $totalQueries = (int) $conn->fetchOne("
-                SELECT COUNT(DISTINCT query_id)
-                FROM metric_configs
-                WHERE channeled_account_id = :asset_id
-                  AND query_id IS NOT NULL
-            ", ['asset_id' => $assetId]);
+            if ($assetId) {
+                // Total queries for this asset
+                $totalQueries = (int) $conn->fetchOne("
+                    SELECT COUNT(DISTINCT query_id)
+                    FROM metric_configs
+                    WHERE channeled_account_id = :asset_id
+                      AND query_id IS NOT NULL
+                ", ['asset_id' => $assetId]);
 
-            // Classified queries for this asset
-            $classifiedQueries = (int) $conn->fetchOne("
-                SELECT COUNT(DISTINCT query_id)
-                FROM account_query_classifications
-                WHERE channeled_account_id = :asset_id
-            ", ['asset_id' => $assetId]);
+                // Classified queries for this asset
+                $classifiedQueries = (int) $conn->fetchOne("
+                    SELECT COUNT(DISTINCT query_id)
+                    FROM account_query_classifications
+                    WHERE channeled_account_id = :asset_id
+                ", ['asset_id' => $assetId]);
 
-            $coveragePercentage = $totalQueries > 0 ? round(($classifiedQueries / $totalQueries) * 100, 2) : 100.0;
+                // Traffic volume coverage (clicks/impressions of classified queries vs total)
+                $trafficStats = $conn->fetchAssociative("
+                    SELECT 
+                        COALESCE(SUM(mc.occurrences), 0) AS total_occurrences,
+                        COALESCE(SUM(CASE WHEN aqc.query_id IS NOT NULL THEN mc.occurrences ELSE 0 END), 0) AS classified_occurrences
+                    FROM (
+                        SELECT query_id, COUNT(id) AS occurrences
+                        FROM metric_configs
+                        WHERE channeled_account_id = :asset_id AND query_id IS NOT NULL
+                        GROUP BY query_id
+                    ) mc
+                    LEFT JOIN account_query_classifications aqc 
+                        ON aqc.query_id = mc.query_id AND aqc.channeled_account_id = :asset_id
+                ", ['asset_id' => $assetId]);
+            } else {
+                // Tenant-wide totals across all GSC assets
+                $totalQueries = (int) $conn->fetchOne("
+                    SELECT COUNT(DISTINCT query_id)
+                    FROM metric_configs
+                    WHERE query_id IS NOT NULL
+                ");
+
+                $classifiedQueries = (int) $conn->fetchOne("
+                    SELECT COUNT(DISTINCT query_id)
+                    FROM query_classifications
+                ");
+
+                $trafficStats = $conn->fetchAssociative("
+                    SELECT 
+                        COALESCE(SUM(mc.occurrences), 0) AS total_occurrences,
+                        COALESCE(SUM(CASE WHEN qc.query_id IS NOT NULL THEN mc.occurrences ELSE 0 END), 0) AS classified_occurrences
+                    FROM (
+                        SELECT query_id, COUNT(id) AS occurrences
+                        FROM metric_configs
+                        WHERE query_id IS NOT NULL
+                        GROUP BY query_id
+                    ) mc
+                    LEFT JOIN query_classifications qc 
+                        ON qc.query_id = mc.query_id
+                ");
+            }
+
+            $totalOccurrences = (int) ($trafficStats['total_occurrences'] ?? 0);
+            $classifiedOccurrences = (int) ($trafficStats['classified_occurrences'] ?? 0);
+            $trafficCoveragePercentage = $totalOccurrences > 0 ? round(($classifiedOccurrences / $totalOccurrences) * 100, 2) : 100.0;
+            $queryCoveragePercentage = $totalQueries > 0 ? round(($classifiedQueries / $totalQueries) * 100, 2) : 100.0;
             $hasKey = !empty(getenv('TYPESAFE_API_KEY'));
 
             return new JsonResponse([
                 'status' => 'success',
                 'data' => [
-                    'account_id' => (int) $assetId,
+                    'account_id' => $assetId ? (int) $assetId : null,
                     'total_queries' => $totalQueries,
                     'classified_queries' => $classifiedQueries,
                     'unclassified_queries' => max(0, $totalQueries - $classifiedQueries),
-                    'query_coverage_percentage' => $coveragePercentage,
+                    'query_coverage_percentage' => $queryCoveragePercentage,
+                    'traffic_coverage_percentage' => $trafficCoveragePercentage,
                     'is_fully_classified' => $classifiedQueries >= $totalQueries,
                     'has_active_key' => $hasKey,
                 ]
