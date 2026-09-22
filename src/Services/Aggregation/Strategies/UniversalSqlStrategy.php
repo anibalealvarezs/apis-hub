@@ -105,6 +105,22 @@
                                       || str_ends_with($field, '_id');
 
                 if (!$isStandardRelation || $isDimension) {
+                    $semanticDimensions = ['intent', 'language', 'brand_relation', 'business_relevance'];
+                    if (in_array($dimKey, $semanticDimensions, true)) {
+                        $isAccountSemantic = in_array($dimKey, ['brand_relation', 'business_relevance'], true);
+                        $semAlias = 'sem_'.preg_replace('/[^a-z0-9]/i', '_', $dimKey);
+                        if ($isAccountSemantic) {
+                            $safeLeftJoin('account_query_classifications', $semAlias, "$semAlias.query_id = mc.query_id AND $semAlias.channeled_account_id = mc.channeled_account_id");
+                        } else {
+                            $safeLeftJoin('query_classifications', $semAlias, "$semAlias.query_id = mc.query_id");
+                        }
+
+                        $selectFields[] = "COALESCE($semAlias.$dimKey, 'unclassified') AS $quotedField";
+                        $groupByFields[] = "$semAlias.$dimKey";
+                        $orderMap[$field] = "$semAlias.$dimKey";
+                        continue;
+                    }
+
                     // Dimension join logic
                     $dimAlias = 'dim_'.preg_replace('/[^a-z0-9]/i', '_', $dimKey);
                     $sqlParams["key_$dimAlias"] = strtolower($dimKey);
@@ -271,6 +287,29 @@
                                       || str_ends_with($baseKey, '_id');
 
                 if (!$isStandardRelation || $isDimension) {
+                    $semanticDimensions = ['intent', 'language', 'brand_relation', 'business_relevance'];
+                    if (in_array($dimKey, $semanticDimensions, true)) {
+                        $isAccountSemantic = in_array($dimKey, ['brand_relation', 'business_relevance'], true);
+                        $semAlias = 'sem_filter_'.preg_replace('/[^a-z0-9]/i', '_', $key);
+                        if ($isAccountSemantic) {
+                            $safeLeftJoin('account_query_classifications', $semAlias, "$semAlias.query_id = mc.query_id AND $semAlias.channeled_account_id = mc.channeled_account_id");
+                        } else {
+                            $safeLeftJoin('query_classifications', $semAlias, "$semAlias.query_id = mc.query_id");
+                        }
+
+                        $whereClauses[] = $this->buildFilterClause("$semAlias.$dimKey", $condition, $paramName, $isPostgres);
+                        if ($condition['value'] !== null) {
+                            if (in_array($condition['operator'], ['in', 'not_in'], true) && is_array($condition['value'])) {
+                                foreach ($condition['value'] as $i => $v) {
+                                    $sqlParams["{$paramName}_{$i}"] = $this->formatFilterValue($v, $condition['operator']);
+                                }
+                            } else {
+                                $sqlParams[$paramName] = $this->formatFilterValue($condition['value'], $condition['operator']);
+                            }
+                        }
+                        continue;
+                    }
+
                     $dimAlias = 'dim_filter_'.preg_replace('/[^a-z0-9]/i', '_', $dimKey);
                     $sqlParams["key_$dimAlias"] = strtolower($dimKey);
 
