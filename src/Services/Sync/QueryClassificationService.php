@@ -100,6 +100,12 @@ class QueryClassificationService
         $context = $this->resolveAssetContext($channeledAccountId, $assetContext);
         $brand = $context['brand'];
         $businessDescription = $context['description'];
+        $competitorsList = $context['competitors'] ?? [];
+        $competitorsStr = !empty($competitorsList) ? implode(', ', (array) $competitorsList) : '';
+
+        $competitorCriteria = !empty($competitorsStr)
+            ? "Mentions rival companies or competing brands ({$competitorsStr})"
+            : 'Mentions rival companies, competing brands, or alternative commercial services';
 
         foreach ($candidates as $row) {
             $queryId = (int) $row['query_id'];
@@ -130,7 +136,7 @@ class QueryClassificationService
                         'criteria' => [
                             'brand' => "Contains the brand name '{$brand}', its official trademarks, or direct variations",
                             'non_brand' => 'Generic product or service term without any specific brand name',
-                            'competitor' => 'Mentions rival companies, competing brands, or alternative commercial services'
+                            'competitor' => $competitorCriteria
                         ]
                     ],
                     'business_relevance' => [
@@ -226,6 +232,7 @@ class QueryClassificationService
         // 1. Check if fully provided
         $brand = !empty($providedContext['brand']) ? trim((string) $providedContext['brand']) : null;
         $description = !empty($providedContext['description']) ? trim((string) $providedContext['description']) : null;
+        $competitors = !empty($providedContext['competitors']) ? $providedContext['competitors'] : null;
 
         // Fetch channeled_account record
         $accountData = $this->connection->fetchAssociative(
@@ -239,7 +246,14 @@ class QueryClassificationService
             if (is_array($meta) && !empty($meta['ai_context'])) {
                 $brand = $brand ?: ($meta['ai_context']['brand'] ?? null);
                 $description = $description ?: ($meta['ai_context']['description'] ?? null);
+                $competitors = $competitors ?: ($meta['ai_context']['competitors'] ?? null);
             }
+        }
+
+        $competitorsList = [];
+        if (!empty($competitors)) {
+            $competitorsList = is_array($competitors) ? $competitors : array_map('trim', explode(',', (string) $competitors));
+            $competitorsList = array_values(array_filter($competitorsList));
         }
 
         $rawName = (string) ($accountData['name'] ?? '');
@@ -256,6 +270,7 @@ class QueryClassificationService
             return [
                 'brand' => $brand,
                 'description' => $description,
+                'competitors' => $competitorsList,
             ];
         }
 
@@ -265,6 +280,7 @@ class QueryClassificationService
             return [
                 'brand' => $brand,
                 'description' => "{$brand}. " . $metaDescription,
+                'competitors' => $competitorsList,
             ];
         }
 
@@ -275,6 +291,7 @@ class QueryClassificationService
             return [
                 'brand' => $brand,
                 'description' => "Official website and services for {$cleanDomain} ({$brandFormatted}). Core topics: {$topicsStr}",
+                'competitors' => $competitorsList,
             ];
         }
 
@@ -282,6 +299,7 @@ class QueryClassificationService
         return [
             'brand' => $brand,
             'description' => "Official brand, website and digital services for {$cleanDomain} ({$brandFormatted})",
+            'competitors' => $competitorsList,
         ];
     }
 
