@@ -199,7 +199,7 @@ class SyncStatusController extends BaseController
             $classifiedOccurrences = (int) ($trafficStats['classified_occurrences'] ?? 0);
             $trafficCoveragePercentage = $totalOccurrences > 0 ? round(($classifiedOccurrences / $totalOccurrences) * 100, 2) : 100.0;
             $queryCoveragePercentage = $totalQueries > 0 ? round(($classifiedQueries / $totalQueries) * 100, 2) : 100.0;
-            $hasKey = !empty(getenv('TYPESAFE_API_KEY'));
+            $hasKey = !empty(Helpers::getEnvValue('TYPESAFE_API_KEY'));
 
             return new JsonResponse([
                 'status' => 'success',

@@ -20,10 +20,10 @@ class QueryClassificationService
         $this->logger = $logger ?: Helpers::setLogger('query_classification.log');
         $this->connection = Helpers::getManager()->getConnection();
 
-        $apiKey = getenv('TYPESAFE_API_KEY');
+        $apiKey = Helpers::getEnvValue('TYPESAFE_API_KEY');
         if (!empty($apiKey)) {
             try {
-                $baseUrl = getenv('TYPESAFE_BASE_URL') ?: 'https://api.typesafe.ai/v1/';
+                $baseUrl = Helpers::getEnvValue('TYPESAFE_BASE_URL') ?: 'https://api.typesafe.ai/v1/';
                 $this->client = new TypeSafeApi(
                     apiKey: $apiKey,
                     baseUrl: $baseUrl,

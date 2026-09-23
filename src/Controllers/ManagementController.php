@@ -56,13 +56,13 @@ class ManagementController extends BaseController
             foreach ($data as $key => $value) {
                 if (in_array($key, $allowedKeys)) {
                     $logger->info("Updating credential: {$key}");
-                    
-                    // Simple regex replacement for .env format
-                    $pattern = "/^{$key}=.*/m";
+
+                    // Regex-safe replacement for .env format (avoids $ / backslash mangling in values)
+                    $pattern = "/^".preg_quote($key, '/')."=.*$/m";
                     $replacement = "{$key}={$value}";
-                    
+
                     if (preg_match($pattern, $updatedEnv)) {
-                        $updatedEnv = preg_replace($pattern, $replacement, $updatedEnv);
+                        $updatedEnv = preg_replace_callback($pattern, fn () => $replacement, $updatedEnv);
                     } else {
                         // If key doesn't exist, append it
                         $updatedEnv .= "\n{$key}={$value}";
@@ -71,6 +71,21 @@ class ManagementController extends BaseController
             }
 
             file_put_contents($envPath, $updatedEnv);
+
+            // Hot-reload updated keys into the running process (Swoole workers don't re-read .env).
+            // This updates the current worker immediately; other workers re-read .env through
+            // Helpers::getEnvValue() on their next resolution thanks to the env cache reset below.
+            foreach ($data as $key => $value) {
+                if (in_array($key, $allowedKeys)) {
+                    putenv("{$key}={$value}");
+                    $_ENV[$key] = (string) $value;
+                    $_SERVER[$key] = (string) $value;
+                }
+            }
+
+            // Ensure the runtime .env snapshot is invalidated so all in-process consumers
+            // observe the freshly written values right away.
+            Helpers::resetEnvCache();
 
             return new Response(json_encode(['success' => true, 'message' => 'Credentials updated successfully']), 200, ['Content-Type' => 'application/json']);
         } catch (Exception $e) {

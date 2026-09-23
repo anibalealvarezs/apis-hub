@@ -96,6 +96,10 @@ class ManagementControllerTest extends BaseIntegrationTestCase
         $this->assertStringContainsString("GOOGLE_REFRESH_TOKEN={$newTokens['GOOGLE_REFRESH_TOKEN']}", $content);
         $this->assertStringContainsString("MONITOR_FACADE_URL={$newTokens['MONITOR_FACADE_URL']}", $content);
         $this->assertStringContainsString("INITIAL_KEY=initial_value", $content);
+
+        // Runtime hot-reload must make the value immediately resolvable in-process
+        $this->assertSame($newTokens['MONITOR_FACADE_URL'], Helpers::getEnvValue('MONITOR_FACADE_URL'));
+        $this->assertSame($newTokens['MONITOR_FACADE_URL'], getenv('MONITOR_FACADE_URL'));
     }
 
     public function testUpdateCredentialsRejectsUnallowedKeys(): void
