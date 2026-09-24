@@ -6,6 +6,15 @@ use Controllers\SyncStatusController;
 use Symfony\Component\HttpFoundation\Request;
 
 return [
+    '/api/v1/ping' => [
+        'httpMethod' => 'GET',
+        'callable' => function (...$args) {
+            $request = $args['request'] ?? Request::createFromGlobals();
+            return (new SyncStatusController())->ping($request);
+        },
+        'public' => true,
+        'admin' => false
+    ],
     '/api/sync/status' => [
         'httpMethod' => 'GET',
         'callable' => function (...$args) {

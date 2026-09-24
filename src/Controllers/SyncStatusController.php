@@ -23,6 +23,31 @@ class SyncStatusController extends BaseController
     }
 
     /**
+     * GET /api/v1/ping
+     *
+     * Lightweight client-facing heartbeat endpoint to test public API key validity.
+     *
+     * @param Request $request
+     * @return JsonResponse
+     */
+    public function ping(Request $request): JsonResponse
+    {
+        if (!$this->isAuthorized($request)) {
+            return new JsonResponse([
+                'status' => 'error',
+                'error' => 'Unauthorized',
+                'message' => 'Invalid or missing API Key.'
+            ], 401);
+        }
+
+        return new JsonResponse([
+            'status' => 'ok',
+            'message' => 'APIs Hub API connection verified successfully.',
+            'timestamp' => (new \DateTimeImmutable())->format(\DateTimeInterface::ATOM)
+        ], 200);
+    }
+
+    /**
      * GET /api/sync/status
      *
      * Params:
