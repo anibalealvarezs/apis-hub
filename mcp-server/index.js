@@ -492,11 +492,8 @@ if (MODE === "sse") {
     // Si es un GET al SSE, iniciar stream
     console.error(`[DISC] Discovery GET detectado en ${req.url}`);
 
-    res.setHeader("Content-Type", "text/event-stream");
-    res.setHeader("Cache-Control", "no-cache, no-transform");
-    res.setHeader("Connection", "keep-alive");
+    // Set reverse proxy buffering header before transport writes headers
     res.setHeader("X-Accel-Buffering", "no");
-    res.flushHeaders();
 
     const protocol = req.headers["x-forwarded-proto"] || req.protocol;
     const host = req.get("host");
