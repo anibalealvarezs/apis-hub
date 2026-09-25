@@ -162,9 +162,28 @@ function setCachedAggregation(cacheKey, data) {
  */
 const USER_TOOLS = [
   {
+    name: "get_analytics_catalog",
+    description:
+      "Introspect and discover the full analytics capabilities of APIs Hub. Returns data scopes (scope_global, scope_channel, scope_asset), supported channels and tags, canonical metrics, formula-based derived metrics, allowed temporal/non-temporal breakdowns, and predefined KPIs.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        scope: {
+          type: "string",
+          description: "Optional: Filter catalog by data scope ('global', 'channel', 'asset')",
+          enum: ["global", "channel", "asset"]
+        },
+        channel: {
+          type: "string",
+          description: "Optional: Channel identifier to inspect specific capabilities (e.g. 'facebook_marketing', 'google_search_console', 'shopify', 'klaviyo', 'amazon', 'tiktok')"
+        }
+      }
+    }
+  },
+  {
     name: "summarize_performance",
     description:
-      "Get aggregated performance data using Channeled Metrics and intelligent formulas (spend, clicks, ctr, etc). Ideal for LLM cross-channel reporting and executive dashboards.",
+      "Get aggregated performance data using Channeled Metrics and intelligent formulas (spend, clicks, ctr, cpc, cpm, roas, position, etc). Matches widget capabilities, supporting multiple data scopes, breakdowns (daily, weekly, monthly, dimensional), advanced filters, and asset group isolation.",
     inputSchema: {
       type: "object",
       properties: {
@@ -172,26 +191,33 @@ const USER_TOOLS = [
           type: "string",
           description:
             "The entity name (use 'channeled_metric' for performance data)",
+          default: "channeled_metric"
         },
         channel: {
           type: "string",
           description:
-            "The channel identifier (e.g. 'google_search_console', 'facebook', 'shopify', 'klaviyo', 'amazon', 'tiktok')",
+            "The channel identifier (e.g. 'google_search_console', 'facebook', 'facebook_marketing', 'shopify', 'klaviyo', 'amazon', 'tiktok')",
+        },
+        scope: {
+          type: "string",
+          description:
+            "Data scope for calculation: 'global' (cross-channel / blended), 'channel' (single provider/channel), or 'asset' (specific ad account, store, or property)",
+          enum: ["global", "channel", "asset"]
         },
         aggregations: {
           type: "object",
           description:
-            "Object mapping alias to formula. Available formulas: 'spend', 'clicks', 'impressions', 'reach', 'results', 'ctr', 'cpc', 'cpm', 'roas', 'cost_per_result', 'result_rate', 'position'. e.g. {\"total_spend\":\"spend\",\"total_clicks\":\"clicks\"}",
+            "Object mapping alias to formula or canonical metric. Available formulas: 'spend', 'clicks', 'impressions', 'reach', 'results', 'ctr', 'cpc', 'cpm', 'roas', 'cost_per_result', 'result_rate', 'position', 'sessions', 'conversions', 'conversion_rate', 'bounce_rate'. e.g. {\"total_spend\":\"spend\",\"blended_roas\":\"roas\",\"avg_cpc\":\"cpc\"}",
         },
         filters: {
           type: "object",
           description:
-            'Optional: Object containing filters. e.g. {"dimensions.gender":"male"}',
+            'Optional: Object containing filters or dimensions. e.g. {"dimensions.gender":"male", "country":"US"}',
         },
         groupBy: {
           type: "string",
           description:
-            "Comma separated fields to group by (e.g. 'daily', 'weekly', 'dimensions.gender')",
+            "Comma separated fields to group by. Supports temporal granularities ('daily', 'weekly', 'monthly', 'quarterly', 'yearly') and dimensional breakdowns ('device', 'country', 'query', 'page', 'dimensions.*').",
         },
         startDate: { type: "string", description: "Start date in format Y-m-d" },
         endDate: { type: "string", description: "End date in format Y-m-d" },
@@ -428,10 +454,104 @@ function createMcpServer(role = "admin") {
       }
     }
 
+    if (name === "get_analytics_catalog") {
+      const { scope, channel } = args;
+      const catalog = {
+        data_scopes: {
+          scope_global: {
+            name: "Global Scope",
+            description: "Cross-channel blended metrics aggregated across all active providers.",
+            applicable_channels: ["all"],
+            sample_metrics: ["total_spend", "total_clicks", "total_impressions", "blended_roas", "blended_cpa", "true_blended_marginal_cost"]
+          },
+          scope_channel: {
+            name: "Channel Scope",
+            description: "Metrics specific to a marketing provider or platform channel.",
+            applicable_channels: ["meta", "google", "shopify", "klaviyo", "amazon", "tiktok"],
+            sample_metrics: ["spend", "clicks", "impressions", "reach", "frequency", "ctr", "cpc", "cpm", "roas", "spend_elasticity"]
+          },
+          scope_asset: {
+            name: "Asset Scope",
+            description: "Sub-channel metrics isolated to specific ad accounts, profiles, stores or properties.",
+            applicable_channels: ["facebook_marketing", "facebook_organic", "google_search_console", "google_analytics", "google_ads"],
+            sample_metrics: ["position", "sessions", "conversions", "bounce_rate", "asset_ctr_anomaly", "organic_vs_paid_clicks"]
+          }
+        },
+        supported_channels: {
+          meta: ["spendable", "clickable", "impressionable", "paid_media", "organic_social", "reach_driven"],
+          google: ["spendable", "clickable", "impressionable", "seo", "traffic_tracked", "conversion_tracked", "revenue_tracked", "behavior_tracked", "analytics", "paid_media"],
+          klaviyo: ["revenue_tracked", "conversion_tracked", "email_marketing"],
+          shopify: ["revenue_tracked", "conversion_tracked", "ecommerce"],
+          facebook_marketing: ["spendable", "clickable", "impressionable", "paid_media"],
+          facebook_organic: ["organic_social", "reach_driven", "impressionable"],
+          google_search_console: ["clickable", "impressionable", "seo"],
+          google_analytics: ["traffic_tracked", "conversion_tracked", "revenue_tracked", "behavior_tracked", "analytics"],
+          google_ads: ["spendable", "clickable", "impressionable", "paid_media"]
+        },
+        canonical_metrics: [
+          "spend", "clicks", "impressions", "reach", "frequency", "ctr", "cpc", "cpm",
+          "sessions", "new_users", "conversions", "cost_per_conversion", "conversion_rate",
+          "roas_purchase", "position", "engagement", "page_views", "event_count", "bounce_rate",
+          "average_session_duration", "total_users", "total_revenue"
+        ],
+        derived_formulas: [
+          { formula: "spend", description: "Total advertising cost" },
+          { formula: "clicks", description: "Total link or ad clicks" },
+          { formula: "impressions", description: "Total visual impressions" },
+          { formula: "ctr", description: "Click-Through Rate (clicks / impressions * 100)" },
+          { formula: "cpc", description: "Cost Per Click (spend / clicks)" },
+          { formula: "cpm", description: "Cost Per Mille (spend / impressions * 1000)" },
+          { formula: "roas", description: "Return on Ad Spend (revenue / spend)" },
+          { formula: "cost_per_result", description: "Cost Per Conversion / Result (spend / results)" },
+          { formula: "result_rate", description: "Conversion Rate (results / clicks * 100)" },
+          { formula: "position", description: "Weighted Average Ranking Position (weighted by impressions)" }
+        ],
+        granularities: {
+          temporal: ["daily", "weekly", "monthly", "quarterly", "yearly"],
+          dimensional: ["device", "country", "query", "page", "campaign", "ad_set", "placement", "dimensions.*"]
+        }
+      };
+
+      if (scope) {
+        const scopeKey = scope.startsWith("scope_") ? scope : `scope_${scope}`;
+        if (catalog.data_scopes[scopeKey]) {
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify({ scope: scopeKey, details: catalog.data_scopes[scopeKey] }, null, 2)
+            }]
+          };
+        }
+      }
+
+      if (channel) {
+        const channelCapabilities = catalog.supported_channels[channel];
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              channel,
+              capabilities: channelCapabilities || "Channel not specifically registered or uses generic adapter",
+              available_canonical_metrics: catalog.canonical_metrics,
+              allowed_breakdowns: catalog.granularities
+            }, null, 2)
+          }]
+        };
+      }
+
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(catalog, null, 2)
+        }]
+      };
+    }
+
     if (name === "summarize_performance") {
       const {
         entity,
         channel,
+        scope,
         aggregations,
         groupBy,
         startDate,
