@@ -517,7 +517,22 @@ if (MODE === "sse") {
     const server = createMcpServer();
     await server.connect(transport);
 
+    // Keepalive ping every 15s to prevent proxy/Cloudflare timeout
+    const keepAliveTimer = setInterval(() => {
+      try {
+        if (!res.writableEnded) {
+          res.write(": keepalive\n\n");
+          if (typeof res.flush === 'function') {
+            res.flush();
+          }
+        }
+      } catch (e) {
+        clearInterval(keepAliveTimer);
+      }
+    }, 15000);
+
     res.on("close", () => {
+      clearInterval(keepAliveTimer);
       console.error(`[DISC] Conexión SSE cerrada. Programando borrado con gracia para sesión ${transport.sessionId}`);
       // Give a grace period (e.g., 60 seconds) so that HTTP/2 re-connects or in-flight POSTs don't hit 404
       setTimeout(() => {
@@ -590,6 +605,10 @@ if (MODE === "sse") {
     }
     
     req.body = parsedBody;
+    // Ensure content-type is application/json so SDK handlePostMessage doesn't reject it
+    if (!req.headers['content-type'] || !req.headers['content-type'].includes('application/json')) {
+      req.headers['content-type'] = 'application/json';
+    }
 
     await handleIncomingMessage(req, res);
   });
