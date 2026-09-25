@@ -622,6 +622,12 @@ if (MODE === "sse") {
       if (req.headers['transfer-encoding'] === 'chunked') {
         return res.status(400).send("StreamableHttp not supported");
       }
+      // Antigravity Go client fails if 202 Accepted response has an empty Content-Type
+      const originalWriteHead = res.writeHead.bind(res);
+      res.writeHead = (statusCode, statusMessage, headers) => {
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        return originalWriteHead(statusCode, statusMessage, headers);
+      };
       next();
     },
     express.text({ type: '*/*' }),
