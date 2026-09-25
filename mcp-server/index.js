@@ -29,25 +29,25 @@ const APIS_HUB_ROOT = path.resolve(__dirname, "..");
  * otherwise execute directly (useful for different environments).
  */
 async function runCliCommand(command) {
-  // Prefix with docker compose if we are on the host machine
-  const dockerPrefix =
-    "docker compose exec -T facebook-marketing-entities-sync";
-  const fullCommand = `${dockerPrefix} ${command}`;
-
+  // If running directly inside a PHP-enabled container with php CLI installed
   try {
-    const { stdout } = await execAsync(fullCommand, {
+    const { stdout } = await execAsync(command, {
       cwd: APIS_HUB_ROOT,
     });
     return stdout;
-  } catch (error) {
-    // Fallback to direct execution if docker fails (e.g. not running or already inside container)
+  } catch (directError) {
+    // If direct execution fails (e.g. executed from host or from a node-only environment),
+    // delegate to the master container via docker compose.
+    const dockerPrefix = "docker compose exec -T master";
+    const fullCommand = `${dockerPrefix} ${command}`;
+
     try {
-      const { stdout } = await execAsync(command, {
+      const { stdout } = await execAsync(fullCommand, {
         cwd: APIS_HUB_ROOT,
       });
       return stdout;
     } catch (innerError) {
-      throw new Error(`Command failed: ${innerError.message}`);
+      throw new Error(`Command failed: ${directError.message || innerError.message}`);
     }
   }
 }
