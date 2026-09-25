@@ -588,6 +588,31 @@ if (MODE === "sse") {
         return res.status(200).json({ jsonrpc: "2.0" });
       }
 
+      // server/discover or discovery requests
+      if (method === "server/discover" || method === "discovery") {
+        const discoverResult = {
+          jsonrpc: "2.0",
+          id,
+          result: {
+            protocolVersion: "2024-11-05",
+            serverInfo: {
+              name: "apis-hub-mcp",
+              version: "1.0.0",
+            },
+            capabilities: {
+              tools: {},
+              resources: {},
+            },
+          },
+        };
+        if (transport) {
+          try {
+            transport.send(discoverResult).catch(() => {});
+          } catch (e) {}
+        }
+        return res.status(200).json(discoverResult);
+      }
+
       // Initialize request
       if (method === "initialize") {
         const initResult = {
@@ -720,6 +745,25 @@ if (MODE === "sse") {
         return res.status(400).send("StreamableHttp not supported");
       }
       res.setHeader("Content-Type", "application/json");
+
+      // Antigravity Go client strictly unmarshals the HTTP response body as a JSON-RPC message.
+      // If the SDK's SSEServerTransport calls res.writeHead(202).end('Accepted'),
+      // replace 'Accepted' with a valid JSON-RPC body '{"jsonrpc":"2.0"}'.
+      const originalEnd = res.end.bind(res);
+      res.end = (chunk, encoding, callback) => {
+        if (
+          chunk === "Accepted" ||
+          (Buffer.isBuffer(chunk) && chunk.toString() === "Accepted")
+        ) {
+          const reqId = req.body?.id;
+          const fallbackBody = reqId !== undefined
+            ? JSON.stringify({ jsonrpc: "2.0", id: reqId, result: {} })
+            : JSON.stringify({ jsonrpc: "2.0" });
+          return originalEnd(fallbackBody, "utf-8", callback);
+        }
+        return originalEnd(chunk, encoding, callback);
+      };
+
       next();
     },
     express.text({ type: "*/*" }),
