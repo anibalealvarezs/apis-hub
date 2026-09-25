@@ -495,25 +495,13 @@ if (MODE === "sse") {
     // Set reverse proxy buffering header before transport writes headers
     res.setHeader("X-Accel-Buffering", "no");
 
-    const protocol = req.headers["x-forwarded-proto"] || req.protocol;
-    const host = req.get("host");
-    const baseUrl = `${protocol}://${host}`;
-    const endpoint = `${baseUrl}/mcp/messages`;
+    // Standard MCP SSE Transport expects the relative endpoint path.
+    // The client resolves it against its connection URL.
+    const endpoint = "/mcp/messages";
 
-    // HACK: Intercept res.write to force an absolute URL for the Go SDK,
-    // since the standard SSEServerTransport always emits a relative URL.
     const originalWrite = res.write.bind(res);
     res.write = (chunk, encoding, callback) => {
-      let data = chunk;
-      if (typeof chunk === 'string' && chunk.startsWith('event: endpoint\ndata: /')) {
-        data = chunk.replace('data: /', `data: ${baseUrl}/`);
-      } else if (Buffer.isBuffer(chunk)) {
-        const str = chunk.toString();
-        if (str.startsWith('event: endpoint\ndata: /')) {
-          data = str.replace('data: /', `data: ${baseUrl}/`);
-        }
-      }
-      const result = originalWrite(data, encoding, callback);
+      const result = originalWrite(chunk, encoding, callback);
       if (typeof res.flush === 'function') {
         res.flush();
       }
@@ -530,8 +518,12 @@ if (MODE === "sse") {
     await server.connect(transport);
 
     res.on("close", () => {
-      console.error(`[DISC] Conexión cerrada. Eliminando sesión ${transport.sessionId}`);
-      sessions.delete(transport.sessionId);
+      console.error(`[DISC] Conexión SSE cerrada. Programando borrado con gracia para sesión ${transport.sessionId}`);
+      // Give a grace period (e.g., 60 seconds) so that HTTP/2 re-connects or in-flight POSTs don't hit 404
+      setTimeout(() => {
+        sessions.delete(transport.sessionId);
+        console.error(`[DISC] Sesión eliminada definitivamente tras periodo de gracia: ${transport.sessionId}`);
+      }, 60000);
     });
   });
 
@@ -544,11 +536,10 @@ if (MODE === "sse") {
 
     if (Array.isArray(sessionId)) sessionId = sessionId[0];
 
-    // Fallback logic removed to prevent picking up dead sessions.
-
-    // Safe fallback for clients that don't pass sessionId in the URL (like Antigravity)
+    // Safe fallback for clients that don't pass sessionId in the URL (like Antigravity or custom clients)
     if (!sessionId && sessions.size > 0) {
       sessionId = Array.from(sessions.keys())[sessions.size - 1];
+      console.error(`[MSG] Usando fallback de última sesión activa: ${sessionId}`);
     }
 
     if (!sessionId) {
