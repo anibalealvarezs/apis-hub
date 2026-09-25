@@ -622,11 +622,18 @@ if (MODE === "sse") {
       if (req.headers['transfer-encoding'] === 'chunked') {
         return res.status(400).send("StreamableHttp not supported");
       }
-      // Antigravity Go client strictly requires application/json
+      // Antigravity Go client strictly requires application/json and errors if body contains 'Accepted' text
       const originalWriteHead = res.writeHead.bind(res);
       res.writeHead = (statusCode, statusMessage, headers) => {
         res.setHeader('Content-Type', 'application/json');
         return originalWriteHead(statusCode, statusMessage, headers);
+      };
+      const originalEnd = res.end.bind(res);
+      res.end = (chunk, encoding, callback) => {
+        if (chunk === 'Accepted' || (Buffer.isBuffer(chunk) && chunk.toString() === 'Accepted')) {
+          return originalEnd(callback);
+        }
+        return originalEnd(chunk, encoding, callback);
       };
       next();
     },
