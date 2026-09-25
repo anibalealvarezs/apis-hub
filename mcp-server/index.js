@@ -504,10 +504,20 @@ if (MODE === "sse") {
     // since the standard SSEServerTransport always emits a relative URL.
     const originalWrite = res.write.bind(res);
     res.write = (chunk, encoding, callback) => {
+      let data = chunk;
       if (typeof chunk === 'string' && chunk.startsWith('event: endpoint\ndata: /')) {
-        chunk = chunk.replace('data: /', `data: ${baseUrl}/`);
+        data = chunk.replace('data: /', `data: ${baseUrl}/`);
+      } else if (Buffer.isBuffer(chunk)) {
+        const str = chunk.toString();
+        if (str.startsWith('event: endpoint\ndata: /')) {
+          data = str.replace('data: /', `data: ${baseUrl}/`);
+        }
       }
-      return originalWrite(chunk, encoding, callback);
+      const result = originalWrite(data, encoding, callback);
+      if (typeof res.flush === 'function') {
+        res.flush();
+      }
+      return result;
     };
 
     const transport = new SSEServerTransport(endpoint, res);
