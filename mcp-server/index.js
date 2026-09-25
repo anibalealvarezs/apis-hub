@@ -102,10 +102,39 @@ function extractAuth(req) {
   }
 
   if (token && appKey && token === appKey) {
-    return { authenticated: true, role: "user", key: token };
+    return { authenticated: true, role: "user", key: token, userContext: null };
   }
 
-  return { authenticated: false, role: null, key: token };
+  // 4. Validate against user-scoped API keys (config/user_keys.json)
+  try {
+    const userKeysPath = path.join(APIS_HUB_ROOT, "config", "user_keys.json");
+    if (fs.existsSync(userKeysPath)) {
+      const rawUserKeys = fs.readFileSync(userKeysPath, "utf-8");
+      const userKeys = JSON.parse(rawUserKeys);
+      if (Array.isArray(userKeys)) {
+        const matchingUser = userKeys.find(
+          (u) => u.api_key && u.api_key.trim() === token
+        );
+        if (matchingUser) {
+          return {
+            authenticated: true,
+            role: "user",
+            key: token,
+            userContext: {
+              userId: matchingUser.user_id,
+              userName: matchingUser.name,
+              allowedAssetGroups: matchingUser.allowed_asset_groups || [],
+              allowedAssets: matchingUser.allowed_assets || {},
+            },
+          };
+        }
+      }
+    }
+  } catch (err) {
+    console.error(`[AUTH] Error reading config/user_keys.json: ${err.message}`);
+  }
+
+  return { authenticated: false, role: null, key: token, userContext: null };
 }
 
 /**
@@ -322,7 +351,7 @@ const ADMIN_TOOLS = [
   },
 ];
 
-function createMcpServer(role = "admin") {
+function createMcpServer(role = "admin", userContext = null) {
   const server = new Server(
     {
       name: "apis-hub-mcp",
@@ -559,17 +588,29 @@ function createMcpServer(role = "admin") {
         filters,
       } = args;
 
+      // Enforce user-scoped asset isolation if caller is restricted
+      let effectiveFilters = filters && typeof filters === "object" ? { ...filters } : {};
+      if (userContext && userContext.allowedAssets && Object.keys(userContext.allowedAssets).length > 0) {
+        if (channel && userContext.allowedAssets[channel]) {
+          const allowedChannelAssets = userContext.allowedAssets[channel];
+          // Restrict ad_account / site / instance to only allowed IDs
+          if (Array.isArray(allowedChannelAssets) && allowedChannelAssets.length > 0) {
+            effectiveFilters["account_id"] = allowedChannelAssets.length === 1 ? allowedChannelAssets[0] : allowedChannelAssets;
+          }
+        }
+      }
+
       const aggregationsStr =
         typeof aggregations === "object"
           ? JSON.stringify(aggregations)
           : aggregations;
       const filtersStr =
-        filters && typeof filters === "object"
-          ? JSON.stringify(filters)
-          : filters;
+        Object.keys(effectiveFilters).length > 0
+          ? JSON.stringify(effectiveFilters)
+          : "";
 
       // Deterministic Cache Key to avoid redundant CLI & DB invocations by agents
-      const cacheKey = JSON.stringify({ entity, channel, aggregationsStr, groupBy, startDate, endDate, filtersStr });
+      const cacheKey = JSON.stringify({ entity, channel, aggregationsStr, groupBy, startDate, endDate, filtersStr, userId: userContext?.userId });
       const cached = getCachedAggregation(cacheKey);
       if (cached) {
         return { content: [{ type: "text", text: cached }] };
@@ -753,10 +794,11 @@ if (MODE === "sse") {
       transport,
       role: auth.role,
       key: auth.key,
+      userContext: auth.userContext,
     });
     console.error(`[DISC] Sesión iniciada: ${transport.sessionId} con rol: ${auth.role}`);
 
-    const server = createMcpServer(auth.role);
+    const server = createMcpServer(auth.role, auth.userContext);
     await server.connect(transport);
 
     // Keepalive ping every 15s to prevent proxy/Cloudflare timeout
@@ -803,13 +845,16 @@ if (MODE === "sse") {
     const directAuth = extractAuth(req);
     let effectiveRole = null;
     let effectiveKey = null;
+    let effectiveUserContext = null;
 
     if (directAuth.authenticated) {
       effectiveRole = directAuth.role;
       effectiveKey = directAuth.key;
+      effectiveUserContext = directAuth.userContext;
     } else if (sessionData && sessionData.role) {
       effectiveRole = sessionData.role;
       effectiveKey = sessionData.key;
+      effectiveUserContext = sessionData.userContext;
     } else {
       console.error(`[AUTH] Mensaje POST rechazado: No autenticado`);
       return res.status(401).json({
@@ -910,7 +955,7 @@ if (MODE === "sse") {
 
       // Tools List request: filtered by caller's role (admin vs user)
       if (method === "tools/list") {
-        const serverInstance = createMcpServer(effectiveRole);
+        const serverInstance = createMcpServer(effectiveRole, effectiveUserContext);
         const listResult = {
           jsonrpc: "2.0",
           id,
@@ -928,7 +973,7 @@ if (MODE === "sse") {
 
       // Tool Call request: role authorization enforced
       if (method === "tools/call") {
-        const serverInstance = createMcpServer(effectiveRole);
+        const serverInstance = createMcpServer(effectiveRole, effectiveUserContext);
         const toolName = body.params?.name;
         const toolArgs = body.params?.arguments || {};
         try {

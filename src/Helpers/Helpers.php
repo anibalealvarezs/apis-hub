@@ -946,6 +946,51 @@
         }
 
         /**
+         * Get user-scoped API keys configuration from config/user_keys.json
+         *
+         * @return array
+         */
+        public static function getUserApiKeys(): array
+        {
+            $path = __DIR__ . '/../../config/user_keys.json';
+            if (!file_exists($path)) {
+                return [];
+            }
+
+            $content = file_get_contents($path);
+            if (!$content) {
+                return [];
+            }
+
+            $decoded = json_decode($content, true);
+            return is_array($decoded) ? $decoded : [];
+        }
+
+        /**
+         * Find a user-scoped API key entry matching the provided key.
+         *
+         * @param string|null $key
+         * @return array|null
+         */
+        public static function findUserApiKey(?string $key): ?array
+        {
+            if (empty($key)) {
+                return null;
+            }
+
+            $trimmed = trim($key);
+            $userKeys = self::getUserApiKeys();
+
+            foreach ($userKeys as $entry) {
+                if (!empty($entry['api_key']) && hash_equals($entry['api_key'], $trimmed)) {
+                    return $entry;
+                }
+            }
+
+            return null;
+        }
+
+        /**
          * @return array
          * @throws ConfigurationException
          */
