@@ -156,9 +156,10 @@ if [ -f "docker-compose.yml" ]; then
 fi
 
 DEPLOYMENT_NAME=$(grep -E '^DEPLOYMENT_NAME=' "$ENV_FILE" | cut -d '=' -f 2 | tr -d '"' | tr -d "'" || echo "apis-hub")
-[ -z "$DEPLOYMENT_NAME" ] && DEPLOYMENT_NAME="apis-hub"
-echo "  🌐 Ensuring external gateway network exists (${DEPLOYMENT_NAME}_default)..."
-docker network ls | grep -w "${DEPLOYMENT_NAME}_default" >/dev/null 2>&1 || docker network create "${DEPLOYMENT_NAME}_default"
+GATEWAY_NET=$(grep -E '^SHARED_GATEWAY_NETWORK=' "$ENV_FILE" | cut -d '=' -f 2 | tr -d '"' | tr -d "'" || echo "")
+[ -z "$GATEWAY_NET" ] && GATEWAY_NET="${DEPLOYMENT_NAME}_default"
+echo "  🌐 Ensuring external gateway network exists (${GATEWAY_NET})..."
+docker network ls | grep -w "${GATEWAY_NET}" >/dev/null 2>&1 || docker network create "${GATEWAY_NET}"
 
 echo "  🏗️  Building and starting new containers..."
 # Inject PROJECT_PATH_HOST so master knows how to scale workers correctly
