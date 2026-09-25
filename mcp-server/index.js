@@ -141,145 +141,139 @@ function createMcpServer() {
   /**
    * Tools
    */
-  server.setRequestHandler(ListToolsRequestSchema, async () => {
-    return {
-      tools: [
-        {
-          name: "get_system_health",
-          description:
-            "Get a comprehensive health check of the APIs Hub infrastructure",
-          inputSchema: {
-            type: "object",
-            properties: {},
+  const MCP_TOOLS = [
+    {
+      name: "get_system_health",
+      description:
+        "Get a comprehensive health check of the APIs Hub infrastructure",
+      inputSchema: {
+        type: "object",
+        properties: {},
+      },
+    },
+    {
+      name: "trigger_instance_sync",
+      description: "Trigger a manual sync for a specific instance",
+      inputSchema: {
+        type: "object",
+        properties: {
+          instance_name: {
+            type: "string",
+            description:
+              "The name of the instance to trigger (e.g. facebook-marketing-recent)",
           },
         },
-        {
-          name: "trigger_instance_sync",
-          description: "Trigger a manual sync for a specific instance",
-          inputSchema: {
-            type: "object",
-            properties: {
-              instance_name: {
-                type: "string",
-                description:
-                  "The name of the instance to trigger (e.g. facebook-marketing-recent)",
-              },
-            },
-            required: ["instance_name"],
+        required: ["instance_name"],
+      },
+    },
+    {
+      name: "check_coverage",
+      description:
+        "Analyze data gaps for a specific channel (e.g. facebook_marketing, gsc)",
+      inputSchema: {
+        type: "object",
+        properties: {
+          channel: {
+            type: "string",
+            description: "The channel identifier",
+          },
+          days: {
+            type: "number",
+            description:
+              "Optional: Number of days to look back (default 30)",
+            default: 30,
           },
         },
-        {
-          name: "check_coverage",
-          description:
-            "Analyze data gaps for a specific channel (e.g. facebook_marketing, gsc)",
-          inputSchema: {
-            type: "object",
-            properties: {
-              channel: {
-                type: "string",
-                description: "The channel identifier",
-              },
-              days: {
-                type: "number",
-                description:
-                  "Optional: Number of days to look back (default 30)",
-                default: 30,
-              },
-            },
-            required: ["channel"],
+        required: ["channel"],
+      },
+    },
+    {
+      name: "process_jobs",
+      description: "Manually trigger the job processing command",
+      inputSchema: {
+        type: "object",
+        properties: {},
+      },
+    },
+    {
+      name: "inspect_job_queue",
+      description:
+        "Get detailed statistics about current jobs (scheduled, failed, completed)",
+      inputSchema: {
+        type: "object",
+        properties: {},
+      },
+    },
+    {
+      name: "log_analyzer",
+      description:
+        "Scan system logs for recent errors or critical failures",
+      inputSchema: {
+        type: "object",
+        properties: {
+          limit: {
+            type: "number",
+            description: "Max errors to show per log file",
+            default: 5,
+          },
+          hours: {
+            type: "number",
+            description: "Look back timeframe in hours",
+            default: 24,
           },
         },
-        {
-          name: "process_jobs",
-          description: "Manually trigger the job processing command",
-          inputSchema: {
-            type: "object",
-            properties: {},
+      },
+    },
+    {
+      name: "summarize_performance",
+      description:
+        "Get aggregated performance data using Channeled Metrics and intelligent formulas (spend, clicks, ctr, etc).",
+      inputSchema: {
+        type: "object",
+        properties: {
+          entity: {
+            type: "string",
+            description:
+              "The entity name (use 'channeled_metric' for performance data)",
           },
-        },
-        {
-          name: "inspect_job_queue",
-          description:
-            "Get detailed statistics about current jobs (scheduled, failed, completed)",
-          inputSchema: {
-            type: "object",
-            properties: {},
+          channel: {
+            type: "string",
+            description:
+              "The channel identifier (e.g. 'google_search_console', 'facebook')",
           },
-        },
-        {
-          name: "log_analyzer",
-          description:
-            "Scan system logs for recent errors or critical failures",
-          inputSchema: {
+          aggregations: {
             type: "object",
-            properties: {
-              limit: {
-                type: "number",
-                description: "Max errors to show per log file",
-                default: 5,
-              },
-              hours: {
-                type: "number",
-                description: "Look back timeframe in hours",
-                default: 24,
-              },
-            },
+            description:
+              "Object mapping alias to formula. Formulas: 'spend', 'clicks', 'impressions', 'reach', 'results', 'ctr', 'cpc', 'cpm', 'roas', 'cost_per_result', 'result_rate', 'position'. e.g. {\"total_spend\":\"spend\"}",
           },
-        },
-        {
-          name: "summarize_performance",
-          description:
-            "Get aggregated performance data using Channeled Metrics and intelligent formulas (spend, clicks, ctr, etc).",
-          inputSchema: {
+          filters: {
             type: "object",
-            properties: {
-              entity: {
-                type: "string",
-                description:
-                  "The entity name (use 'channeled_metric' for performance data)",
-              },
-              channel: {
-                type: "string",
-                description:
-                  "The channel identifier (e.g. 'google_search_console', 'facebook')",
-              },
-              aggregations: {
-                type: "object",
-                description:
-                  "Object mapping alias to formula. Formulas: 'spend', 'clicks', 'impressions', 'reach', 'results', 'ctr', 'cpc', 'cpm', 'roas', 'cost_per_result', 'result_rate', 'position'. e.g. {\"total_spend\":\"spend\"}",
-              },
-              filters: {
-                type: "object",
-                description:
-                  'Optional: Object containing filters. e.g. {"dimensions.gender":"male"}',
-              },
-              groupBy: {
-                type: "string",
-                description:
-                  "Comma separated fields to group by (e.g. 'daily', 'weekly', 'dimensions.gender')",
-              },
-              startDate: { type: "string", description: "Start date (Y-m-d)" },
-              endDate: { type: "string", description: "End date (Y-m-d)" },
-            },
-            required: ["entity", "aggregations"],
+            description:
+              'Optional: Object containing filters. e.g. {"dimensions.gender":"male"}',
           },
-        },
-        {
-          name: "get_available_instances",
-          description:
-            "List all configured worker instances from instances.yaml",
-          inputSchema: {
-            type: "object",
-            properties: {},
+          groupBy: {
+            type: "string",
+            description:
+              "Comma separated fields to group by (e.g. 'daily', 'weekly', 'dimensions.gender')",
           },
+          startDate: { type: "string", description: "Start date (Y-m-d)" },
+          endDate: { type: "string", description: "End date (Y-m-d)" },
         },
-      ],
-    };
-  });
+        required: ["entity", "aggregations"],
+      },
+    },
+    {
+      name: "get_available_instances",
+      description:
+        "List all configured worker instances from instances.yaml",
+      inputSchema: {
+        type: "object",
+        properties: {},
+      },
+    },
+  ];
 
-  server.setRequestHandler(CallToolRequestSchema, async (request) => {
-    const { name, arguments: args } = request.params;
-
+  async function executeToolCall(name, args = {}) {
     if (name === "get_system_health") {
       try {
         const stdout = await runCliCommand("php bin/cli.php app:health-check");
@@ -384,7 +378,6 @@ function createMcpServer() {
         filters,
       } = args;
 
-      // Ensure aggregations and filters are stringified for the CLI
       const aggregationsStr =
         typeof aggregations === "object"
           ? JSON.stringify(aggregations)
@@ -421,7 +414,6 @@ function createMcpServer() {
         );
         return { content: [{ type: "text", text: stdout }] };
       } catch (error) {
-        // Fallback if --list is not available or fails
         try {
           const filePath = path.join(APIS_HUB_ROOT, "config", "instances.yaml");
           if (fs.existsSync(filePath)) {
@@ -454,7 +446,19 @@ function createMcpServer() {
     }
 
     throw new Error(`Tool not found: ${name}`);
+  }
+
+  server.setRequestHandler(ListToolsRequestSchema, async () => {
+    return { tools: MCP_TOOLS };
   });
+
+  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    const { name, arguments: args } = request.params;
+    return await executeToolCall(name, args);
+  });
+
+  server.MCP_TOOLS = MCP_TOOLS;
+  server.executeToolCall = executeToolCall;
 
   return server;
 }
@@ -565,6 +569,136 @@ if (MODE === "sse") {
     }
 
     const transport = sessionId ? sessions.get(sessionId) : null;
+    const body = req.body;
+
+    // Detect if this is a JSON-RPC request / notification
+    if (body && body.jsonrpc === "2.0") {
+      const method = body.method;
+      const id = body.id;
+
+      // Notifications don't expect a result payload
+      if (!id && (method?.startsWith("notifications/") || method === "notifications/initialized")) {
+        if (transport) {
+          try {
+            await transport.handleMessage(body);
+          } catch (e) {
+            console.error(`Error handling notification via transport: ${e.message}`);
+          }
+        }
+        return res.status(200).json({ jsonrpc: "2.0" });
+      }
+
+      // Initialize request
+      if (method === "initialize") {
+        const initResult = {
+          jsonrpc: "2.0",
+          id,
+          result: {
+            protocolVersion: body.params?.protocolVersion || "2024-11-05",
+            capabilities: {
+              tools: {},
+              resources: {},
+            },
+            serverInfo: {
+              name: "apis-hub-mcp",
+              version: "1.0.0",
+            },
+          },
+        };
+        if (transport) {
+          try {
+            transport.send(initResult).catch(() => {});
+          } catch (e) {}
+        }
+        return res.status(200).json(initResult);
+      }
+
+      // Tools List request
+      if (method === "tools/list") {
+        const serverInstance = createMcpServer();
+        const listResult = {
+          jsonrpc: "2.0",
+          id,
+          result: {
+            tools: serverInstance.MCP_TOOLS || [],
+          },
+        };
+        if (transport) {
+          try {
+            transport.send(listResult).catch(() => {});
+          } catch (e) {}
+        }
+        return res.status(200).json(listResult);
+      }
+
+      // Tool Call request
+      if (method === "tools/call") {
+        const serverInstance = createMcpServer();
+        const toolName = body.params?.name;
+        const toolArgs = body.params?.arguments || {};
+        try {
+          const executionResult = await serverInstance.executeToolCall(toolName, toolArgs);
+          const callResponse = {
+            jsonrpc: "2.0",
+            id,
+            result: executionResult,
+          };
+          if (transport) {
+            try {
+              transport.send(callResponse).catch(() => {});
+            } catch (e) {}
+          }
+          return res.status(200).json(callResponse);
+        } catch (callErr) {
+          const errResponse = {
+            jsonrpc: "2.0",
+            id,
+            error: {
+              code: -32603,
+              message: callErr.message || "Internal error",
+            },
+          };
+          if (transport) {
+            try {
+              transport.send(errResponse).catch(() => {});
+            } catch (e) {}
+          }
+          return res.status(200).json(errResponse);
+        }
+      }
+
+      // Resources List request
+      if (method === "resources/list") {
+        const resList = {
+          jsonrpc: "2.0",
+          id,
+          result: {
+            resources: [
+              {
+                uri: "apis-hub://config/instances",
+                name: "Current Instances Configuration",
+                mimeType: "text/yaml",
+                description: "The current instances.yaml generated from rules",
+              },
+              {
+                uri: "apis-hub://logs/recent",
+                name: "Recent Jobs Logs",
+                mimeType: "text/plain",
+                description: "Recent logs from jobs.log",
+              },
+            ],
+          },
+        };
+        if (transport) {
+          try {
+            transport.send(resList).catch(() => {});
+          } catch (e) {}
+        }
+        return res.status(200).json(resList);
+      }
+    }
+
+    // Standard SSE transport handling if not intercepted
     if (transport) {
       try {
         if (!transport._sseResponse) {
@@ -577,82 +711,36 @@ if (MODE === "sse") {
       }
     }
 
-    // STATELESS JSON-RPC FALLBACK (Para clientes stateless como 2026-07-28 spec o cuando se pierde sesión)
-    if (req.body && req.body.jsonrpc === "2.0") {
-      try {
-        const method = req.body.method;
-        const id = req.body.id;
-
-        if (method === "initialize") {
-          return res.json({
-            jsonrpc: "2.0",
-            id,
-            result: {
-              protocolVersion: req.body.params?.protocolVersion || "2024-11-05",
-              capabilities: { tools: {}, resources: {} },
-              serverInfo: { name: "apis-hub-mcp", version: "1.0.0" }
-            }
-          });
-        }
-
-        if (method === "notifications/initialized") {
-          return res.status(202).send("Accepted");
-        }
-
-        if (method === "tools/list") {
-          const server = createMcpServer();
-          // Obtener lista de herramientas directamente
-          const tools = await server.getTools?.() || [];
-          return res.json({
-            jsonrpc: "2.0",
-            id,
-            result: { tools }
-          });
-        }
-      } catch (statelessErr) {
-        console.error("Error en stateless fallback:", statelessErr);
-      }
-    }
-
     res.status(404).send("Session expired. Please reconnect.");
   }
 
   const postMiddleware = [
     (req, res, next) => {
-      if (req.headers['transfer-encoding'] === 'chunked') {
+      if (req.headers["transfer-encoding"] === "chunked") {
         return res.status(400).send("StreamableHttp not supported");
       }
-      // Antigravity Go client strictly requires application/json and errors if body contains 'Accepted' text
-      const originalWriteHead = res.writeHead.bind(res);
-      res.writeHead = (statusCode, statusMessage, headers) => {
-        res.setHeader('Content-Type', 'application/json');
-        return originalWriteHead(statusCode, statusMessage, headers);
-      };
-      const originalEnd = res.end.bind(res);
-      res.end = (chunk, encoding, callback) => {
-        if (chunk === 'Accepted' || (Buffer.isBuffer(chunk) && chunk.toString() === 'Accepted')) {
-          return originalEnd('{}', 'utf-8', callback);
-        }
-        return originalEnd(chunk, encoding, callback);
-      };
+      res.setHeader("Content-Type", "application/json");
       next();
     },
-    express.text({ type: '*/*' }),
+    express.text({ type: "*/*" }),
     async (req, res) => {
       let parsedBody = {};
-      if (req.body && typeof req.body === 'string') {
+      if (req.body && typeof req.body === "string") {
         try {
           parsedBody = JSON.parse(req.body);
         } catch (e) {}
-      } else if (req.body && typeof req.body === 'object') {
+      } else if (req.body && typeof req.body === "object") {
         parsedBody = req.body;
       }
       req.body = parsedBody;
-      if (!req.headers['content-type'] || !req.headers['content-type'].includes('application/json')) {
-        req.headers['content-type'] = 'application/json';
+      if (
+        !req.headers["content-type"] ||
+        !req.headers["content-type"].includes("application/json")
+      ) {
+        req.headers["content-type"] = "application/json";
       }
       await handleIncomingMessage(req, res);
-    }
+    },
   ];
 
   app.post("/mcp/messages", ...postMiddleware);
