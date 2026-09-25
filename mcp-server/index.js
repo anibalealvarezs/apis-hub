@@ -489,19 +489,31 @@ if (MODE === "sse") {
 
   // MANEJO DE DISCOVERY: Iniciar flujo SSE solo en la ruta específica
   app.get("/mcp/sse", async (req, res) => {
-    // Si es un GET al SSE, iniciar stream
     console.error(`[DISC] Discovery GET detectado en ${req.url}`);
 
-    // Set reverse proxy buffering header before transport writes headers
     res.setHeader("X-Accel-Buffering", "no");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "*");
 
-    // Standard MCP SSE Transport expects the relative endpoint path.
-    // The client resolves it against its connection URL.
-    const endpoint = "/mcp/messages";
+    const protocol = req.headers["x-forwarded-proto"] || req.protocol || "https";
+    const host = req.get("host");
+    const baseUrl = `${protocol}://${host}`;
+    const endpoint = `${baseUrl}/mcp/messages`;
 
+    // Intercept to write absolute URL in endpoint event for Go MCP clients (like Antigravity)
     const originalWrite = res.write.bind(res);
     res.write = (chunk, encoding, callback) => {
-      const result = originalWrite(chunk, encoding, callback);
+      let data = chunk;
+      if (typeof chunk === 'string' && chunk.startsWith('event: endpoint\ndata: /')) {
+        data = chunk.replace('data: /', `data: ${baseUrl}/`);
+      } else if (Buffer.isBuffer(chunk)) {
+        const str = chunk.toString();
+        if (str.startsWith('event: endpoint\ndata: /')) {
+          data = str.replace('data: /', `data: ${baseUrl}/`);
+        }
+      }
+      const result = originalWrite(data, encoding, callback);
       if (typeof res.flush === 'function') {
         res.flush();
       }
@@ -510,9 +522,7 @@ if (MODE === "sse") {
 
     const transport = new SSEServerTransport(endpoint, res);
     sessions.set(transport.sessionId, transport);
-    console.error(
-      `[DISC] Sesión iniciada desde descubrimiento: ${transport.sessionId}`,
-    );
+    console.error(`[DISC] Sesión iniciada: ${transport.sessionId}`);
 
     const server = createMcpServer();
     await server.connect(transport);
@@ -533,12 +543,10 @@ if (MODE === "sse") {
 
     res.on("close", () => {
       clearInterval(keepAliveTimer);
-      console.error(`[DISC] Conexión SSE cerrada. Programando borrado con gracia para sesión ${transport.sessionId}`);
-      // Give a grace period (e.g., 60 seconds) so that HTTP/2 re-connects or in-flight POSTs don't hit 404
+      console.error(`[DISC] Conexión SSE cerrada para sesión ${transport.sessionId}`);
       setTimeout(() => {
         sessions.delete(transport.sessionId);
-        console.error(`[DISC] Sesión eliminada definitivamente tras periodo de gracia: ${transport.sessionId}`);
-      }, 60000);
+      }, 300000); // 5 minutos de retención
     });
   });
 
@@ -551,67 +559,91 @@ if (MODE === "sse") {
 
     if (Array.isArray(sessionId)) sessionId = sessionId[0];
 
-    // Safe fallback for clients that don't pass sessionId in the URL (like Antigravity or custom clients)
+    // Fallback: usar la última sesión viva si el cliente no la envía en la URL
     if (!sessionId && sessions.size > 0) {
       sessionId = Array.from(sessions.keys())[sessions.size - 1];
-      console.error(`[MSG] Usando fallback de última sesión activa: ${sessionId}`);
     }
 
-    if (!sessionId) {
-      console.error(
-        `[MSG] Error: Sin sesiones activas para responder al POST.`,
-      );
-      return res
-        .status(401)
-        .send("No active session. Please initiate a GET request first.");
-    }
-
-    const transport = sessions.get(sessionId);
+    const transport = sessionId ? sessions.get(sessionId) : null;
     if (transport) {
       try {
-        // PATCH: Si el SDK limpió el _sseResponse debido a un evento 'close' erróneo de Express,
-        // lo restauramos forzosamente para que no tire el error 500 y procese el mensaje.
         if (!transport._sseResponse) {
-           transport._sseResponse = transport.res;
+          transport._sseResponse = transport.res;
         }
         await transport.handlePostMessage(req, res, req.body);
+        return;
       } catch (err) {
-        const errorLog = `[${new Date().toISOString()}] ERROR in handlePostMessage: ${err.message}\n${err.stack}\n`;
-        fs.appendFileSync(path.join(APIS_HUB_ROOT, "mcp-debug.log"), errorLog);
-        res.status(500).send(`APIHUB-ERROR: ${err.message}. DEBUG: ${req.debugLogStr}`);
+        console.error(`Error en handlePostMessage: ${err.message}`);
       }
-    } else {
-      res.status(404).send("Session expired. Please reconnect.");
     }
+
+    // STATELESS JSON-RPC FALLBACK (Para clientes stateless como 2026-07-28 spec o cuando se pierde sesión)
+    if (req.body && req.body.jsonrpc === "2.0") {
+      try {
+        const method = req.body.method;
+        const id = req.body.id;
+
+        if (method === "initialize") {
+          return res.json({
+            jsonrpc: "2.0",
+            id,
+            result: {
+              protocolVersion: req.body.params?.protocolVersion || "2024-11-05",
+              capabilities: { tools: {}, resources: {} },
+              serverInfo: { name: "apis-hub-mcp", version: "1.0.0" }
+            }
+          });
+        }
+
+        if (method === "notifications/initialized") {
+          return res.status(202).send("Accepted");
+        }
+
+        if (method === "tools/list") {
+          const server = createMcpServer();
+          // Obtener lista de herramientas directamente
+          const tools = await server.getTools?.() || [];
+          return res.json({
+            jsonrpc: "2.0",
+            id,
+            result: { tools }
+          });
+        }
+      } catch (statelessErr) {
+        console.error("Error en stateless fallback:", statelessErr);
+      }
+    }
+
+    res.status(404).send("Session expired. Please reconnect.");
   }
 
-  app.post("/mcp/messages", (req, res, next) => {
-    // Reject StreamableHttp probes (chunked POST streams) to prevent express.text from hanging indefinitely.
-    if (req.headers['transfer-encoding'] === 'chunked') {
-      return res.status(400).send("APIHUB-ERROR: StreamableHttp transport is not supported on this server. Please use SSE transport.");
-    }
-    next();
-  }, express.text({ type: '*/*' }), async (req, res) => {
-    // Usamos express.text para leer el body como string y evitar fallos de raw-body no nativo
-    let parsedBody = {};
-    if (req.body && typeof req.body === 'string') {
-      try {
-        parsedBody = JSON.parse(req.body);
-      } catch (e) {
-        console.error("Express text JSON parse failed:", e);
+  const postMiddleware = [
+    (req, res, next) => {
+      if (req.headers['transfer-encoding'] === 'chunked') {
+        return res.status(400).send("StreamableHttp not supported");
       }
-    } else if (req.body && typeof req.body === 'object') {
-      parsedBody = req.body;
+      next();
+    },
+    express.text({ type: '*/*' }),
+    async (req, res) => {
+      let parsedBody = {};
+      if (req.body && typeof req.body === 'string') {
+        try {
+          parsedBody = JSON.parse(req.body);
+        } catch (e) {}
+      } else if (req.body && typeof req.body === 'object') {
+        parsedBody = req.body;
+      }
+      req.body = parsedBody;
+      if (!req.headers['content-type'] || !req.headers['content-type'].includes('application/json')) {
+        req.headers['content-type'] = 'application/json';
+      }
+      await handleIncomingMessage(req, res);
     }
-    
-    req.body = parsedBody;
-    // Ensure content-type is application/json so SDK handlePostMessage doesn't reject it
-    if (!req.headers['content-type'] || !req.headers['content-type'].includes('application/json')) {
-      req.headers['content-type'] = 'application/json';
-    }
+  ];
 
-    await handleIncomingMessage(req, res);
-  });
+  app.post("/mcp/messages", ...postMiddleware);
+  app.post("/mcp/sse", ...postMiddleware);
 
   // Wait for PHP server to be ready before starting MCP (useful in Docker)
   const waitForPhp = async () => {
