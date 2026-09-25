@@ -631,7 +631,7 @@ if (MODE === "sse") {
       const originalEnd = res.end.bind(res);
       res.end = (chunk, encoding, callback) => {
         if (chunk === 'Accepted' || (Buffer.isBuffer(chunk) && chunk.toString() === 'Accepted')) {
-          return originalEnd(callback);
+          return originalEnd('{}', 'utf-8', callback);
         }
         return originalEnd(chunk, encoding, callback);
       };
