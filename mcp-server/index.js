@@ -58,7 +58,245 @@ async function runCliCommand(command) {
 // Load .env relative to project root
 dotenv.config({ path: path.join(APIS_HUB_ROOT, ".env") });
 
-function createMcpServer() {
+/**
+ * Authentication and Security Middleware Helper
+ * Extracts API key from Bearer token, custom headers, or query parameters.
+ */
+function extractAuth(req) {
+  let token = null;
+
+  // 1. Authorization: Bearer <key>
+  const authHeader = req.headers["authorization"] || req.headers["Authorization"];
+  if (authHeader && typeof authHeader === "string") {
+    const parts = authHeader.split(" ");
+    if (parts.length === 2 && /^Bearer$/i.test(parts[0])) {
+      token = parts[1];
+    } else {
+      token = authHeader;
+    }
+  }
+
+  // 2. Custom headers: X-API-Key or X-Admin-API-Key
+  if (!token) {
+    token = req.headers["x-api-key"] || req.headers["x-admin-api-key"] || req.headers["api-key"];
+  }
+
+  // 3. Query string fallback: key, api_key, token
+  if (!token && req.query) {
+    token = req.query.key || req.query.api_key || req.query.token;
+  }
+
+  if (Array.isArray(token)) token = token[0];
+  if (token) token = token.trim();
+
+  const adminKey = (process.env.ADMIN_API_KEY || "").trim();
+  const appKey = (process.env.APP_API_KEY || "").trim();
+
+  // If no keys configured in .env, default to admin for development safety
+  if (!adminKey && !appKey) {
+    return { authenticated: true, role: "admin", key: token || "dev-unrestricted" };
+  }
+
+  if (token && adminKey && token === adminKey) {
+    return { authenticated: true, role: "admin", key: token };
+  }
+
+  if (token && appKey && token === appKey) {
+    return { authenticated: true, role: "user", key: token };
+  }
+
+  return { authenticated: false, role: null, key: token };
+}
+
+/**
+ * Sliding Window In-Memory Rate Limiter
+ * Default: 60 requests per minute per key/IP to prevent agent swarm abuse.
+ */
+const rateLimitMap = new Map();
+const RATE_LIMIT_WINDOW_MS = 60 * 1000;
+const MAX_REQUESTS_PER_WINDOW = 60;
+
+function checkRateLimit(identifier) {
+  const now = Date.now();
+  const record = rateLimitMap.get(identifier) || { count: 0, resetTime: now + RATE_LIMIT_WINDOW_MS };
+
+  if (now > record.resetTime) {
+    record.count = 1;
+    record.resetTime = now + RATE_LIMIT_WINDOW_MS;
+  } else {
+    record.count += 1;
+  }
+
+  rateLimitMap.set(identifier, record);
+
+  const remaining = Math.max(0, MAX_REQUESTS_PER_WINDOW - record.count);
+  const resetInSec = Math.ceil((record.resetTime - now) / 1000);
+  const exceeded = record.count > MAX_REQUESTS_PER_WINDOW;
+
+  return { exceeded, remaining, resetInSec };
+}
+
+// Memory Cache for heavy aggregation responses (TTL: 10 mins)
+const aggregationCache = new Map();
+const CACHE_TTL_MS = 10 * 60 * 1000;
+
+function getCachedAggregation(cacheKey) {
+  const item = aggregationCache.get(cacheKey);
+  if (!item) return null;
+  if (Date.now() > item.expiresAt) {
+    aggregationCache.delete(cacheKey);
+    return null;
+  }
+  return item.data;
+}
+
+function setCachedAggregation(cacheKey, data) {
+  aggregationCache.set(cacheKey, {
+    data,
+    expiresAt: Date.now() + CACHE_TTL_MS,
+  });
+}
+
+/**
+ * Tool Definitions Segregated by Role
+ */
+const USER_TOOLS = [
+  {
+    name: "summarize_performance",
+    description:
+      "Get aggregated performance data using Channeled Metrics and intelligent formulas (spend, clicks, ctr, etc). Ideal for LLM cross-channel reporting and executive dashboards.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        entity: {
+          type: "string",
+          description:
+            "The entity name (use 'channeled_metric' for performance data)",
+        },
+        channel: {
+          type: "string",
+          description:
+            "The channel identifier (e.g. 'google_search_console', 'facebook', 'shopify', 'klaviyo', 'amazon', 'tiktok')",
+        },
+        aggregations: {
+          type: "object",
+          description:
+            "Object mapping alias to formula. Available formulas: 'spend', 'clicks', 'impressions', 'reach', 'results', 'ctr', 'cpc', 'cpm', 'roas', 'cost_per_result', 'result_rate', 'position'. e.g. {\"total_spend\":\"spend\",\"total_clicks\":\"clicks\"}",
+        },
+        filters: {
+          type: "object",
+          description:
+            'Optional: Object containing filters. e.g. {"dimensions.gender":"male"}',
+        },
+        groupBy: {
+          type: "string",
+          description:
+            "Comma separated fields to group by (e.g. 'daily', 'weekly', 'dimensions.gender')",
+        },
+        startDate: { type: "string", description: "Start date in format Y-m-d" },
+        endDate: { type: "string", description: "End date in format Y-m-d" },
+      },
+      required: ["entity", "aggregations"],
+    },
+  },
+  {
+    name: "check_coverage",
+    description:
+      "Analyze data gap coverage for a specific channel (e.g. facebook_marketing, google_search_console)",
+    inputSchema: {
+      type: "object",
+      properties: {
+        channel: {
+          type: "string",
+          description: "The channel identifier",
+        },
+        days: {
+          type: "number",
+          description:
+            "Optional: Number of days to look back (default 30)",
+          default: 30,
+        },
+      },
+      required: ["channel"],
+    },
+  },
+  {
+    name: "get_available_instances",
+    description:
+      "List configured sync instances and their active status",
+    inputSchema: {
+      type: "object",
+      properties: {},
+    },
+  },
+];
+
+const ADMIN_TOOLS = [
+  ...USER_TOOLS,
+  {
+    name: "get_system_health",
+    description:
+      "Comprehensive diagnostic health check of the APIs Hub worker infrastructure, queue workers, Redis and databases",
+    inputSchema: {
+      type: "object",
+      properties: {},
+    },
+  },
+  {
+    name: "trigger_instance_sync",
+    description: "Manually schedule and dispatch initial jobs for an instance",
+    inputSchema: {
+      type: "object",
+      properties: {
+        instance_name: {
+          type: "string",
+          description:
+            "The name of the instance to trigger (e.g. facebook-marketing-recent)",
+        },
+      },
+      required: ["instance_name"],
+    },
+  },
+  {
+    name: "process_jobs",
+    description: "Manually execute pending job queue batch via worker CLI",
+    inputSchema: {
+      type: "object",
+      properties: {},
+    },
+  },
+  {
+    name: "inspect_job_queue",
+    description:
+      "Inspect current job queue metrics (scheduled, pending, failed, completed)",
+    inputSchema: {
+      type: "object",
+      properties: {},
+    },
+  },
+  {
+    name: "log_analyzer",
+    description:
+      "Scan server logs for recent exceptions, tracebacks or critical anomalies",
+    inputSchema: {
+      type: "object",
+      properties: {
+        limit: {
+          type: "number",
+          description: "Max errors to show per log file",
+          default: 5,
+        },
+        hours: {
+          type: "number",
+          description: "Look back timeframe in hours",
+          default: 24,
+        },
+      },
+    },
+  },
+];
+
+function createMcpServer(role = "admin") {
   const server = new Server(
     {
       name: "apis-hub-mcp",
@@ -71,6 +309,8 @@ function createMcpServer() {
       },
     },
   );
+
+  const activeTools = role === "admin" ? ADMIN_TOOLS : USER_TOOLS;
 
   /**
    * Resources
@@ -93,188 +333,6 @@ function createMcpServer() {
       ],
     };
   });
-
-  server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
-    const uri = request.params.uri;
-
-    if (uri === "apis-hub://config/instances") {
-      const filePath = path.join(APIS_HUB_ROOT, "config", "instances.yaml");
-      if (!fs.existsSync(filePath)) {
-        return {
-          contents: [{ uri, mimeType: "text/yaml", text: "File not found." }],
-        };
-      }
-      const content = fs.readFileSync(filePath, "utf-8");
-      return {
-        contents: [
-          {
-            uri,
-            mimeType: "text/yaml",
-            text: content,
-          },
-        ],
-      };
-    }
-
-    if (uri === "apis-hub://logs/recent") {
-      const logPath = path.join(APIS_HUB_ROOT, "logs", "jobs.log");
-      if (!fs.existsSync(logPath)) {
-        return {
-          contents: [
-            { uri, mimeType: "text/plain", text: "Log file not found." },
-          ],
-        };
-      }
-      const content = fs.readFileSync(logPath, "utf-8");
-      const lines = content.split("\n").slice(-50).join("\n");
-      return {
-        contents: [
-          {
-            uri,
-            mimeType: "text/plain",
-            text: lines,
-          },
-        ],
-      };
-    }
-
-    throw new Error(`Resource not found: ${uri}`);
-  });
-
-  /**
-   * Tools
-   */
-  const MCP_TOOLS = [
-    {
-      name: "get_system_health",
-      description:
-        "Get a comprehensive health check of the APIs Hub infrastructure",
-      inputSchema: {
-        type: "object",
-        properties: {},
-      },
-    },
-    {
-      name: "trigger_instance_sync",
-      description: "Trigger a manual sync for a specific instance",
-      inputSchema: {
-        type: "object",
-        properties: {
-          instance_name: {
-            type: "string",
-            description:
-              "The name of the instance to trigger (e.g. facebook-marketing-recent)",
-          },
-        },
-        required: ["instance_name"],
-      },
-    },
-    {
-      name: "check_coverage",
-      description:
-        "Analyze data gaps for a specific channel (e.g. facebook_marketing, gsc)",
-      inputSchema: {
-        type: "object",
-        properties: {
-          channel: {
-            type: "string",
-            description: "The channel identifier",
-          },
-          days: {
-            type: "number",
-            description:
-              "Optional: Number of days to look back (default 30)",
-            default: 30,
-          },
-        },
-        required: ["channel"],
-      },
-    },
-    {
-      name: "process_jobs",
-      description: "Manually trigger the job processing command",
-      inputSchema: {
-        type: "object",
-        properties: {},
-      },
-    },
-    {
-      name: "inspect_job_queue",
-      description:
-        "Get detailed statistics about current jobs (scheduled, failed, completed)",
-      inputSchema: {
-        type: "object",
-        properties: {},
-      },
-    },
-    {
-      name: "log_analyzer",
-      description:
-        "Scan system logs for recent errors or critical failures",
-      inputSchema: {
-        type: "object",
-        properties: {
-          limit: {
-            type: "number",
-            description: "Max errors to show per log file",
-            default: 5,
-          },
-          hours: {
-            type: "number",
-            description: "Look back timeframe in hours",
-            default: 24,
-          },
-        },
-      },
-    },
-    {
-      name: "summarize_performance",
-      description:
-        "Get aggregated performance data using Channeled Metrics and intelligent formulas (spend, clicks, ctr, etc).",
-      inputSchema: {
-        type: "object",
-        properties: {
-          entity: {
-            type: "string",
-            description:
-              "The entity name (use 'channeled_metric' for performance data)",
-          },
-          channel: {
-            type: "string",
-            description:
-              "The channel identifier (e.g. 'google_search_console', 'facebook')",
-          },
-          aggregations: {
-            type: "object",
-            description:
-              "Object mapping alias to formula. Formulas: 'spend', 'clicks', 'impressions', 'reach', 'results', 'ctr', 'cpc', 'cpm', 'roas', 'cost_per_result', 'result_rate', 'position'. e.g. {\"total_spend\":\"spend\"}",
-          },
-          filters: {
-            type: "object",
-            description:
-              'Optional: Object containing filters. e.g. {"dimensions.gender":"male"}',
-          },
-          groupBy: {
-            type: "string",
-            description:
-              "Comma separated fields to group by (e.g. 'daily', 'weekly', 'dimensions.gender')",
-          },
-          startDate: { type: "string", description: "Start date (Y-m-d)" },
-          endDate: { type: "string", description: "End date (Y-m-d)" },
-        },
-        required: ["entity", "aggregations"],
-      },
-    },
-    {
-      name: "get_available_instances",
-      description:
-        "List all configured worker instances from instances.yaml",
-      inputSchema: {
-        type: "object",
-        properties: {},
-      },
-    },
-  ];
 
   async function executeToolCall(name, args = {}) {
     if (name === "get_system_health") {
@@ -390,6 +448,13 @@ function createMcpServer() {
           ? JSON.stringify(filters)
           : filters;
 
+      // Deterministic Cache Key to avoid redundant CLI & DB invocations by agents
+      const cacheKey = JSON.stringify({ entity, channel, aggregationsStr, groupBy, startDate, endDate, filtersStr });
+      const cached = getCachedAggregation(cacheKey);
+      if (cached) {
+        return { content: [{ type: "text", text: cached }] };
+      }
+
       let cmd = `php bin/cli.php app:aggregate --entity="${entity}" --aggregations='${aggregationsStr}' --pretty`;
       if (channel) cmd += ` --channel="${channel}"`;
       if (groupBy) cmd += ` --group-by="${groupBy}"`;
@@ -399,6 +464,7 @@ function createMcpServer() {
 
       try {
         const stdout = await runCliCommand(cmd);
+        setCachedAggregation(cacheKey, stdout);
         return { content: [{ type: "text", text: stdout }] };
       } catch (error) {
         return {
@@ -452,16 +518,26 @@ function createMcpServer() {
   }
 
   server.setRequestHandler(ListToolsRequestSchema, async () => {
-    return { tools: MCP_TOOLS };
+    return { tools: activeTools };
   });
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
+    const isAllowed = activeTools.some((t) => t.name === name);
+    if (!isAllowed) {
+      throw new Error(`Unauthorized tool call: Administrative privileges required for tool '${name}'`);
+    }
     return await executeToolCall(name, args);
   });
 
-  server.MCP_TOOLS = MCP_TOOLS;
-  server.executeToolCall = executeToolCall;
+  server.MCP_TOOLS = activeTools;
+  server.executeToolCall = async (name, args) => {
+    const isAllowed = activeTools.some((t) => t.name === name);
+    if (!isAllowed) {
+      throw new Error(`Unauthorized tool call: Administrative privileges required for tool '${name}'`);
+    }
+    return await executeToolCall(name, args);
+  };
 
   return server;
 }
@@ -498,6 +574,31 @@ if (MODE === "sse") {
   app.get("/mcp/sse", async (req, res) => {
     console.error(`[DISC] Discovery GET detectado en ${req.url}`);
 
+    // Autenticación de la conexión SSE
+    const auth = extractAuth(req);
+    if (!auth.authenticated) {
+      console.error(`[AUTH] Conexión SSE rechazada: Clave no válida o ausente.`);
+      return res.status(401).json({
+        error: "Unauthorized",
+        message: "Valid API key required via Authorization header (Bearer <key>), X-API-Key, or ?key=<key>",
+      });
+    }
+
+    // Rate Limiting Check
+    const rateIdentifier = auth.key || req.ip || "unknown";
+    const rateCheck = checkRateLimit(rateIdentifier);
+    res.setHeader("X-RateLimit-Limit", MAX_REQUESTS_PER_WINDOW);
+    res.setHeader("X-RateLimit-Remaining", rateCheck.remaining);
+    res.setHeader("X-RateLimit-Reset", rateCheck.resetInSec);
+
+    if (rateCheck.exceeded) {
+      console.error(`[RATE_LIMIT] Conexión SSE rechazada por rate limit: ${rateIdentifier}`);
+      return res.status(429).json({
+        error: "Too Many Requests",
+        message: `Rate limit exceeded (Max ${MAX_REQUESTS_PER_WINDOW} req/min). Retry in ${rateCheck.resetInSec} seconds.`,
+      });
+    }
+
     res.setHeader("X-Accel-Buffering", "no");
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
@@ -528,10 +629,14 @@ if (MODE === "sse") {
     };
 
     const transport = new SSEServerTransport(endpoint, res);
-    sessions.set(transport.sessionId, transport);
-    console.error(`[DISC] Sesión iniciada: ${transport.sessionId}`);
+    sessions.set(transport.sessionId, {
+      transport,
+      role: auth.role,
+      key: auth.key,
+    });
+    console.error(`[DISC] Sesión iniciada: ${transport.sessionId} con rol: ${auth.role}`);
 
-    const server = createMcpServer();
+    const server = createMcpServer(auth.role);
     await server.connect(transport);
 
     // Keepalive ping every 15s to prevent proxy/Cloudflare timeout
@@ -571,7 +676,49 @@ if (MODE === "sse") {
       sessionId = Array.from(sessions.keys())[sessions.size - 1];
     }
 
-    const transport = sessionId ? sessions.get(sessionId) : null;
+    const sessionData = sessionId ? sessions.get(sessionId) : null;
+    const transport = sessionData ? sessionData.transport : null;
+
+    // Verificar autenticación: ya sea por encabezados en este POST o por la sesión activa establecida
+    const directAuth = extractAuth(req);
+    let effectiveRole = null;
+    let effectiveKey = null;
+
+    if (directAuth.authenticated) {
+      effectiveRole = directAuth.role;
+      effectiveKey = directAuth.key;
+    } else if (sessionData && sessionData.role) {
+      effectiveRole = sessionData.role;
+      effectiveKey = sessionData.key;
+    } else {
+      console.error(`[AUTH] Mensaje POST rechazado: No autenticado`);
+      return res.status(401).json({
+        jsonrpc: "2.0",
+        error: {
+          code: -32000,
+          message: "Unauthorized: Valid API key required",
+        },
+      });
+    }
+
+    // Rate limiting para llamadas de mensajes
+    const rateIdentifier = effectiveKey || req.ip || "unknown";
+    const rateCheck = checkRateLimit(rateIdentifier);
+    res.setHeader("X-RateLimit-Limit", MAX_REQUESTS_PER_WINDOW);
+    res.setHeader("X-RateLimit-Remaining", rateCheck.remaining);
+    res.setHeader("X-RateLimit-Reset", rateCheck.resetInSec);
+
+    if (rateCheck.exceeded) {
+      console.error(`[RATE_LIMIT] Mensaje rechazado por rate limit: ${rateIdentifier}`);
+      return res.status(429).json({
+        jsonrpc: "2.0",
+        error: {
+          code: -32000,
+          message: `Rate limit exceeded (Max ${MAX_REQUESTS_PER_WINDOW} req/min). Retry in ${rateCheck.resetInSec} seconds.`,
+        },
+      });
+    }
+
     const body = req.body;
 
     // Detect if this is a JSON-RPC request / notification
@@ -641,9 +788,9 @@ if (MODE === "sse") {
         return res.status(200).json(initResult);
       }
 
-      // Tools List request
+      // Tools List request: filtered by caller's role (admin vs user)
       if (method === "tools/list") {
-        const serverInstance = createMcpServer();
+        const serverInstance = createMcpServer(effectiveRole);
         const listResult = {
           jsonrpc: "2.0",
           id,
@@ -659,9 +806,9 @@ if (MODE === "sse") {
         return res.status(200).json(listResult);
       }
 
-      // Tool Call request
+      // Tool Call request: role authorization enforced
       if (method === "tools/call") {
-        const serverInstance = createMcpServer();
+        const serverInstance = createMcpServer(effectiveRole);
         const toolName = body.params?.name;
         const toolArgs = body.params?.arguments || {};
         try {
