@@ -21,6 +21,7 @@
     use Commands\Analytics\ResetChannelCommand;
     use Commands\Analytics\RetryFailedJobCommand;
     use Commands\Analytics\RetryFailedJobsCommand;
+    use Commands\Analytics\ListAssetsCommand;
     use Commands\Analytics\SwooleWorkerCommand;
     use Commands\Analytics\EvaluateAlertsCommand;
     use Commands\HealthCheckCommand;
@@ -121,6 +122,7 @@
             new UpgradeVersionCommand($entityManager),
             new EvaluateAlertsCommand($entityManager),
             new ClassifyQueriesCommand($entityManager),
+            new ListAssetsCommand(),
         ];
 
         foreach ($commands as $command) {

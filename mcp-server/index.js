@@ -191,6 +191,46 @@ function setCachedAggregation(cacheKey, data) {
  */
 const USER_TOOLS = [
   {
+    name: "get_mcp_guide",
+    description:
+      "Comprehensive interaction guide and usage specifications for AI agents connecting to this APIs Hub MCP node. Explains data discovery, filtering by connected assets, temporal/dimensional breakdowns, data scopes, error prevention, and copy-paste ready query patterns.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        topic: {
+          type: "string",
+          description:
+            "Optional: Specific guide topic ('overview', 'workflow', 'assets', 'filters', 'scopes', 'breakdowns', 'formulas', 'examples')",
+          enum: [
+            "overview",
+            "workflow",
+            "assets",
+            "filters",
+            "scopes",
+            "breakdowns",
+            "formulas",
+            "examples"
+          ]
+        }
+      }
+    }
+  },
+  {
+    name: "list_connected_assets",
+    description:
+      "List all connected accounts, web properties, ad profiles, and stores linked to this project node. Returns asset IDs, display names, channels, and platform identifiers needed to formulate asset-scoped queries in summarize_performance.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        channel: {
+          type: "string",
+          description:
+            "Optional: Filter connected assets by channel (e.g. 'google_search_console', 'google_analytics', 'facebook_marketing', 'shopify', 'klaviyo', 'amazon', 'tiktok')"
+        }
+      }
+    }
+  },
+  {
     name: "get_analytics_catalog",
     description:
       "Introspect and discover the full analytics capabilities of APIs Hub. Returns data scopes (scope_global, scope_channel, scope_asset), supported channels and tags, canonical metrics, formula-based derived metrics, allowed temporal/non-temporal breakdowns, and predefined KPIs.",
@@ -241,7 +281,7 @@ const USER_TOOLS = [
         filters: {
           type: "object",
           description:
-            'Optional: Object containing filters or dimensions. e.g. {"dimensions.gender":"male", "country":"US"}',
+            'Optional: Object containing filters or dimensions. e.g. {"channeledAccount":"2", "device":"desktop", "country":"US"}',
         },
         groupBy: {
           type: "string",
@@ -437,6 +477,14 @@ function createMcpServer(role = "admin", userContext = null) {
 
     if (name === "check_coverage") {
       const { channel, days = 30 } = args;
+      if (!channel) {
+        return {
+          content: [
+            { type: "text", text: "Error: The 'channel' parameter is required for check_coverage (e.g. 'google_search_console', 'facebook_marketing', 'shopify', 'klaviyo')." }
+          ],
+          isError: true
+        };
+      }
       try {
         const stdout = await runCliCommand(
           `php bin/cli.php app:check-coverage --channel="${channel}" --days=${days}`,
@@ -479,6 +527,174 @@ function createMcpServer(role = "admin", userContext = null) {
             { type: "text", text: `Log analysis failed: ${error.message}` },
           ],
           isError: true,
+        };
+      }
+    }
+
+    if (name === "get_mcp_guide") {
+      const { topic = "overview" } = args;
+
+      const guideSections = {
+        overview: {
+          title: "APIs Hub MCP Server — System Architecture & Interaction Overview",
+          summary: "This MCP server bridges LLMs and Autonomous Agents directly to the high-performance OLAP and data aggregation engine of APIs Hub.",
+          key_principles: [
+            "1. Three-Tier Analytics Hierarchy: Always choose the appropriate data scope ('global', 'channel', or 'asset').",
+            "2. Read-Only Safety: All analytics tools are non-destructive and optimized with in-memory deterministic caching.",
+            "3. Asset Discovery First: Never guess asset IDs. Call 'list_connected_assets' to discover the exact IDs and channels available.",
+            "4. Formula Normalization: Metrics (spend, clicks, impressions, ctr, cpc, cpm, roas, position, sessions) are computed uniformly across Meta, Google, Shopify, Klaviyo, Amazon, and TikTok."
+          ],
+          available_topics: ["overview", "workflow", "assets", "filters", "scopes", "breakdowns", "formulas", "examples"]
+        },
+        workflow: {
+          title: "Recommended Agent Workflow",
+          steps: [
+            {
+              step: 1,
+              tool: "list_connected_assets",
+              purpose: "Discover active accounts, websites, properties, and ad accounts linked to the project, noting their integer 'id' and 'channel'."
+            },
+            {
+              step: 2,
+              tool: "get_analytics_catalog",
+              purpose: "Inspect available canonical metrics, derived formulas, and valid dimensional or temporal breakdowns for the target channel or scope."
+            },
+            {
+              step: 3,
+              tool: "summarize_performance",
+              purpose: "Run the targeted aggregation query passing discovered asset IDs into 'filters: { channeledAccount: \"<id>\" }' or 'groupBy'."
+            }
+          ]
+        },
+        assets: {
+          title: "Asset Identification & Filtering Protocol",
+          explanation: "In APIs Hub, connected entities (GSC web properties, GA4 analytics streams, Meta ad accounts, Shopify stores, Klaviyo accounts) are called 'Assets' or 'Channeled Accounts'.",
+          rules: [
+            "Asset IDs are integers (e.g. 2, 46, 12).",
+            "When querying a specific asset in 'summarize_performance', pass the ID in the filters object using either 'channeledAccount' or 'account_id'. Example: filters: { \"channeledAccount\": \"2\" }.",
+            "If the user asks about a client or domain (e.g. 'marcelacrodriguez.com'), run 'list_connected_assets' first to find matching IDs."
+          ]
+        },
+        scopes: {
+          title: "Data Scopes ('global', 'channel', 'asset')",
+          scopes: {
+            global: "Blended cross-network performance across all integrated providers. Do not pass a 'channel' parameter.",
+            channel: "Ecosystem performance restricted to a single provider (e.g. channel: 'google_search_console', 'google_analytics', 'facebook_marketing').",
+            asset: "Granular performance isolated to a specific account, property, or store. Must include filters: { \"channeledAccount\": \"<id>\" }."
+          }
+        },
+        filters: {
+          title: "Filter Syntax & Capabilities",
+          accepted_formats: {
+            exact_match: { "device": "desktop", "country": "US", "channeledAccount": "2" },
+            nested_dimensions: { "dimensions.gender": "male", "dimensions.country": "USA" }
+          },
+          warning: "Do not pass complex mathematical operators in filter keys unless checking standard equality. For metric thresholds, aggregate first then evaluate in prompt reasoning."
+        },
+        breakdowns: {
+          title: "Temporal and Dimensional Breakdowns ('groupBy')",
+          temporal: ["daily", "weekly", "monthly", "quarterly", "yearly", "date"],
+          dimensional: ["device", "country", "query", "page", "campaign", "ad_set", "placement", "dimensions.*"],
+          multi_grouping: "You can group by multiple dimensions comma-separated, e.g. 'channel,device' or 'date,device'."
+        },
+        formulas: {
+          title: "Supported Derived Formulas in 'aggregations'",
+          formulas: [
+            { name: "spend", formula: "SUM(spend)", description: "Total advertising cost" },
+            { name: "clicks", formula: "SUM(clicks)", description: "Total link or ad clicks" },
+            { name: "impressions", formula: "SUM(impressions)", description: "Total impressions" },
+            { name: "ctr", formula: "clicks / impressions * 100", description: "Click-Through Rate (%)" },
+            { name: "cpc", formula: "spend / clicks", description: "Cost Per Click" },
+            { name: "cpm", formula: "spend / impressions * 1000", description: "Cost Per Mille" },
+            { name: "roas", formula: "revenue / spend", description: "Return on Ad Spend" },
+            { name: "position", formula: "weighted_avg(position by impressions)", description: "Average Search Engine Rank" },
+            { name: "sessions", formula: "SUM(sessions)", description: "Web/Store Traffic Sessions" },
+            { name: "conversions", formula: "SUM(conversions)", description: "Total Goal / Purchase Conversions" }
+          ]
+        },
+        examples: {
+          title: "Copy-Paste Ready Query Recipes",
+          recipes: [
+            {
+              scenario: "SEO Audit: Top ranking queries and CTR for a website",
+              tool: "summarize_performance",
+              arguments: {
+                entity: "channeled_metric",
+                channel: "google_search_console",
+                scope: "asset",
+                filters: { channeledAccount: "2" },
+                groupBy: "device",
+                aggregations: {
+                  total_clicks: "clicks",
+                  total_impressions: "impressions",
+                  click_through_rate: "ctr",
+                  avg_position: "position"
+                },
+                startDate: "2026-09-01",
+                endDate: "2026-09-24"
+              }
+            },
+            {
+              scenario: "Cross-Channel Executive Blended Performance",
+              tool: "summarize_performance",
+              arguments: {
+                entity: "channeled_metric",
+                scope: "global",
+                groupBy: "channel,device",
+                aggregations: {
+                  blended_clicks: "clicks",
+                  blended_impressions: "impressions",
+                  blended_ctr: "ctr"
+                }
+              }
+            },
+            {
+              scenario: "GA4 Traffic and Session Analysis",
+              tool: "summarize_performance",
+              arguments: {
+                entity: "channeled_metric",
+                channel: "google_analytics",
+                scope: "asset",
+                filters: { channeledAccount: "46" },
+                groupBy: "device",
+                aggregations: {
+                  total_sessions: "sessions",
+                  total_conversions: "conversions"
+                }
+              }
+            }
+          ]
+        }
+      };
+
+      const selected = guideSections[topic] || guideSections.overview;
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(selected, null, 2)
+          }
+        ]
+      };
+    }
+
+    if (name === "list_connected_assets") {
+      const { channel } = args;
+      let cmd = "php bin/cli.php app:list-assets --pretty";
+      if (channel) {
+        cmd += ` --channel="${channel}"`;
+      }
+
+      try {
+        const stdout = await runCliCommand(cmd);
+        return { content: [{ type: "text", text: stdout }] };
+      } catch (error) {
+        // Fallback: Query via instances.yaml or direct PDO if CLI encounters bootstrap exception
+        return {
+          content: [
+            { type: "text", text: `Asset listing failed: ${error.message}` }
+          ],
+          isError: true
         };
       }
     }
@@ -538,6 +754,10 @@ function createMcpServer(role = "admin", userContext = null) {
         granularities: {
           temporal: ["daily", "weekly", "monthly", "quarterly", "yearly"],
           dimensional: ["device", "country", "query", "page", "campaign", "ad_set", "placement", "dimensions.*"]
+        },
+        recipes_and_guidance: {
+          guide_tool: "Call 'get_mcp_guide' with topic='overview' or topic='examples' for detailed recipes.",
+          discovery_tool: "Call 'list_connected_assets' to discover exact asset IDs for filters: { channeledAccount: '<id>' }."
         }
       };
 
@@ -562,7 +782,8 @@ function createMcpServer(role = "admin", userContext = null) {
               channel,
               capabilities: channelCapabilities || "Channel not specifically registered or uses generic adapter",
               available_canonical_metrics: catalog.canonical_metrics,
-              allowed_breakdowns: catalog.granularities
+              allowed_breakdowns: catalog.granularities,
+              recipes_and_guidance: catalog.recipes_and_guidance
             }, null, 2)
           }]
         };
@@ -595,7 +816,9 @@ function createMcpServer(role = "admin", userContext = null) {
           const allowedChannelAssets = userContext.allowedAssets[channel];
           // Restrict ad_account / site / instance to only allowed IDs
           if (Array.isArray(allowedChannelAssets) && allowedChannelAssets.length > 0) {
-            effectiveFilters["account_id"] = allowedChannelAssets.length === 1 ? allowedChannelAssets[0] : allowedChannelAssets;
+            const targetId = allowedChannelAssets.length === 1 ? allowedChannelAssets[0] : allowedChannelAssets;
+            effectiveFilters["channeledAccount"] = targetId;
+            effectiveFilters["account_id"] = targetId;
           }
         }
       }
