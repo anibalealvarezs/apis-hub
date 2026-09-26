@@ -46,6 +46,10 @@
         #[ORM\JoinColumn(name: 'order_id', onDelete: 'cascade')]
         protected Order $order;
 
+        #[ORM\ManyToOne(targetEntity: ChanneledStore::class)]
+        #[ORM\JoinColumn(name: 'channeled_store_id', referencedColumnName: 'id', nullable: true, onDelete: 'SET NULL')]
+        protected ?ChanneledStore $channeledStore = null;
+
         public function __construct()
         {
             $this->channeledProducts = new ArrayCollection();

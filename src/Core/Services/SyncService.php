@@ -178,6 +178,8 @@
                         'accounts'            => Account::class,
                         'events'              => Event::class,
                         'channeled_events'    => ChanneledEvent::class,
+                        'stores'              => \Entities\Analytics\Store::class,
+                        'channeled_stores'    => \Entities\Analytics\Channeled\ChanneledStore::class,
                     ];
 
                     if (!isset($repoMap[$type])) {
@@ -194,7 +196,7 @@
 
                     $category = match ($type) {
                         'pages' => AssetCategory::PAGEABLE,
-                        'channeled_accounts' => AssetCategory::IDENTITY,
+                        'channeled_accounts', 'channeled_stores', 'stores' => AssetCategory::IDENTITY,
                         'channeled_campaigns' => AssetCategory::CAMPAIGN,
                         'channeled_ad_groups' => AssetCategory::GROUPING,
                         'channeled_ads', 'posts' => AssetCategory::UNIT,
