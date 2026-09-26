@@ -595,7 +595,7 @@ function createMcpServer(role = "admin", userContext = null) {
             {
               step: 2,
               tool: "get_analytics_catalog",
-              purpose: "Inspect available canonical metrics, derived formulas, and valid dimensional or temporal breakdowns for the target channel or scope."
+              purpose: "Inspect available canonical metrics, derived formulas, channel datascopes, valid breakdowns, and the platform-wide reference library of predefined KPIs and Derived Metrics for analytical inspiration."
             },
             {
               step: 3,
@@ -964,6 +964,26 @@ function createMcpServer(role = "admin", userContext = null) {
           discovery_tool: "Call 'list_connected_assets' to discover exact asset IDs for filters: { channeledAccount: '<id>' }."
         }
       };
+
+      // Load reference library of predefined platform KPIs & Derived Metrics from project_context.json if available
+      try {
+        const filePath = path.join(APIS_HUB_ROOT, "config", "project_context.json");
+        if (fs.existsSync(filePath)) {
+          const raw = fs.readFileSync(filePath, "utf-8");
+          const ctx = JSON.parse(raw);
+          if (ctx.reference_library) {
+            catalog.reference_library = {
+              notice: "These predefined KPIs and Derived Metrics are platform-wide reference definitions and templates provided for analytical inspiration and deep analysis. They are NOT active custom KPIs created specifically for this project.",
+              predefined_kpis_count: Object.keys(ctx.reference_library.predefined_kpis || {}).length,
+              predefined_kpis: ctx.reference_library.predefined_kpis || {},
+              predefined_derived_metrics_count: Object.keys(ctx.reference_library.predefined_derived_metrics || {}).length,
+              predefined_derived_metrics: ctx.reference_library.predefined_derived_metrics || {}
+            };
+          }
+        }
+      } catch (e) {
+        // Silently continue with standard catalog if reference library cannot be read
+      }
 
       if (scope) {
         const scopeKey = scope.startsWith("scope_") ? scope : `scope_${scope}`;
