@@ -213,6 +213,9 @@ const USER_TOOLS = [
             "kpi_calculation",
             "derived_metrics",
             "dashboards",
+            "benchmarks",
+            "temporal_comparison",
+            "funnel_decomposition",
             "examples"
           ]
         }
@@ -243,8 +246,8 @@ const USER_TOOLS = [
       properties: {
         section: {
           type: "string",
-          description: "Optional: Specific catalog section to inspect ('reference_library', 'predefined_kpis', 'predefined_derived_metrics', 'data_scopes', 'canonical_metrics', 'derived_formulas')",
-          enum: ["reference_library", "predefined_kpis", "predefined_derived_metrics", "data_scopes", "canonical_metrics", "derived_formulas"]
+          description: "Optional: Specific catalog section to inspect ('reference_library', 'predefined_kpis', 'predefined_derived_metrics', 'benchmarks', 'data_scopes', 'canonical_metrics', 'derived_formulas')",
+          enum: ["reference_library", "predefined_kpis", "predefined_derived_metrics", "benchmarks", "data_scopes", "canonical_metrics", "derived_formulas"]
         },
         scope: {
           type: "string",
@@ -590,7 +593,7 @@ function createMcpServer(role = "admin", userContext = null) {
             "3. Asset Discovery First: Never guess asset IDs. Call 'list_connected_assets' to discover the exact IDs and channels available.",
             "4. Formula Normalization: Metrics (spend, clicks, impressions, ctr, cpc, cpm, roas, position, sessions) are computed uniformly across Meta, Google, Shopify, Klaviyo, Amazon, and TikTok."
           ],
-          available_topics: ["overview", "workflow", "assets", "filters", "scopes", "breakdowns", "formulas", "kpi_calculation", "derived_metrics", "dashboards", "examples"]
+          available_topics: ["overview", "workflow", "assets", "filters", "scopes", "breakdowns", "formulas", "kpi_calculation", "derived_metrics", "dashboards", "benchmarks", "temporal_comparison", "funnel_decomposition", "examples"]
         },
         workflow: {
           title: "Recommended Agent Workflow",
@@ -841,6 +844,86 @@ function createMcpServer(role = "admin", userContext = null) {
           },
           agent_interpretation_guideline: "When an agent is asked 'What does our dashboard show?' or 'How is our main dashboard performing?', the agent should: (1) call 'list_project_dashboards' to identify the active widgets and their source KPIs/metrics, (2) query 'summarize_performance' for the corresponding metrics and date range, and (3) synthesize an executive interpretation highlighting trend direction, goal achievement, and outliers."
         },
+        benchmarks: {
+          title: "Marketing Benchmarks & Target Evaluation Guidelines",
+          purpose: "Enables agents to assess whether observed metrics represent strong, average, or concerning performance when explicit client targets are not provided in project alerts or metadata.",
+          standard_channel_benchmarks: {
+            google_search_console: {
+              top_3_ctr: "25% - 35% for Position 1; 12% - 16% for Position 2; 8% - 11% for Position 3.",
+              top_10_ctr: "2% - 4% for Positions 4-10.",
+              diagnostic_rule: "If an organic query ranks in Position <= 3 but has CTR < 5%, evaluate title and snippet copy for intent mismatch or rich snippet competition."
+            },
+            google_analytics_ga4: {
+              average_bounce_rate: "40% - 60% for content/blogs; 25% - 45% for e-commerce.",
+              engagement_rate: "55% - 70% is healthy across direct and organic search.",
+              session_duration: "1.5 - 3.5 minutes for content and shopping sites."
+            },
+            facebook_marketing: {
+              average_ctr: "0.90% - 1.60% (e-commerce / retail); 0.70% - 1.10% (B2B).",
+              average_cpc: "$0.80 - $2.50 depending on audience geography and vertical.",
+              healthy_frequency: "1.5 - 3.0 per 7-day window. Frequency > 4.5 accompanied by rising CPC signals audience saturation / creative fatigue."
+            },
+            ecommerce_funnel: {
+              healthy_conversion_rate: "1.8% - 3.5% (Sessions to Completed Orders).",
+              cart_abandonment_rate: "65% - 75% baseline.",
+              blended_mer: "3.0x - 5.0x for mature brands; 1.8x - 2.5x for rapid acquisition phases."
+            }
+          }
+        },
+        temporal_comparison: {
+          title: "Period-over-Period (PoP) & Year-over-Year (YoY) Velocity Analysis",
+          methodology: "Accurate marketing intelligence requires comparing current period performance against prior periods to measure momentum, seasonality, and campaign impact.",
+          delta_formulas: {
+            absolute_delta: "Current_Value - Prior_Value",
+            percentage_delta: "((Current_Value - Prior_Value) / Prior_Value) * 100",
+            velocity_indicator: "Positive delta indicates growth; for cost metrics (CPA, CPC), negative delta indicates efficiency gain."
+          },
+          recipe_pop_comparison: [
+            "1. Define Current Window: e.g., startDate='2026-09-01', endDate='2026-09-25' (25 days).",
+            "2. Define Prior Window: Calculate equivalent length prior offset, e.g., startDate='2026-08-07', endDate='2026-08-31' (25 days).",
+            "3. Query Both Windows: Call 'summarize_performance' once for each period with identical aggregations, scope, and filters.",
+            "4. Calculate Deltas: For each key metric (spend, clicks, conversions, ctr, cpc), compute the % change: ((current - prior) / prior) * 100."
+          ],
+          recipe_yoy_comparison: [
+            "1. Shift Current Window by exactly 1 year (365 days) or 52 weeks (matching day-of-week).",
+            "2. Query both periods via 'summarize_performance'.",
+            "3. Isolate macro/seasonal growth from tactical campaign performance."
+          ]
+        },
+        funnel_decomposition: {
+          title: "Funnel Decomposition & Root-Cause Attribution Tree",
+          principle: "When high-level performance shifts (e.g. ROAS or Revenue changes), autonomous agents should follow a systematic MECE decomposition tree instead of guessing.",
+          roas_decomposition_tree: {
+            formula: "ROAS = (Revenue / Spend) = (Conversions * AOV) / (Clicks * CPC) = (CVR * AOV) / CPC",
+            diagnostic_steps: [
+              {
+                step: 1,
+                check: "Did ROAS decline due to Cost (CPC) or Yield (CVR * AOV)?",
+                action: "Calculate Delta(CPC) and Delta(Conversion_Rate). If CPC rose > 20%, inspect auction competition, audience fatigue (frequency), and creative CTR."
+              },
+              {
+                step: 2,
+                check: "If Yield declined, was it Conversion Rate (CVR) or Order Value (AOV)?",
+                action: "If CVR dropped, inspect landing page load time, out-of-stock items, or mobile vs desktop checkout breakdown. If AOV dropped, check promotional discounting or product mix changes."
+              }
+            ]
+          },
+          seo_traffic_decomposition_tree: {
+            formula: "Organic Search Clicks = Total Search Impressions * CTR",
+            diagnostic_steps: [
+              {
+                step: 1,
+                check: "Did Clicks drop due to lower Market Demand (Impressions) or lower Capture (CTR)?",
+                action: "Query 'summarize_performance' with groupBy='query' and aggregations={ clicks: 'clicks', impressions: 'impressions', ctr: 'ctr', position: 'position' }."
+              },
+              {
+                step: 2,
+                check: "If Impressions dropped: Did average ranking position slip, or did overall seasonal search volume decline?",
+                action: "Inspect avg_position delta. If position is stable but impressions dropped, the keyword demand is seasonal. If position slipped from 2.1 to 8.4, algorithm updates or competitor outranking occurred."
+              }
+            ]
+          }
+        },
         examples: {
           title: "Copy-Paste Ready Query Recipes",
           recipes: [
@@ -1069,6 +1152,28 @@ function createMcpServer(role = "admin", userContext = null) {
         recipes_and_guidance: {
           guide_tool: "Call 'get_mcp_guide' with topic='datascopes' or topic='examples' for detailed recipes.",
           discovery_tool: "Call 'list_connected_assets' to discover exact asset IDs for filters: { channeledAccount: '<id>' }."
+        },
+        benchmarks: {
+          google_search_console: {
+            top_3_ctr: "25% - 35% (Pos 1); 12% - 16% (Pos 2); 8% - 11% (Pos 3)",
+            top_10_ctr: "2% - 4% (Pos 4-10)",
+            health_rule: "Position <= 3 with CTR < 5% signals snippet mismatch or rich snippet displacement."
+          },
+          google_analytics_ga4: {
+            bounce_rate: "40% - 60% (content/blog); 25% - 45% (ecommerce)",
+            engagement_rate: "55% - 70% (healthy across search/direct)",
+            session_duration_minutes: "1.5 - 3.5 mins"
+          },
+          facebook_marketing: {
+            ctr: "0.90% - 1.60% (ecommerce); 0.70% - 1.10% (B2B)",
+            cpc: "$0.80 - $2.50 (geography and competition dependent)",
+            frequency_7d: "1.5 - 3.0 (frequency > 4.5 signals creative exhaustion)"
+          },
+          ecommerce_funnel: {
+            cvr: "1.8% - 3.5% (sessions to orders)",
+            cart_abandonment_rate: "65% - 75%",
+            blended_mer: "3.0x - 5.0x (mature brands); 1.8x - 2.5x (growth phase)"
+          }
         }
       };
 
@@ -1139,6 +1244,14 @@ function createMcpServer(role = "admin", userContext = null) {
                 count: catalog.reference_library?.predefined_derived_metrics_count || 0,
                 predefined_derived_metrics: catalog.reference_library?.predefined_derived_metrics || {}
               }, null, 2)
+            }]
+          };
+        }
+        if (section === "benchmarks") {
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify(catalog.benchmarks || {}, null, 2)
             }]
           };
         }
