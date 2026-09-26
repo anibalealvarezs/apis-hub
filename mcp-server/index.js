@@ -250,6 +250,43 @@ const USER_TOOLS = [
     }
   },
   {
+    name: "list_custom_kpis",
+    description:
+      "List the custom KPIs and calculated derived metrics specifically defined for this project. Returns KPI names, calculation formulas (AST / math expression), descriptions, and filtering criteria.",
+    inputSchema: {
+      type: "object",
+      properties: {}
+    }
+  },
+  {
+    name: "list_project_dashboards",
+    description:
+      "List all configured project dashboards and their constituent widgets. Returns dashboard names, layout, widget titles, selected metrics/KPIs, source channels, and visualization controls so agents can answer questions regarding active dashboards.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        dashboard_id: {
+          type: "number",
+          description: "Optional: Specific dashboard ID to inspect its detailed widget configurations"
+        }
+      }
+    }
+  },
+  {
+    name: "list_configured_alerts",
+    description:
+      "List active threshold alerts, schedule triggers, and monitoring rules configured in the project. Returns alert names, source metrics, upper/lower limit thresholds, and schedule evaluation status.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        alert_id: {
+          type: "number",
+          description: "Optional: Specific alert ID to inspect"
+        }
+      }
+    }
+  },
+  {
     name: "summarize_performance",
     description:
       "Get aggregated performance data using Channeled Metrics and intelligent formulas (spend, clicks, ctr, cpc, cpm, roas, position, etc). Matches widget capabilities, supporting multiple data scopes, breakdowns (daily, weekly, monthly, dimensional), advanced filters, and asset group isolation.",
@@ -561,8 +598,23 @@ function createMcpServer(role = "admin", userContext = null) {
             },
             {
               step: 3,
+              tool: "list_custom_kpis",
+              purpose: "Check if the project has user-defined custom KPIs or formula AST expressions configured."
+            },
+            {
+              step: 4,
+              tool: "list_project_dashboards",
+              purpose: "Inspect active dashboards, widget definitions, and chart controls configured by the user."
+            },
+            {
+              step: 5,
+              tool: "list_configured_alerts",
+              purpose: "Review active monitoring threshold alerts, scheduled evaluations, and anomaly limits."
+            },
+            {
+              step: 6,
               tool: "summarize_performance",
-              purpose: "Run the targeted aggregation query passing discovered asset IDs into 'filters: { channeledAccount: \"<id>\" }' or 'groupBy'."
+              purpose: "Run targeted aggregation queries passing discovered asset IDs into 'filters: { channeledAccount: \"<id>\" }' or 'groupBy'."
             }
           ]
         },
@@ -795,6 +847,190 @@ function createMcpServer(role = "admin", userContext = null) {
           text: JSON.stringify(catalog, null, 2)
         }]
       };
+    }
+
+    if (name === "list_custom_kpis") {
+      try {
+        const filePath = path.join(APIS_HUB_ROOT, "config", "project_context.json");
+        if (fs.existsSync(filePath)) {
+          const raw = fs.readFileSync(filePath, "utf-8");
+          const ctx = JSON.parse(raw);
+          const kpis = ctx.custom_kpis || [];
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(
+                  {
+                    status: "success",
+                    count: kpis.length,
+                    custom_kpis: kpis,
+                  },
+                  null,
+                  2
+                ),
+              },
+            ],
+          };
+        }
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                status: "success",
+                count: 0,
+                custom_kpis: [],
+                message: "No custom KPIs configured or project context not yet synchronized.",
+              }, null, 2),
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [{ type: "text", text: `Failed to load custom KPIs: ${error.message}` }],
+          isError: true,
+        };
+      }
+    }
+
+    if (name === "list_project_dashboards") {
+      const { dashboard_id } = args;
+      try {
+        const filePath = path.join(APIS_HUB_ROOT, "config", "project_context.json");
+        if (fs.existsSync(filePath)) {
+          const raw = fs.readFileSync(filePath, "utf-8");
+          const ctx = JSON.parse(raw);
+          const dashboards = ctx.dashboards || [];
+
+          if (dashboard_id) {
+            const found = dashboards.find((d) => d.id === Number(dashboard_id));
+            if (found) {
+              return {
+                content: [{ type: "text", text: JSON.stringify(found, null, 2) }],
+              };
+            }
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: JSON.stringify({ error: `Dashboard with ID ${dashboard_id} not found.` }, null, 2),
+                },
+              ],
+              isError: true,
+            };
+          }
+
+          // Return high-level dashboard summaries with widget counts and metadata
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(
+                  {
+                    status: "success",
+                    count: dashboards.length,
+                    dashboards: dashboards.map((d) => ({
+                      id: d.id,
+                      name: d.name,
+                      description: d.description,
+                      is_default: d.is_default,
+                      widgets_count: d.widgets_count,
+                      widgets: d.widgets.map((w) => ({
+                        id: w.id,
+                        title: w.title,
+                        name: w.name,
+                        widget_type: w.widget_type,
+                        source_type: w.source_type,
+                        source_config: w.source_config,
+                      })),
+                    })),
+                  },
+                  null,
+                  2
+                ),
+              },
+            ],
+          };
+        }
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                status: "success",
+                count: 0,
+                dashboards: [],
+                message: "No dashboards configured or project context not yet synchronized.",
+              }, null, 2),
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [{ type: "text", text: `Failed to load dashboards: ${error.message}` }],
+          isError: true,
+        };
+      }
+    }
+
+    if (name === "list_configured_alerts") {
+      const { alert_id } = args;
+      try {
+        let alerts = [];
+        // First check project_context.json, then fallback to alerts.json
+        const contextPath = path.join(APIS_HUB_ROOT, "config", "project_context.json");
+        const alertsPath = path.join(APIS_HUB_ROOT, "config", "alerts.json");
+
+        if (fs.existsSync(contextPath)) {
+          const raw = fs.readFileSync(contextPath, "utf-8");
+          const ctx = JSON.parse(raw);
+          alerts = ctx.alerts || [];
+        } else if (fs.existsSync(alertsPath)) {
+          const raw = fs.readFileSync(alertsPath, "utf-8");
+          alerts = JSON.parse(raw) || [];
+        }
+
+        if (alert_id) {
+          const found = alerts.find((a) => a.id === Number(alert_id));
+          if (found) {
+            return {
+              content: [{ type: "text", text: JSON.stringify(found, null, 2) }],
+            };
+          }
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify({ error: `Alert with ID ${alert_id} not found.` }, null, 2),
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  status: "success",
+                  count: alerts.length,
+                  alerts,
+                },
+                null,
+                2
+              ),
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [{ type: "text", text: `Failed to load alerts: ${error.message}` }],
+          isError: true,
+        };
+      }
     }
 
     if (name === "summarize_performance") {
