@@ -200,13 +200,14 @@ const USER_TOOLS = [
         topic: {
           type: "string",
           description:
-            "Optional: Specific guide topic ('overview', 'workflow', 'assets', 'filters', 'scopes', 'breakdowns', 'formulas', 'examples')",
+            "Optional: Specific guide topic ('overview', 'workflow', 'assets', 'datascopes', 'scopes', 'filters', 'breakdowns', 'formulas', 'examples')",
           enum: [
             "overview",
             "workflow",
             "assets",
-            "filters",
+            "datascopes",
             "scopes",
+            "filters",
             "breakdowns",
             "formulas",
             "examples"
@@ -627,8 +628,77 @@ function createMcpServer(role = "admin", userContext = null) {
             "If the user asks about a client or domain (e.g. 'marcelacrodriguez.com'), run 'list_connected_assets' first to find matching IDs."
           ]
         },
+        datascopes: {
+          title: "Channel-Specific Datascopes & Dimension Orthogonality",
+          critical_rule: "Each marketing and analytics channel in APIs Hub possesses exclusive, non-overlapping datascopes. Mixing metrics or dimensions across different scopes within the same channel produces ambiguous cross-joins or duplicate row counting.",
+          channels: {
+            google_search_console: {
+              scopes: {
+                "non-searchAppearance (default / standard)": {
+                  description: "Standard web search performance metrics. Safe to cross with query, dimensions.page, country, device.",
+                  enforced_filter: '{ "dimensions.searchAppearance": "standard" }',
+                  explanation: "Google Search Console stores impressions separated by searchAppearance. If you do not filter to 'standard' (or group by dimensions.searchAppearance), metrics will double count because multiple feature rows exist for identical queries."
+                },
+                "searchAppearance": {
+                  description: "Performance by Google Search feature (AMP, Good Page Experience, Merchant Listings, Review Snippets, Video).",
+                  required_group_or_filter: 'groupBy: "dimensions.searchAppearance" or filters: { "dimensions.searchAppearance": { "operator": "not_equal", "value": "standard" } }'
+                }
+              }
+            },
+            google_analytics_ga4: {
+              scopes: {
+                "traffic_matrix (session scope)": {
+                  description: "Traffic, visits, and engagement acquired in each session.",
+                  metrics: ["sessions", "bounce_rate", "average_session_duration", "engaged_sessions"],
+                  dimensions: ["dimensions.sessionDefaultChannelGroup", "dimensions.sessionSourceMedium", "dimensions.landing_page", "device", "country"]
+                },
+                "acquisition_matrix (first user scope)": {
+                  description: "First touchpoint / user acquisition attribution.",
+                  metrics: ["new_users", "total_users"],
+                  dimensions: ["dimensions.firstUserDefaultChannelGroup", "dimensions.firstUserSourceMedium"]
+                },
+                "event_matrix": {
+                  description: "Granular interaction event counting.",
+                  metrics: ["event_count", "conversions"],
+                  dimensions: ["event"]
+                },
+                "ad_touchpoint_matrix": {
+                  description: "Paid advertising attribution linking campaign, ad group, and ad.",
+                  dimensions: ["channeledCampaign", "channeledAdGroup", "channeledAd"]
+                }
+              }
+            },
+            facebook_marketing: {
+              hierarchy_rule: "Facebook Ads metrics are stored at the finest granularity ('ad' level) and roll up cleanly to ad_set, campaign, and account.",
+              dimensions: ["ad", "adGroup", "channeledCampaign", "channeledAccount", "dimensions.age", "dimensions.gender"],
+              safeguard: "Never mix age/gender breakdown with ad level attribution unless specifically analyzing demographic reach."
+            },
+            facebook_organic: {
+              scopes: {
+                "instagram_account": {
+                  description: "Metrics for the IG profile entity.",
+                  metrics: ["reach", "views", "follows", "profile_views", "website_clicks", "accounts_engaged", "total_interactions"]
+                },
+                "ig_post / media": {
+                  description: "Metrics scoped strictly to individual media / posts.",
+                  metrics: ["reach", "views", "likes", "comments", "shares", "saves", "replies", "profile_visits"],
+                  breakdown: "post"
+                },
+                "facebook_page": {
+                  description: "Page-level organic performance.",
+                  metrics: ["reach", "page_views_total", "views", "follows", "likes", "total_interactions", "video_views"]
+                },
+                "fb_post": {
+                  description: "Post-level organic performance.",
+                  metrics: ["reach", "views", "video_views", "likes", "post_clicks", "total_interactions", "comments", "shares"],
+                  breakdown: "post"
+                }
+              }
+            }
+          }
+        },
         scopes: {
-          title: "Data Scopes ('global', 'channel', 'asset')",
+          title: "Execution Scopes ('global', 'channel', 'asset')",
           scopes: {
             global: "Blended cross-network performance across all integrated providers. Do not pass a 'channel' parameter.",
             channel: "Ecosystem performance restricted to a single provider (e.g. channel: 'google_search_console', 'google_analytics', 'facebook_marketing').",
@@ -639,7 +709,7 @@ function createMcpServer(role = "admin", userContext = null) {
           title: "Filter Syntax & Capabilities",
           accepted_formats: {
             exact_match: { "device": "desktop", "country": "US", "channeledAccount": "2" },
-            nested_dimensions: { "dimensions.gender": "male", "dimensions.country": "USA" }
+            nested_dimensions: { "dimensions.gender": "male", "dimensions.country": "USA", "dimensions.searchAppearance": "standard" }
           },
           warning: "Do not pass complex mathematical operators in filter keys unless checking standard equality. For metric thresholds, aggregate first then evaluate in prompt reasoning."
         },
@@ -807,8 +877,90 @@ function createMcpServer(role = "admin", userContext = null) {
           temporal: ["daily", "weekly", "monthly", "quarterly", "yearly"],
           dimensional: ["device", "country", "query", "page", "campaign", "ad_set", "placement", "dimensions.*"]
         },
+        channel_datascopes: {
+          google_search_console: {
+            scopes: ["non-searchAppearance", "searchAppearance"],
+            default_scope: "non-searchAppearance",
+            scope_rules: {
+              "non-searchAppearance": {
+                description: "Standard web search queries, landing pages, devices, and countries. Always requires dimensions.searchAppearance='standard' to avoid duplicate counting across search features.",
+                enforced_filter: { "dimensions.searchAppearance": "standard" },
+                metrics: ["clicks", "impressions", "ctr", "position"],
+                breakdowns: ["query", "dimensions.page", "country", "device"]
+              },
+              "searchAppearance": {
+                description: "Aggregations by Google Search feature (AMP, Good Page Experience, Review Snippets, etc). Cannot be combined with query/page dimensions without causing multi-attribution ambiguity.",
+                metrics: ["clicks", "impressions", "ctr", "position"],
+                breakdowns: ["dimensions.searchAppearance"]
+              }
+            }
+          },
+          google_analytics: {
+            scopes: ["traffic_matrix", "acquisition_matrix", "event_matrix", "ad_touchpoint_matrix"],
+            default_scope: "traffic_matrix",
+            scope_rules: {
+              "traffic_matrix": {
+                description: "Session-level traffic and landing page metrics.",
+                metrics: ["sessions", "bounce_rate", "average_session_duration", "screen_page_views"],
+                breakdowns: ["dimensions.sessionDefaultChannelGroup", "dimensions.sessionSourceMedium", "dimensions.landing_page", "device", "country"]
+              },
+              "acquisition_matrix": {
+                description: "First-user attribution and user acquisition.",
+                metrics: ["new_users", "total_users"],
+                breakdowns: ["dimensions.firstUserDefaultChannelGroup", "dimensions.firstUserSourceMedium"]
+              },
+              "event_matrix": {
+                description: "Event-level interactions and goal conversions.",
+                metrics: ["event_count", "conversions"],
+                breakdowns: ["event"]
+              },
+              "ad_touchpoint_matrix": {
+                description: "Paid touchpoints linking campaigns, ad groups, and ads.",
+                metrics: ["conversions", "total_revenue"],
+                breakdowns: ["channeledCampaign", "channeledAdGroup", "channeledAd"]
+              }
+            }
+          },
+          facebook_marketing: {
+            scopes: ["ad_level", "adset_level", "campaign_level", "account_level"],
+            default_scope: "ad_level",
+            scope_rules: {
+              "ad_level": {
+                description: "Finest atomized granularity. All metrics are collected at the ad level and roll up hierarchically.",
+                metrics: ["spend", "clicks", "impressions", "reach", "frequency", "ctr", "cpc", "cpm", "roas_purchase"],
+                breakdowns: ["ad", "adGroup", "channeledCampaign", "channeledAccount", "dimensions.age", "dimensions.gender"]
+              }
+            }
+          },
+          facebook_organic: {
+            scopes: ["instagram_account", "ig_post", "facebook_page", "fb_post"],
+            default_scope: "instagram_account",
+            scope_rules: {
+              "instagram_account": {
+                description: "Account-level organic reach, views, and profile clicks.",
+                metrics: ["reach", "views", "follows", "profile_views", "website_clicks", "accounts_engaged", "total_interactions"],
+                breakdowns: ["dimensions.contact_button_type", "dimensions.follow_type"]
+              },
+              "ig_post": {
+                description: "Media/post-level engagement and comments.",
+                metrics: ["reach", "views", "likes", "comments", "shares", "saves", "profile_visits"],
+                breakdowns: ["post", "dimensions.media_product_type"]
+              },
+              "facebook_page": {
+                description: "Facebook Page aggregate metrics.",
+                metrics: ["reach", "page_views_total", "views", "follows", "likes", "total_interactions", "video_views"],
+                breakdowns: ["dimensions.reaction_type"]
+              },
+              "fb_post": {
+                description: "Facebook post interactions.",
+                metrics: ["reach", "views", "video_views", "likes", "post_clicks", "total_interactions", "comments", "shares"],
+                breakdowns: ["post"]
+              }
+            }
+          }
+        },
         recipes_and_guidance: {
-          guide_tool: "Call 'get_mcp_guide' with topic='overview' or topic='examples' for detailed recipes.",
+          guide_tool: "Call 'get_mcp_guide' with topic='datascopes' or topic='examples' for detailed recipes.",
           discovery_tool: "Call 'list_connected_assets' to discover exact asset IDs for filters: { channeledAccount: '<id>' }."
         }
       };
@@ -827,12 +979,14 @@ function createMcpServer(role = "admin", userContext = null) {
 
       if (channel) {
         const channelCapabilities = catalog.supported_channels[channel];
+        const datascopes = catalog.channel_datascopes[channel] || null;
         return {
           content: [{
             type: "text",
             text: JSON.stringify({
               channel,
               capabilities: channelCapabilities || "Channel not specifically registered or uses generic adapter",
+              datascopes: datascopes || "Channel uses unified un-scoped metrics",
               available_canonical_metrics: catalog.canonical_metrics,
               allowed_breakdowns: catalog.granularities,
               recipes_and_guidance: catalog.recipes_and_guidance
@@ -1056,6 +1210,18 @@ function createMcpServer(role = "admin", userContext = null) {
             effectiveFilters["channeledAccount"] = targetId;
             effectiveFilters["account_id"] = targetId;
           }
+        }
+      }
+
+      // Safeguard: GSC stores impressions separated by searchAppearance.
+      // If the caller does not group by dimensions.searchAppearance and did not explicitly specify a searchAppearance filter,
+      // default to 'standard' to prevent duplicate row counting and skewed metrics.
+      if (channel === "google_search_console") {
+        const isGroupingByAppearance = typeof groupBy === "string" && (
+          groupBy.includes("searchAppearance") || groupBy.includes("search_appearance")
+        );
+        if (!isGroupingByAppearance && !effectiveFilters["dimensions.searchAppearance"]) {
+          effectiveFilters["dimensions.searchAppearance"] = "standard";
         }
       }
 
