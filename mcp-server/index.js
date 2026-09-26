@@ -210,6 +210,7 @@ const USER_TOOLS = [
             "filters",
             "breakdowns",
             "formulas",
+            "kpi_calculation",
             "examples"
           ]
         }
@@ -234,7 +235,7 @@ const USER_TOOLS = [
   {
     name: "get_analytics_catalog",
     description:
-      "Introspect and discover the full analytics capabilities of APIs Hub. Returns data scopes (scope_global, scope_channel, scope_asset), supported channels and tags, canonical metrics, formula-based derived metrics, allowed temporal/non-temporal breakdowns, and the platform-wide reference library of predefined KPIs and Derived Metrics.",
+      "Introspect and discover the full analytics capabilities of APIs Hub. Returns data scopes (scope_global, scope_channel, scope_asset), supported channels and tags, canonical metrics, formula-based derived metrics, allowed temporal/non-temporal breakdowns, and the platform-wide reference library of predefined KPIs and Derived Metrics. Use these reference formulas and AST templates as blueprints to query constituent metrics via 'summarize_performance' and evaluate composite KPIs.",
     inputSchema: {
       type: "object",
       properties: {
@@ -587,7 +588,7 @@ function createMcpServer(role = "admin", userContext = null) {
             "3. Asset Discovery First: Never guess asset IDs. Call 'list_connected_assets' to discover the exact IDs and channels available.",
             "4. Formula Normalization: Metrics (spend, clicks, impressions, ctr, cpc, cpm, roas, position, sessions) are computed uniformly across Meta, Google, Shopify, Klaviyo, Amazon, and TikTok."
           ],
-          available_topics: ["overview", "workflow", "assets", "filters", "scopes", "breakdowns", "formulas", "examples"]
+          available_topics: ["overview", "workflow", "assets", "filters", "scopes", "breakdowns", "formulas", "kpi_calculation", "examples"]
         },
         workflow: {
           title: "Recommended Agent Workflow",
@@ -621,8 +622,32 @@ function createMcpServer(role = "admin", userContext = null) {
               step: 6,
               tool: "summarize_performance",
               purpose: "Run targeted aggregation queries passing discovered asset IDs into 'filters: { channeledAccount: \"<id>\" }' or 'groupBy'."
+            },
+            {
+              step: 7,
+              tool: "kpi_evaluation_protocol",
+              purpose: "To calculate or evaluate Predefined KPIs or Custom AST Formulas: (1) inspect the AST / variables via 'get_analytics_catalog' or 'list_custom_kpis', (2) fetch the constituent base metrics using 'summarize_performance' with matching filters and breakdowns, and (3) perform the mathematical operator or regression calculation over the returned series."
             }
           ]
+        },
+        kpi_calculation: {
+          title: "How Autonomous Agents Execute KPI & AST Formula Calculations",
+          architecture_principle: "APIs Hub decouples raw OLAP data aggregation from virtual metric computation. While standard metrics (spend, clicks, impressions, ctr, cpc, cpm, roas, position, sessions, conversions) are aggregated server-side via 'summarize_performance', complex statistical KPIs (regressions, elasticities, MACD momentum, Granger causality, and multi-channel AST combinations) are designed to be calculated by AI agents using constituent data streams.",
+          three_step_execution_recipe: [
+            "Step 1 (Inspect Formula): Call 'get_analytics_catalog' (with section='predefined_kpis' or 'predefined_derived_metrics') or 'list_custom_kpis' to obtain the KPI's AST (Abstract Syntax Tree), calculation_type, and constituent metrics.",
+            "Step 2 (Fetch Constituents): For each metric in the AST, call 'summarize_performance' specifying the appropriate channel, scope ('global', 'channel', 'asset'), asset filter, and groupBy (e.g., 'daily', 'query', 'page').",
+            "Step 3 (Execute Math / Statistical Evaluation): Apply the AST operator ('+', '-', '*', '/', 'ratio') or statistical model (linear regression slope, moving average, percent change) across the aligned data points."
+          ],
+          concrete_example_search_position_efficiency: {
+            kpi: "search_position_efficiency_query",
+            ast_logic: "clicks / position grouped by query",
+            agent_execution: "Call 'summarize_performance' with channel='google_search_console', aggregations={ clicks: 'clicks', avg_position: 'position' }, groupBy='query'. In the returned dataset, for each query calculate efficiency = clicks / avg_position. Queries with the highest ratio yield maximum click capture per ranking rank."
+          },
+          concrete_example_cross_channel_marginal_cost: {
+            kpi: "true_blended_marginal_cost",
+            ast_logic: "(spend_ch1 + spend_ch2) / (clicks_ch1 + clicks_ch2)",
+            agent_execution: "Call 'summarize_performance' with scope='global', aggregations={ total_spend: 'spend', total_clicks: 'clicks' }, groupBy='daily'. For each day or total, calculate blended_marginal_cost = total_spend / total_clicks."
+          }
         },
         assets: {
           title: "Asset Identification & Filtering Protocol",
