@@ -234,10 +234,15 @@ const USER_TOOLS = [
   {
     name: "get_analytics_catalog",
     description:
-      "Introspect and discover the full analytics capabilities of APIs Hub. Returns data scopes (scope_global, scope_channel, scope_asset), supported channels and tags, canonical metrics, formula-based derived metrics, allowed temporal/non-temporal breakdowns, and predefined KPIs.",
+      "Introspect and discover the full analytics capabilities of APIs Hub. Returns data scopes (scope_global, scope_channel, scope_asset), supported channels and tags, canonical metrics, formula-based derived metrics, allowed temporal/non-temporal breakdowns, and the platform-wide reference library of predefined KPIs and Derived Metrics.",
     inputSchema: {
       type: "object",
       properties: {
+        section: {
+          type: "string",
+          description: "Optional: Specific catalog section to inspect ('reference_library', 'predefined_kpis', 'predefined_derived_metrics', 'data_scopes', 'canonical_metrics', 'derived_formulas')",
+          enum: ["reference_library", "predefined_kpis", "predefined_derived_metrics", "data_scopes", "canonical_metrics", "derived_formulas"]
+        },
         scope: {
           type: "string",
           description: "Optional: Filter catalog by data scope ('global', 'channel', 'asset')",
@@ -822,7 +827,7 @@ function createMcpServer(role = "admin", userContext = null) {
     }
 
     if (name === "get_analytics_catalog") {
-      const { scope, channel } = args;
+      const { scope, channel, section } = args;
       const catalog = {
         data_scopes: {
           scope_global: {
@@ -983,6 +988,49 @@ function createMcpServer(role = "admin", userContext = null) {
         }
       } catch (e) {
         // Silently continue with standard catalog if reference library cannot be read
+      }
+
+      if (section) {
+        if (section === "reference_library") {
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify(catalog.reference_library || { notice: "Reference library not loaded yet." }, null, 2)
+            }]
+          };
+        }
+        if (section === "predefined_kpis") {
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify({
+                notice: catalog.reference_library?.notice || "Platform-wide reference library",
+                count: catalog.reference_library?.predefined_kpis_count || 0,
+                predefined_kpis: catalog.reference_library?.predefined_kpis || {}
+              }, null, 2)
+            }]
+          };
+        }
+        if (section === "predefined_derived_metrics") {
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify({
+                notice: catalog.reference_library?.notice || "Platform-wide reference library",
+                count: catalog.reference_library?.predefined_derived_metrics_count || 0,
+                predefined_derived_metrics: catalog.reference_library?.predefined_derived_metrics || {}
+              }, null, 2)
+            }]
+          };
+        }
+        if (catalog[section]) {
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify({ section, data: catalog[section] }, null, 2)
+            }]
+          };
+        }
       }
 
       if (scope) {
