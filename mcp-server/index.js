@@ -211,6 +211,8 @@ const USER_TOOLS = [
             "breakdowns",
             "formulas",
             "kpi_calculation",
+            "derived_metrics",
+            "dashboards",
             "examples"
           ]
         }
@@ -588,7 +590,7 @@ function createMcpServer(role = "admin", userContext = null) {
             "3. Asset Discovery First: Never guess asset IDs. Call 'list_connected_assets' to discover the exact IDs and channels available.",
             "4. Formula Normalization: Metrics (spend, clicks, impressions, ctr, cpc, cpm, roas, position, sessions) are computed uniformly across Meta, Google, Shopify, Klaviyo, Amazon, and TikTok."
           ],
-          available_topics: ["overview", "workflow", "assets", "filters", "scopes", "breakdowns", "formulas", "kpi_calculation", "examples"]
+          available_topics: ["overview", "workflow", "assets", "filters", "scopes", "breakdowns", "formulas", "kpi_calculation", "derived_metrics", "dashboards", "examples"]
         },
         workflow: {
           title: "Recommended Agent Workflow",
@@ -611,7 +613,7 @@ function createMcpServer(role = "admin", userContext = null) {
             {
               step: 4,
               tool: "list_project_dashboards",
-              purpose: "Inspect active dashboards, widget definitions, and chart controls configured by the user."
+              purpose: "Inspect active dashboards, widget definitions, chart types, source bindings, and visual layouts configured for this project."
             },
             {
               step: 5,
@@ -625,8 +627,8 @@ function createMcpServer(role = "admin", userContext = null) {
             },
             {
               step: 7,
-              tool: "kpi_evaluation_protocol",
-              purpose: "To calculate or evaluate Predefined KPIs or Custom AST Formulas: (1) inspect the AST / variables via 'get_analytics_catalog' or 'list_custom_kpis', (2) fetch the constituent base metrics using 'summarize_performance' with matching filters and breakdowns, and (3) perform the mathematical operator or regression calculation over the returned series."
+              tool: "kpi_and_derived_metric_evaluation",
+              purpose: "To calculate or evaluate Predefined KPIs, Custom KPIs, or Derived Metrics (DMs): (1) inspect the AST / source_series via 'get_analytics_catalog' or 'list_custom_kpis', (2) fetch the constituent base metrics using 'summarize_performance' with matching filters and breakdowns, and (3) perform the mathematical operator or regression calculation over the returned series."
             }
           ]
         },
@@ -750,7 +752,8 @@ function createMcpServer(role = "admin", userContext = null) {
           multi_grouping: "You can group by multiple dimensions comma-separated, e.g. 'channel,device' or 'date,device'."
         },
         formulas: {
-          title: "Supported Derived Formulas in 'aggregations'",
+          title: "Server-Side OLAP Aggregations (Computed Natively in summarize_performance)",
+          architecture_note: "These 10 standard formulas are computed directly by the OLAP SQL aggregation engine when requested in 'aggregations'. You do NOT need to manually compute them unless performing custom statistical modeling.",
           formulas: [
             { name: "spend", formula: "SUM(spend)", description: "Total advertising cost" },
             { name: "clicks", formula: "SUM(clicks)", description: "Total link or ad clicks" },
@@ -759,10 +762,84 @@ function createMcpServer(role = "admin", userContext = null) {
             { name: "cpc", formula: "spend / clicks", description: "Cost Per Click" },
             { name: "cpm", formula: "spend / impressions * 1000", description: "Cost Per Mille" },
             { name: "roas", formula: "revenue / spend", description: "Return on Ad Spend" },
-            { name: "position", formula: "weighted_avg(position by impressions)", description: "Average Search Engine Rank" },
+            { name: "position", formula: "weighted_avg(position by impressions)", description: "Average Search Engine Rank (weighted by impressions)" },
             { name: "sessions", formula: "SUM(sessions)", description: "Web/Store Traffic Sessions" },
             { name: "conversions", formula: "SUM(conversions)", description: "Total Goal / Purchase Conversions" }
           ]
+        },
+        derived_metrics: {
+          title: "Predefined Derived Metrics (DMs) — Platform Reference Library & Evaluation",
+          concept: "Derived Metrics (DMs) represent mathematical combinations of two or more time-series or channel metrics (e.g. CPA = Spend / Results, SEO Efficiency = Clicks / Position, Blended CPC = (Spend_Ch1 + Spend_Ch2) / (Clicks_Ch1 + Clicks_Ch2)).",
+          reference_library_access: "Call 'get_analytics_catalog' with section='predefined_derived_metrics' to retrieve all 26 platform-wide reference blueprints with their complete ASTs, source series definitions, required capability tags, and formats.",
+          structure_of_a_dm: {
+            required_tags: "Channel capability tags that must be active (e.g., ['spendable', 'clickable'], ['seo', 'impressionable'], ['organic_social', 'reach_driven']).",
+            source_series: "Constituent series labeled with keys ('a', 'b', etc.). Channel placeholders (e.g., '__SPENDABLE_CHANNEL_1__', '__SEO_CHANNEL_1__', '__CLICKABLE_CHANNEL_1__') represent the active channel to bind.",
+            ast: "Abstract Syntax Tree with operator ('/', '*', '+', '-') and left/right metric pointers.",
+            format: "'currency', 'percentage', 'decimal', or 'integer'."
+          },
+          evaluation_recipe: [
+            "1. Inspect Blueprint: Fetch DM definition from 'get_analytics_catalog(section: \"predefined_derived_metrics\")' or project's custom list via 'list_custom_kpis'.",
+            "2. Map Channel Placeholders: Replace placeholders like '__SEO_CHANNEL_1__' with the real channel from 'list_connected_assets' (e.g. 'google_search_console').",
+            "3. Query Constituents: Call 'summarize_performance' for each source series with the corresponding metric (e.g. series 'a' = spend, series 'b' = clicks) and desired breakdown/date range.",
+            "4. Compute AST: Combine the series point-by-point or on totals according to the AST operator (e.g. series_a / series_b)."
+          ],
+          available_predefined_dms: [
+            { key: "cpc", name: "Cost per Click", formula: "spend / clicks", categories: ["cost", "paid_media"] },
+            { key: "ctr", name: "Click-Through Rate", formula: "clicks / impressions", categories: ["performance", "paid_media"] },
+            { key: "cpa", name: "Cost per Acquisition / Result", formula: "spend / results", categories: ["cost", "paid_media", "results"] },
+            { key: "cvr", name: "Conversion Rate", formula: "results / clicks", categories: ["results", "paid_media"] },
+            { key: "roas", name: "Return on Ad Spend", formula: "revenue / spend", categories: ["revenue", "paid_media"] },
+            { key: "cost_per_conversion", name: "Cost per Conversion", formula: "spend / conversions", categories: ["cost", "paid_media"] },
+            { key: "result_rate", name: "Result Rate", formula: "results / impressions", categories: ["results", "paid_media"] },
+            { key: "cost_per_engagement", name: "Cost per Engagement", formula: "spend / engagements", categories: ["cost", "engagement"] },
+            { key: "engagement_click_rate", name: "Engagement Click Rate", formula: "clicks / engagements", categories: ["engagement", "paid_media"] },
+            { key: "organic_engagement_rate", name: "Organic Engagement Rate", formula: "engaged_users / reach", categories: ["organic", "social"] },
+            { key: "organic_reach_efficiency", name: "Organic Reach per Impression", formula: "reach / impressions", categories: ["organic", "social"] },
+            { key: "organic_impression_engagement", name: "Engagement per Impression", formula: "engaged_users / impressions", categories: ["organic", "social"] },
+            { key: "seo_ctr", name: "SEO Click-Through Rate", formula: "clicks / impressions", categories: ["seo", "clicks"] },
+            { key: "click_position_efficiency", name: "Click Position Efficiency", formula: "clicks / position", categories: ["seo", "performance"] },
+            { key: "impression_position_efficiency", name: "Impression Position Efficiency", formula: "impressions / position", categories: ["seo", "impressions"] },
+            { key: "blended_cpc", name: "Blended Cross-Channel CPC", formula: "(spend_1 + spend_2) / (clicks_1 + clicks_2)", categories: ["cross-channel", "cost"] },
+            { key: "blended_roas", name: "Blended Cross-Channel ROAS", formula: "(rev_1 + rev_2) / (spend_1 + spend_2)", categories: ["cross-channel", "revenue"] },
+            { key: "blended_ctr", name: "Blended Cross-Channel CTR", formula: "(clicks_1 + clicks_2) / (imp_1 + imp_2)", categories: ["cross-channel", "performance"] },
+            { key: "aov", name: "Average Order Value", formula: "revenue / conversions", categories: ["ecommerce", "revenue"] },
+            { key: "cart_conversion_rate", name: "Cart to Order Conversion Rate", formula: "conversions / add_to_cart", categories: ["ecommerce", "funnel"] },
+            { key: "revenue_per_visitor", name: "Revenue per Visitor", formula: "revenue / sessions", categories: ["ecommerce", "traffic"] },
+            { key: "blended_mer", name: "Marketing Efficiency Ratio (MER)", formula: "store_revenue / total_ad_spend", categories: ["cross-channel", "executive"] },
+            { key: "seo_vs_paid_clicks", name: "SEO vs Paid Clicks Ratio", formula: "seo_clicks / paid_clicks", categories: ["cross-channel", "seo", "paid_media"] },
+            { key: "paid_organic_impression_ratio", name: "Paid-to-Organic Impression Ratio", formula: "organic_impressions / paid_impressions", categories: ["cross-channel", "social"] },
+            { key: "organic_reach_vs_seo_ctr", name: "Organic Reach vs SEO CTR", formula: "organic_reach / seo_clicks", categories: ["cross-channel", "social", "seo"] },
+            { key: "revenue_per_click", name: "Revenue per Click (Combined)", formula: "revenue / total_clicks", categories: ["cross-channel", "revenue"] }
+          ]
+        },
+        dashboards: {
+          title: "Dashboards & Visual Widgets Architecture",
+          purpose: "Dashboards in APIs Hub provide real-time, customizable monitoring views that aggregate performance across channels, KPIs, and derived metrics. An autonomous agent should inspect dashboards to understand what KPIs and visual representations the business prioritizes.",
+          discovery_tool: "Call 'list_project_dashboards' to inspect configured dashboards, widget collections, grid layouts, and source bindings.",
+          dashboard_structure: {
+            id: "Unique dashboard integer ID.",
+            name: "Display title (e.g. 'Executive Summary', 'SEO & Organic Growth', 'Paid Media Performance').",
+            is_default: "Boolean indicating if this is the primary overview dashboard.",
+            widgets: "Array of configured visualization widgets."
+          },
+          widget_sources: {
+            metric: "Direct raw OLAP metric aggregation (e.g., total spend, impressions, clicks from a specific channel).",
+            kpi: "Statistical Analytics Engine KPI (e.g. Anomaly detection, MACD momentum, Linear trendline, Granger causality).",
+            derived_metric: "Calculated series from an AST blueprint (e.g. CPA, Click Position Efficiency, Blended ROAS)."
+          },
+          widget_types_and_roles: {
+            tile: "Number Tile — Displays a single high-impact total or average with trend arrow. Ideal for executive summaries (e.g. total revenue, overall MER).",
+            line_chart: "Continuous Time-Series — Displays trends over daily/weekly intervals. Best for tracking trajectory, velocity, or seasonality.",
+            bar_chart: "Categorical Comparison — Compares discrete volumes side-by-side across channels, campaigns, or devices.",
+            pie_chart: "Part-to-Whole Share — Shows proportion distribution (e.g. channel budget allocation, device share).",
+            gauge: "Target Progress — Measures progress or current percentage against an SLA, threshold, or goal.",
+            sparkline: "Minimalist Trendline — Compact inline visual indicating directional momentum without heavy axis clutter.",
+            scatter_plot: "Correlation & Elasticity — Identifies correlation between two continuous variables (e.g., ad spend vs organic search volume).",
+            combo_chart: "Dual-Axis Overlay — Combines bars (volume like clicks) and lines (rates like CTR or CPA) across time.",
+            table: "Granular Tabular View — Multi-dimensional row-by-row matrix (e.g., top 20 search queries with clicks, impressions, CTR, position).",
+            anomaly_chart: "Statistical Outlier Watch — Line chart with standard deviation bands that highlights anomalies in red."
+          },
+          agent_interpretation_guideline: "When an agent is asked 'What does our dashboard show?' or 'How is our main dashboard performing?', the agent should: (1) call 'list_project_dashboards' to identify the active widgets and their source KPIs/metrics, (2) query 'summarize_performance' for the corresponding metrics and date range, and (3) synthesize an executive interpretation highlighting trend direction, goal achievement, and outliers."
         },
         examples: {
           title: "Copy-Paste Ready Query Recipes",

@@ -277,9 +277,13 @@
     - For `not_in`: Implemented array placeholder expansion with NULL safety (`($col IS NULL OR $col NOT IN (:param_0, ...))`) and guard against empty lists (`1 = 1`). Supported across relational entity columns, ad accounts, and EAV dimension values.
     - For `like`: Added standard `$col LIKE :alias` clause generation and parameter binding.
 
-### 2026-09-25 - MCP Predefined Reference Library & Agent KPI Calculation Protocol
+### 2026-09-25 - MCP Predefined Reference Library, Derived Metrics & Dashboards Architecture
 - **Reference Library Sync**: Facade's `PredefinedKpiRegistry` (40 KPIs) and `PredefinedDerivedMetricRegistry` (26 formulas) are embedded into `project_context.json` and served via `get_analytics_catalog` (`section: "predefined_kpis"` / `"predefined_derived_metrics"`).
 - **Execution Protocol Documentation**: Updated `mcp-server/index.js` `get_mcp_guide`:
-    - Added step 7 to `workflow` clearly explaining that agents evaluate complex/statistical AST formulas by: (1) retrieving the formula/AST from the catalog or custom KPIs, (2) fetching constituent metrics via `summarize_performance`, and (3) computing the formula/regression over the returned series.
+    - Added step 7 to `workflow` clearly explaining that agents evaluate complex/statistical AST formulas and Derived Metrics (DMs) by: (1) retrieving the formula/AST from the catalog or custom KPIs, (2) fetching constituent metrics via `summarize_performance`, and (3) computing the formula/operator over the returned series.
     - Added dedicated guide topic `kpi_calculation` with copy-paste recipes for `search_position_efficiency_query` and `true_blended_marginal_cost`.
-    - Updated `get_analytics_catalog` tool description to explicitly document AST blueprint usage for downstream agent queries.
+    - Added dedicated guide topic `derived_metrics` clarifying the two tiers:
+        1. Built-in Server Aggregations (10 SQL formulas like spend, clicks, impressions, ctr, cpc, cpm, roas, position, sessions, conversions).
+        2. Reference Library AST Blueprints (26 DMs like cpa, cvr, click_position_efficiency, blended_cpc, aov, mer) that map channel placeholders (`__SEO_CHANNEL_1__`, `__SPENDABLE_CHANNEL_1__`) and evaluate ratios/operators across constituent series.
+    - Added dedicated guide topic `dashboards` explaining dashboard structure, widget sources (`metric`, `kpi`, `derived_metric`), visualization widget roles (`tile`, `line_chart`, `bar_chart`, `pie_chart`, `gauge`, `sparkline`, `scatter_plot`, `combo_chart`, `table`, `anomaly_chart`), and guidelines for autonomous agent synthesis.
+    - Updated `get_analytics_catalog` and `get_mcp_guide` tool schemas to include the new topic enums.
