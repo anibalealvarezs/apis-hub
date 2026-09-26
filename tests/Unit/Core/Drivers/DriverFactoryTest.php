@@ -42,6 +42,7 @@ class DriverFactoryTest extends TestCase
             ['linkedin', \Anibalealvarezs\LinkedInHubDriver\Drivers\LinkedInDriver::class],
             ['x', \Anibalealvarezs\XHubDriver\Drivers\XDriver::class],
             ['tiktok', \Anibalealvarezs\TikTokHubDriver\Drivers\TikTokDriver::class],
+            ['mailchimp', \Anibalealvarezs\MailchimpHubDriver\Drivers\MailchimpDriver::class],
         ];
     }
 

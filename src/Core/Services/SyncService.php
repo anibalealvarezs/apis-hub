@@ -387,6 +387,26 @@
                     }
                 }
 
+                // POST-SYNC: Agnostic Pre-Aggregation Engine (Atomic events -> Daily metrics rollup)
+                if ($driver instanceof \Anibalealvarezs\ApiDriverCore\Interfaces\PreAggregationProviderInterface) {
+                    try {
+                        $this->logger->info("[SyncService] Executing post-sync pre-aggregation rollup for channel: $channelName");
+                        $preAggEngine = new \Services\Aggregation\AgnosticPreAggregationEngine($manager->getConnection());
+                        $preAggResult = $preAggEngine->rollup(
+                            rules: $driver::getPreAggregationRules(),
+                            startDate: $start->format('Y-m-d'),
+                            endDate: $end->format('Y-m-d'),
+                            attributionWindowDays: $driver::getDefaultAttributionWindowDays()
+                        );
+                        $this->logger->info(sprintf(
+                            "[SyncService] Pre-aggregation rollup completed. Rows rolled up: %d",
+                            $preAggResult['rows_rolled_up'] ?? 0
+                        ));
+                    } catch (\Throwable $aggEx) {
+                        $this->logger->warning("[SyncService] Non-blocking pre-aggregation rollup error: " . $aggEx->getMessage());
+                    }
+                }
+
                 return new Response(json_encode([
                     'success' => true,
                     'message' => 'Sync completed successfully',
