@@ -973,7 +973,8 @@ function createMcpServer(role = "admin", userContext = null) {
       // Load reference library of predefined platform KPIs & Derived Metrics from project_context.json if available
       try {
         const filePath = path.join(APIS_HUB_ROOT, "config", "project_context.json");
-        if (fs.existsSync(filePath)) {
+        const fileExists = fs.existsSync(filePath);
+        if (fileExists) {
           const raw = fs.readFileSync(filePath, "utf-8");
           const ctx = JSON.parse(raw);
           if (ctx.reference_library) {
@@ -984,10 +985,22 @@ function createMcpServer(role = "admin", userContext = null) {
               predefined_derived_metrics_count: Object.keys(ctx.reference_library.predefined_derived_metrics || {}).length,
               predefined_derived_metrics: ctx.reference_library.predefined_derived_metrics || {}
             };
+          } else {
+            catalog.reference_library_debug = {
+              filePath,
+              fileExists: true,
+              ctxKeys: Object.keys(ctx),
+              hasReferenceLibrary: false
+            };
           }
+        } else {
+          catalog.reference_library_debug = {
+            filePath,
+            fileExists: false
+          };
         }
       } catch (e) {
-        // Silently continue with standard catalog if reference library cannot be read
+        catalog.reference_library_debug = { error: e.message };
       }
 
       if (section) {
@@ -995,7 +1008,10 @@ function createMcpServer(role = "admin", userContext = null) {
           return {
             content: [{
               type: "text",
-              text: JSON.stringify(catalog.reference_library || { notice: "Reference library not loaded yet." }, null, 2)
+              text: JSON.stringify(catalog.reference_library || { 
+                notice: "Reference library not loaded yet.",
+                debug: catalog.reference_library_debug || "No exception, but ctx.reference_library was falsy or config/project_context.json was not found."
+              }, null, 2)
             }]
           };
         }
