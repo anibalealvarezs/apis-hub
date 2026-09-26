@@ -989,6 +989,7 @@ function createMcpServer(role = "admin", userContext = null) {
             catalog.reference_library_debug = {
               filePath,
               fileExists: true,
+              synced_at: ctx.synced_at || null,
               ctxKeys: Object.keys(ctx),
               hasReferenceLibrary: false
             };
