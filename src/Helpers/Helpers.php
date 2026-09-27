@@ -736,6 +736,26 @@
                 if ($driverClass && class_exists($driverClass) && method_exists($driverClass, 'getEnvMapping')) {
                     $mapping = $driverClass::getEnvMapping();
                     foreach ($mapping as $targetChan => $envMap) {
+                        // An empty map carries no ENV_VAR => config_key pairs, so skip it before
+                        // seeding $config[$targetChan], otherwise a channel absent from the tenant
+                        // config would be created as an empty (and thus disabled) channel.
+                        if ($envMap === []) {
+                            continue;
+                        }
+
+                        // A non-array here is a driver contract violation, not a valid mapping.
+                        // Report it instead of warning on a bare foreach, and skip the injection
+                        // so a malformed driver cannot seed a bogus channel key into the config.
+                        if (!is_array($envMap)) {
+                            error_log(sprintf(
+                                'ERROR: Helpers::getChannelsConfig - %s::getEnvMapping() returned %s for key "%s"; expected [channel => [ENV_VAR => config_key]]. Skipping env injection for it.',
+                                $driverClass,
+                                get_debug_type($envMap),
+                                (string) $targetChan
+                            ));
+                            continue;
+                        }
+
                         if (!isset($config[$targetChan])) {
                             $config[$targetChan] = [];
                         }
