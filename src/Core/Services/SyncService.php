@@ -475,6 +475,11 @@
                 case 'channeled_customer':
                     \Classes\CustomerProcessor::processCustomers($collection, $manager);
                     break;
+                case 'order':
+                case 'orders':
+                case 'channeled_order':
+                    \Classes\OrderProcessor::processOrders($collection, $manager);
+                    break;
                 case 'event':
                 case 'events':
                 case 'channeled_event':

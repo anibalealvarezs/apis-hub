@@ -93,6 +93,9 @@ class EventProcessor
 
         // 4. Bulk Insert/Update Channeled Events
         $validChanneledEvents = [];
+        $channelMap = [];
+        $channelRepo = $manager->getRepository(\Entities\Analytics\Channel::class);
+
         foreach ($eventsData as $e) {
             if (!is_object($e) || empty($e->name) || empty($e->platformId)) continue;
             
@@ -100,13 +103,23 @@ class EventProcessor
             $caId = $caMap[$e->channeledAccountId] ?? null;
 
             if ($globalEventId && $caId) {
+                $rawChannel = $e->channel ?? 0;
+                $channelId = 0;
+                if (is_numeric($rawChannel) && (int)$rawChannel > 0) {
+                    $channelId = (int)$rawChannel;
+                } elseif (is_string($rawChannel) && !empty($rawChannel)) {
+                    if (!isset($channelMap[$rawChannel])) {
+                        $ch = $channelRepo->findOneBy(['name' => $rawChannel]);
+                        $channelMap[$rawChannel] = $ch ? $ch->getId() : 0;
+                    }
+                    $channelId = $channelMap[$rawChannel];
+                }
+
                 $validChanneledEvents[] = [
                     'platform_id' => $e->platformId,
-                    'name' => $e->name,
                     'event_id' => $globalEventId,
                     'channeled_account_id' => $caId,
-                    'type' => $e->type ?? 'event',
-                    'channel' => $e->channel ?? 0,
+                    'channel' => $channelId,
                     'data' => !empty($e->data) ? json_encode($e->data) : null,
                     'created_at' => $now ?? date('Y-m-d H:i:s'),
                     'updated_at' => $now ?? date('Y-m-d H:i:s')
@@ -115,16 +128,14 @@ class EventProcessor
         }
 
         if (!empty($validChanneledEvents)) {
-            $cols = ['platform_id', 'name', 'event_id', 'channeled_account_id', 'type', 'channel', 'data', 'created_at', 'updated_at'];
+            $cols = ['platform_id', 'event_id', 'channeled_account_id', 'channel', 'data', 'created_at', 'updated_at'];
             
             foreach (array_chunk($validChanneledEvents, 3000) as $chunk) {
                 $params = [];
                 foreach ($chunk as $row) {
                     $params[] = $row['platform_id'];
-                    $params[] = $row['name'];
                     $params[] = $row['event_id'];
                     $params[] = $row['channeled_account_id'];
-                    $params[] = $row['type'];
                     $params[] = $row['channel'];
                     $params[] = $row['data'];
                     $params[] = $row['created_at'];
@@ -134,8 +145,8 @@ class EventProcessor
                 $sql = Helpers::buildUpsertSql(
                     'channeled_events',
                     $cols,
-                    ['name', 'type', 'data', 'updated_at'],
-                    'platform_id',
+                    ['event_id', 'channel', 'data', 'updated_at'],
+                    ['platform_id', 'channeled_account_id'],
                     count($chunk)
                 );
                 

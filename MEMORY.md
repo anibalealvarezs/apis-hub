@@ -289,3 +289,11 @@
     - Updated `get_analytics_catalog` and `get_mcp_guide` tool schemas to include the new topic enums.
     - Added dedicated guide topics `benchmarks`, `temporal_comparison` (PoP & YoY velocity analysis), and `funnel_decomposition` (MECE root-cause diagnostic trees for ROAS and SEO).
     - Exposed `catalog.benchmarks` in `get_analytics_catalog` with section `benchmarks`.
+
+### 2026-10-01 - EventProcessor Schema Alignment and UniversalEntity Order Routing
+- **EventProcessor SQL Schema**:
+    - Fixed PostgreSQL schema mismatch in `Classes\EventProcessor::processEvents()`. Table `channeled_events` does not have `name` or `type` columns; columns are `platform_id`, `event_id`, `channeled_account_id`, `channel`, `data`, `created_at`, `updated_at`.
+    - Added channel resolution logic for string channel names to integer channel IDs via `Channel` repository lookup.
+    - Updated unique constraint conflict columns to `['platform_id', 'channeled_account_id']` and update columns to `['event_id', 'channel', 'data', 'updated_at']`.
+- **SyncService UniversalEntity Routing**:
+    - Added `order`, `orders`, and `channeled_order` cases to `SyncService::processUniversalEntity()` dispatching to `Classes\OrderProcessor::processOrders()`.
