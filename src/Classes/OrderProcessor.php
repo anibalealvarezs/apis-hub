@@ -6,11 +6,38 @@ use DateTime;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\DBAL\Exception;
 use Doctrine\ORM\EntityManager;
+use Entities\Analytics\Channel;
 use Anibalealvarezs\ApiDriverCore\Classes\KeyGenerator;
 use Helpers\Helpers;
 
 class OrderProcessor
 {
+    private static array $channelMap = [];
+
+    /**
+     * @throws Exception
+     */
+    private static function resolveChannelId(string|int $channel, EntityManager $manager): int
+    {
+        if (is_numeric($channel) && (int)$channel > 0) {
+            return (int)$channel;
+        }
+
+        $channelName = (string)$channel;
+        if (isset(self::$channelMap[$channelName])) {
+            return self::$channelMap[$channelName];
+        }
+
+        $entity = $manager->getRepository(Channel::class)->findOneBy(['name' => $channelName]);
+        if (!$entity) {
+            throw new Exception("Channel '$channelName' not found in database during order processing.");
+        }
+
+        self::$channelMap[$channelName] = (int)$entity->getId();
+
+        return self::$channelMap[$channelName];
+    }
+
     /**
      * @param ArrayCollection $channeledCollection
      * @param EntityManager $manager
@@ -45,7 +72,8 @@ class OrderProcessor
         foreach ($channeledCollection as $co) {
             if (!is_object($co)) continue;
             /** @var object{channel: string|int, platformId: string|int, customer: ?object{id: ?string|int, email: ?string}, platformCreatedAt: ?mixed, data: mixed, discountCodes: ?array, lineItems: ?array} $co */
-            $chan = (string)$co->channel;
+            $chanName = (string)$co->channel;
+            $chanId = self::resolveChannelId($co->channel, $manager);
 
             // Orders
             $oKey = KeyGenerator::generateOrderKey((string)$co->platformId);
@@ -55,21 +83,21 @@ class OrderProcessor
                 ];
             }
 
-            $coKey = KeyGenerator::generateChanneledOrderKey($chan, (string)$co->platformId);
+            $coKey = KeyGenerator::generateChanneledOrderKey((string)$chanId, (string)$co->platformId);
             if (!isset($uCOrd[$coKey])) {
                 // Determine Customer Ref
                 $customerRef = null;
                 if (!empty($co->customer->id)) {
-                    $customerRef = KeyGenerator::generateChanneledCustomerKey($chan, (string)$co->customer->id);
+                    $customerRef = KeyGenerator::generateChanneledCustomerKey((string)$chanId, (string)$co->customer->id);
                 } elseif (!empty($co->customer->email)) {
                     // Fallback to customer ID based on email if platformId acts differently
-                    $customerRef = KeyGenerator::generateChanneledCustomerKey($chan, (string)($co->customer->id ?? ''));
+                    $customerRef = KeyGenerator::generateChanneledCustomerKey((string)$chanId, (string)($co->customer->id ?? ''));
                 }
 
                 $uCOrd[$coKey] = [
                     'order_id' => (string)$co->platformId,
                     'customer_ref' => $customerRef,
-                    'channel' => $chan,
+                    'channel' => $chanId,
                     'platform_id' => (string)$co->platformId,
                     'platform_created_at' => isset($co->platformCreatedAt) ? $co->platformCreatedAt : null,
                     'data' => is_object($co->data) ? clone $co->data : (object)($co->data ?? []),
@@ -100,11 +128,11 @@ class OrderProcessor
                     }
                 }
 
-                $ccKey = KeyGenerator::generateChanneledCustomerKey($chan, (string)$cPId);
+                $ccKey = KeyGenerator::generateChanneledCustomerKey((string)$chanId, (string)$cPId);
                 if (!isset($uCCust[$ccKey])) {
                     $uCCust[$ccKey] = [
                         'customer_email' => $cEmail,
-                        'channel' => $chan,
+                        'channel' => $chanId,
                         'platform_id' => (string)$cPId,
                         'email' => $cEmail,
                         'platform_created_at' => null, 
@@ -119,11 +147,11 @@ class OrderProcessor
                     $pivotOrdDisc[$coKey] = [];
                 }
                 foreach ($co->discountCodes as $code) {
-                    $cdKey = KeyGenerator::generateChanneledDiscountKey($chan, $code);
+                    $cdKey = KeyGenerator::generateChanneledDiscountKey((string)$chanId, $code);
                     if (!isset($uCDisc[$cdKey])) {
                         $uCDisc[$cdKey] = [
                             'code' => $code,
-                            'channel' => $chan,
+                            'channel' => $chanId,
                             'platform_id' => '0',
                             'platform_created_at' => null,
                             'data' => (object)[]
@@ -147,10 +175,10 @@ class OrderProcessor
                     $vId = $li['variant_id'] ?? null;
 
                     if ($pId) {
-                        $cpKey = KeyGenerator::generateChanneledProductKey($chan, (string)$pId);
+                        $cpKey = KeyGenerator::generateChanneledProductKey((string)$chanId, (string)$pId);
                         if (!isset($uCProd[$cpKey])) {
                             $uCProd[$cpKey] = [
-                                'channel' => $chan,
+                                'channel' => $chanId,
                                 'platform_id' => (string)$pId,
                                 'platform_created_at' => null,
                                 'data' => (object)[]
@@ -159,11 +187,11 @@ class OrderProcessor
                         $pivotOrdProd[$coKey][$cpKey] = $cpKey;
 
                         if ($vId) {
-                            $cvKey = KeyGenerator::generateChanneledProductVariantKey($chan, (string)$vId);
+                            $cvKey = KeyGenerator::generateChanneledProductVariantKey((string)$chanId, (string)$vId);
                             if (!isset($uCVar[$cvKey])) {
                                 $uCVar[$cvKey] = [
                                     'channeledProductRef' => $cpKey,
-                                    'channel' => $chan,
+                                    'channel' => $chanId,
                                     'platform_id' => (string)$vId,
                                     'platform_created_at' => null,
                                     'data' => (object)[]
