@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace Services\Aggregation;
 
+use Anibalealvarezs\ApiDriverCore\Classes\KeyGenerator;
 use Anibalealvarezs\ApiDriverCore\Interfaces\PreAggregationProviderInterface;
+use DateTime;
 use DateTimeInterface;
 use Doctrine\DBAL\Connection;
 use Exception;
+use Helpers\Helpers;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -24,10 +27,56 @@ use Psr\Log\LoggerInterface;
  */
 class AgnosticPreAggregationEngine
 {
+    private static array $channelIdMap = [];
+
     public function __construct(
         private readonly Connection $connection,
         private readonly ?LoggerInterface $logger = null
     ) {
+    }
+
+    /**
+     * Executes rollup based on rules and date range.
+     *
+     * @param array<string, array<string, mixed>> $rules
+     * @param string $channel
+     * @param DateTimeInterface|string $startDate
+     * @param DateTimeInterface|string $endDate
+     * @param int $attributionWindowDays
+     * @return array{processed_days: int, metrics_emitted: int, records_evaluated: int, rows_rolled_up: int}
+     */
+    public function rollup(
+        array $rules,
+        string $channel,
+        DateTimeInterface|string $startDate,
+        DateTimeInterface|string $endDate,
+        int $attributionWindowDays = 30
+    ): array {
+        $start = is_string($startDate) ? new DateTime($startDate) : clone $startDate;
+        $end = is_string($endDate) ? new DateTime($endDate) : clone $endDate;
+
+        $processedDays = 0;
+        $metricsEmitted = 0;
+        $recordsEvaluated = 0;
+
+        $current = clone $start;
+        while ($current <= $end) {
+            $dateStr = $current->format('Y-m-d');
+            $dayResult = $this->preAggregateDay($rules, $channel, $dateStr, $attributionWindowDays);
+
+            $processedDays++;
+            $metricsEmitted += $dayResult['metrics_emitted'];
+            $recordsEvaluated += $dayResult['records_evaluated'];
+
+            $current->modify('+1 day');
+        }
+
+        return [
+            'processed_days' => $processedDays,
+            'metrics_emitted' => $metricsEmitted,
+            'records_evaluated' => $recordsEvaluated,
+            'rows_rolled_up' => $recordsEvaluated,
+        ];
     }
 
     /**
@@ -37,7 +86,7 @@ class AgnosticPreAggregationEngine
      * @param string $channel
      * @param DateTimeInterface $startDate
      * @param DateTimeInterface $endDate
-     * @return array{processed_days: int, metrics_emitted: int, records_evaluated: int}
+     * @return array{processed_days: int, metrics_emitted: int, records_evaluated: int, rows_rolled_up: int}
      * @throws Exception
      */
     public function preAggregateDateRange(
@@ -53,27 +102,7 @@ class AgnosticPreAggregationEngine
         $rules = $driverClass::getPreAggregationRules();
         $attributionWindowDays = $driverClass::getDefaultAttributionWindowDays();
 
-        $processedDays = 0;
-        $metricsEmitted = 0;
-        $recordsEvaluated = 0;
-
-        $current = clone $startDate;
-        while ($current <= $endDate) {
-            $dateStr = $current->format('Y-m-d');
-            $dayResult = $this->preAggregateDay($rules, $channel, $dateStr, $attributionWindowDays);
-
-            $processedDays++;
-            $metricsEmitted += $dayResult['metrics_emitted'];
-            $recordsEvaluated += $dayResult['records_evaluated'];
-
-            $current->modify('+1 day');
-        }
-
-        return [
-            'processed_days' => $processedDays,
-            'metrics_emitted' => $metricsEmitted,
-            'records_evaluated' => $recordsEvaluated,
-        ];
+        return $this->rollup($rules, $channel, $startDate, $endDate, $attributionWindowDays);
     }
 
     /**
@@ -118,7 +147,9 @@ class AgnosticPreAggregationEngine
                         scopeKey: $scopeKey,
                         metricKey: $metricKey,
                         value: $metricValue,
-                        date: $dateStr
+                        date: $dateStr,
+                        ruleDef: $ruleDef,
+                        sampleRecord: $records[0] ?? null
                     );
                     $metricsEmitted++;
                 }
@@ -221,11 +252,33 @@ class AgnosticPreAggregationEngine
     protected function fetchAtomicRecordsForDate(string $tableName, string $channel, string $dateStr): array
     {
         try {
-            $sql = "SELECT * FROM {$tableName} WHERE channel = :channel AND DATE(platform_created_at) = :date";
-            return $this->connection->fetchAllAssociative($sql, [
-                'channel' => $channel,
+            $channelId = $this->resolveChannelId($channel);
+            $channelParam = $channelId > 0 ? $channelId : $channel;
+
+            $dateColExpr = "DATE(created_at)";
+            if ($tableName === 'channeled_events') {
+                $dateColExpr = "DATE(COALESCE(NULLIF(data->>'timestamp', '')::timestamp, created_at))";
+            } elseif ($tableName === 'channeled_orders') {
+                $dateColExpr = "DATE(COALESCE(platform_created_at, created_at))";
+            }
+
+            $sql = "SELECT * FROM {$tableName} WHERE channel = :channel AND {$dateColExpr} = :date";
+            $rows = $this->connection->fetchAllAssociative($sql, [
+                'channel' => $channelParam,
                 'date' => $dateStr,
             ]);
+
+            foreach ($rows as &$row) {
+                if (isset($row['data']) && is_string($row['data'])) {
+                    $decoded = json_decode($row['data'], true);
+                    if (is_array($decoded)) {
+                        $row['data'] = $decoded;
+                    }
+                }
+            }
+            unset($row);
+
+            return $rows;
         } catch (Exception $e) {
             $this->logger?->warning("Could not fetch atomic records from {$tableName}: " . $e->getMessage());
             return [];
@@ -256,8 +309,149 @@ class AgnosticPreAggregationEngine
         string $scopeKey,
         string $metricKey,
         float|int $value,
-        string $date
+        string $date,
+        array $ruleDef = [],
+        ?array $sampleRecord = null
     ): void {
         $this->logger?->debug("Persisting pre-aggregated metric: [{$channel}] [{$scopeKey}] {$metricKey} = {$value} on {$date}");
+
+        try {
+            $channelId = $this->resolveChannelId($channel);
+
+            $scopeField = $ruleDef['scope_field'] ?? 'platform_id';
+            $channeledCampaignId = null;
+            $campaignId = null;
+            $channeledAccountId = $sampleRecord['channeled_account_id'] ?? null;
+            $accountId = null;
+
+            if ($scopeField === 'campaign_id' && $scopeKey !== 'global' && $scopeKey !== '') {
+                $campRow = $this->connection->fetchAssociative(
+                    "SELECT id, campaign_id, channeled_account_id FROM channeled_campaigns WHERE platform_id = :pId AND channel = :ch LIMIT 1",
+                    ['pId' => $scopeKey, 'ch' => $channelId]
+                );
+
+                if ($campRow) {
+                    $channeledCampaignId = (int)$campRow['id'];
+                    $campaignId = !empty($campRow['campaign_id']) ? (int)$campRow['campaign_id'] : null;
+                    if (!$channeledAccountId && !empty($campRow['channeled_account_id'])) {
+                        $channeledAccountId = (int)$campRow['channeled_account_id'];
+                    }
+                }
+            }
+
+            if ($channeledAccountId) {
+                $accRow = $this->connection->fetchAssociative(
+                    "SELECT account_id FROM channeled_accounts WHERE id = :id LIMIT 1",
+                    ['id' => $channeledAccountId]
+                );
+                if ($accRow && !empty($accRow['account_id'])) {
+                    $accountId = (int)$accRow['account_id'];
+                }
+            }
+
+            $sigParams = [
+                'channel' => (string) $channelId,
+                'name' => $metricKey,
+                'period' => 'daily',
+            ];
+
+            if ($accountId) {
+                $sigParams['account'] = (string)$accountId;
+            }
+            if ($channeledAccountId) {
+                $sigParams['channeledAccount'] = (string)$channeledAccountId;
+            }
+            if ($campaignId) {
+                $sigParams['campaign'] = (string)$campaignId;
+            }
+            if ($channeledCampaignId) {
+                $sigParams['channeledCampaign'] = (string)$scopeKey;
+            }
+
+            $configSignature = KeyGenerator::generateMetricConfigKey(...$sigParams);
+
+            $mcRow = $this->connection->fetchAssociative(
+                "SELECT id FROM metric_configs WHERE config_signature = :sig LIMIT 1",
+                ['sig' => $configSignature]
+            );
+
+            if ($mcRow) {
+                $metricConfigId = (int)$mcRow['id'];
+            } else {
+                $cols = ['channel', 'name', 'period', 'account_id', 'channeled_account_id', 'campaign_id', 'channeled_campaign_id', 'config_signature'];
+                $insertValues = [
+                    'channel' => $channelId,
+                    'name' => $metricKey,
+                    'period' => 'daily',
+                    'account_id' => $accountId,
+                    'channeled_account_id' => $channeledAccountId,
+                    'campaign_id' => $campaignId,
+                    'channeled_campaign_id' => $channeledCampaignId,
+                    'config_signature' => $configSignature,
+                ];
+
+                $sql = Helpers::buildUpsertSql('metric_configs', $cols, ['name'], ['config_signature'], 1);
+                $this->connection->executeStatement($sql, array_values($insertValues));
+
+                $metricConfigId = (int)$this->connection->fetchOne(
+                    "SELECT id FROM metric_configs WHERE config_signature = :sig LIMIT 1",
+                    ['sig' => $configSignature]
+                );
+            }
+
+            $dimensionsHash = KeyGenerator::generateDimensionsHash([]);
+
+            $metricCols = ['value', 'metadata', 'dimensions_hash', 'metric_config_id', 'metric_date'];
+            $metricValues = [
+                $value,
+                null,
+                $dimensionsHash,
+                $metricConfigId,
+                $date,
+            ];
+
+            $metricSql = Helpers::buildUpsertSql(
+                'metrics',
+                $metricCols,
+                ['value'],
+                ['metric_config_id', 'dimensions_hash', 'metric_date'],
+                1
+            );
+
+            $this->connection->executeStatement($metricSql, $metricValues);
+        } catch (Exception $e) {
+            $this->logger?->warning("[AgnosticPreAggregationEngine] Failed to persist canonical metric slice: " . $e->getMessage(), [
+                'channel' => $channel,
+                'metric' => $metricKey,
+                'date' => $date,
+                'value' => $value,
+            ]);
+        }
+    }
+
+    /**
+     * Resolves integer channel ID from channel name or number.
+     */
+    protected function resolveChannelId(string|int $channel): int
+    {
+        if (is_numeric($channel) && (int)$channel > 0) {
+            return (int)$channel;
+        }
+
+        $channelName = (string)$channel;
+        if (isset(self::$channelIdMap[$channelName])) {
+            return self::$channelIdMap[$channelName];
+        }
+
+        try {
+            $id = $this->connection->fetchOne("SELECT id FROM channels WHERE name = :name LIMIT 1", ['name' => $channelName]);
+            if ($id) {
+                return self::$channelIdMap[$channelName] = (int)$id;
+            }
+        } catch (Exception $e) {
+            // fallback
+        }
+
+        return 0;
     }
 }

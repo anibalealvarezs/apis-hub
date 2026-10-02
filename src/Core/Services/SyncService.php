@@ -391,11 +391,12 @@
                 if ($driver instanceof \Anibalealvarezs\ApiDriverCore\Interfaces\PreAggregationProviderInterface) {
                     try {
                         $this->logger->info("[SyncService] Executing post-sync pre-aggregation rollup for channel: $channelName");
-                        $preAggEngine = new \Services\Aggregation\AgnosticPreAggregationEngine($manager->getConnection());
+                        $preAggEngine = new \Services\Aggregation\AgnosticPreAggregationEngine($manager->getConnection(), $this->logger);
                         $preAggResult = $preAggEngine->rollup(
                             rules: $driver::getPreAggregationRules(),
-                            startDate: $start->format('Y-m-d'),
-                            endDate: $end->format('Y-m-d'),
+                            channel: $channelName,
+                            startDate: $startDate,
+                            endDate: $endDate,
                             attributionWindowDays: $driver::getDefaultAttributionWindowDays()
                         );
                         $this->logger->info(sprintf(

@@ -200,5 +200,36 @@ final class AgnosticPreAggregationEngineTest extends TestCase
         $this->assertSame(3, $result['processed_days']);
         $this->assertSame(0, $result['metrics_emitted']);
         $this->assertSame(0, $result['records_evaluated']);
+        $this->assertSame(0, $result['rows_rolled_up']);
+    }
+
+    public function testRollupExecutesDirectlyWithRules(): void
+    {
+        $rules = [
+            'engagement' => [
+                'source_entity' => 'channeled_events',
+                'scope_field' => 'campaign_id',
+                'metrics' => [
+                    'sends' => ['condition' => ['action' => 'send'], 'reducer' => 'count'],
+                ],
+            ],
+        ];
+
+        $this->mockConnection->expects($this->exactly(2))
+            ->method('fetchAllAssociative')
+            ->willReturn([]);
+
+        $result = $this->engine->rollup(
+            rules: $rules,
+            channel: 'mailchimp',
+            startDate: new DateTime('2026-06-01'),
+            endDate: new DateTime('2026-06-02'),
+            attributionWindowDays: 30
+        );
+
+        $this->assertSame(2, $result['processed_days']);
+        $this->assertSame(0, $result['metrics_emitted']);
+        $this->assertSame(0, $result['records_evaluated']);
+        $this->assertSame(0, $result['rows_rolled_up']);
     }
 }
