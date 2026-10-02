@@ -115,7 +115,8 @@ class EventProcessor
                     $channelId = $channelMap[$rawChannel];
                 }
 
-                $validChanneledEvents[] = [
+                $key = $e->platformId . ':' . $caId;
+                $validChanneledEvents[$key] = [
                     'platform_id' => $e->platformId,
                     'event_id' => $globalEventId,
                     'channeled_account_id' => $caId,
@@ -130,7 +131,7 @@ class EventProcessor
         if (!empty($validChanneledEvents)) {
             $cols = ['platform_id', 'event_id', 'channeled_account_id', 'channel', 'data', 'created_at', 'updated_at'];
             
-            foreach (array_chunk($validChanneledEvents, 3000) as $chunk) {
+            foreach (array_chunk(array_values($validChanneledEvents), 3000) as $chunk) {
                 $params = [];
                 foreach ($chunk as $row) {
                     $params[] = $row['platform_id'];
