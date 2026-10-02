@@ -297,3 +297,9 @@
     - Updated unique constraint conflict columns to `['platform_id', 'channeled_account_id']` and update columns to `['event_id', 'channel', 'data', 'updated_at']`.
 - **SyncService UniversalEntity Routing**:
     - Added `order`, `orders`, and `channeled_order` cases to `SyncService::processUniversalEntity()` dispatching to `Classes\OrderProcessor::processOrders()`.
+
+### 2026-10-02 - Email & Messaging Metric Aggregation Resolution
+- **CanonicalMetricSqlResolver & MetricDefaultFormulaBuilder**:
+    - Added `sends`, `opens`, `bounces`, `unsubscribes`, and `orders` to `CanonicalMetricSqlResolver::SUPPORTED_CANONICAL_METRICS` and mapped them to SUM expressions.
+    - Added default formulas for `sends`, `opens`, `bounces`, `unsubscribes`, and `orders` in `MetricDefaultFormulaBuilder`.
+    - Resolved Mailchimp metrics via driver dictionary without triggering `missing_metric_equivalence_in_universal` or `missing_reducer_strategy`.

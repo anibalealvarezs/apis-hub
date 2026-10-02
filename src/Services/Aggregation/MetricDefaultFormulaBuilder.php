@@ -78,6 +78,11 @@
                 'post_clicks'                    => "SUM(CASE WHEN {$getNameExpr('clicks')} AND $periodCondition THEN $valCol ELSE 0 END)",
                 'post_engagements'               => "SUM(CASE WHEN {$getNameExpr('total_interactions')} AND $periodCondition THEN $valCol ELSE 0 END)",
                 'average_session_duration'       => "AVG(CASE WHEN {$getNameExpr('average_session_duration')} AND $periodCondition THEN $valCol ELSE NULL END)",
+                'sends'                          => "SUM(CASE WHEN {$getNameExpr('sends')} AND $periodCondition THEN $valCol ELSE 0 END)",
+                'opens'                          => "SUM(CASE WHEN {$getNameExpr('opens')} AND $periodCondition THEN $valCol ELSE 0 END)",
+                'bounces'                        => "SUM(CASE WHEN {$getNameExpr('bounces')} AND $periodCondition THEN $valCol ELSE 0 END)",
+                'unsubscribes'                   => "SUM(CASE WHEN {$getNameExpr('unsubscribes')} AND $periodCondition THEN $valCol ELSE 0 END)",
+                'orders'                         => "SUM(CASE WHEN {$getNameExpr('orders')} AND $periodCondition THEN $valCol ELSE 0 END)",
             ];
         }
     }
