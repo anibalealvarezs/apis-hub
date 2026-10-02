@@ -387,7 +387,7 @@ class OrderProcessor
                 'order_id',
                 $orderIds,
                 ['order_id'],
-                [$uOrd, fn ($o) => [$o['orderId']]],
+                [$uOrd, fn ($o) => [$o['order_id']]],
                 fn ($chunk) => "SELECT id, order_id FROM orders WHERE order_id IN (" . implode(', ', array_fill(0, count($chunk), '?')) . ")",
                 fn ($conn, $sql, $params) => MapGenerator::getOrderMap($manager, $sql, $params)
             );
