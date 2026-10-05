@@ -120,16 +120,22 @@
                         }
 
                         // If it's a collection of entities, use appropriate processors
-                        if ($first instanceof UniversalEntity && $type) {
-                            $this->processUniversalEntity($type, $data, $manager);
+                        if ($first instanceof UniversalEntity) {
+                            $entityType = $type ?? ($first->category ?? $first->type);
+                            if ($entityType) {
+                                $this->processUniversalEntity($entityType, $data, $manager);
+                            }
                         }
 
                         return ['metrics' => 0, 'rows' => 0, 'duplicates' => 0];
                     }
 
-                    if ($data instanceof UniversalEntity && $type) {
-                        $collection = new ArrayCollection([$data]);
-                        $this->processUniversalEntity($type, $collection, $manager);
+                    if ($data instanceof UniversalEntity) {
+                        $entityType = $type ?? ($data->category ?? $data->type);
+                        if ($entityType) {
+                            $collection = new ArrayCollection([$data]);
+                            $this->processUniversalEntity($entityType, $collection, $manager);
+                        }
 
                         return null;
                     }
