@@ -364,7 +364,7 @@ class AgnosticPreAggregationEngine
             if ($campaignId) {
                 $sigParams['campaign'] = (string)$campaignId;
             }
-            if ($channeledCampaignId) {
+            if ($scopeField === 'campaign_id' && $scopeKey !== 'global' && $scopeKey !== '') {
                 $sigParams['channeledCampaign'] = (string)$scopeKey;
             }
 
