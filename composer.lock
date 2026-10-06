@@ -205,13 +205,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/api-driver-core.git",
-                "reference": "cb275997a0519c987d6e3019bbc297f4447f1e02"
+                "reference": "997b9d7d53fffd564b5aa02e75d629e8e31ff676"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/api-driver-core/anibalealvarezs-api-driver-core-cb275997a0519c987d6e3019bbc297f4447f1e02-zip-fc0ea8.zip",
-                "reference": "cb275997a0519c987d6e3019bbc297f4447f1e02",
-                "shasum": "49eef424b4b91e82ae252c75bfdb20e68808ab72"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/api-driver-core/anibalealvarezs-api-driver-core-997b9d7d53fffd564b5aa02e75d629e8e31ff676-zip-9cb66a.zip",
+                "reference": "997b9d7d53fffd564b5aa02e75d629e8e31ff676",
+                "shasum": "3e544f8768e9980aafbd78fdb5df6954d85297bd"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "^1.0.0",
@@ -245,7 +245,7 @@
                 }
             ],
             "description": "Core interfaces and orchestration logic for APIs Hub drivers.",
-            "time": "2026-10-06T01:34:34+00:00"
+            "time": "2026-10-06T15:18:20+00:00"
         },
         {
             "name": "anibalealvarezs/facebook-graph-api",
@@ -630,13 +630,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/mailchimp-hub-driver.git",
-                "reference": "f38305a4b926d05fdaa66cc3495f92f21301d2a1"
+                "reference": "7b50df67140b1161956f0f95e7099cdd7561294f"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/mailchimp-hub-driver/anibalealvarezs-mailchimp-hub-driver-f38305a4b926d05fdaa66cc3495f92f21301d2a1-zip-ed7d61.zip",
-                "reference": "f38305a4b926d05fdaa66cc3495f92f21301d2a1",
-                "shasum": "faa4a6f7b505bf2bc90e8f6490f66d3043af9198"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/mailchimp-hub-driver/anibalealvarezs-mailchimp-hub-driver-7b50df67140b1161956f0f95e7099cdd7561294f-zip-08e533.zip",
+                "reference": "7b50df67140b1161956f0f95e7099cdd7561294f",
+                "shasum": "f50581665013936ffad82bccd1355e2a98562909"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "^1.0.0",
@@ -668,7 +668,7 @@
                 }
             ],
             "description": "APIs-Hub driver for Mailchimp marketing & eCommerce integration.",
-            "time": "2026-10-06T01:37:58+00:00"
+            "time": "2026-10-06T15:20:43+00:00"
         },
         {
             "name": "anibalealvarezs/meta-hub-driver",
