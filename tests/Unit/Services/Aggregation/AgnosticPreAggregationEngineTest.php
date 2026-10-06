@@ -232,4 +232,22 @@ final class AgnosticPreAggregationEngineTest extends TestCase
         $this->assertSame(0, $result['records_evaluated']);
         $this->assertSame(0, $result['rows_rolled_up']);
     }
+
+    public function testNormalizeDimensionValueUrlCanonicalization(): void
+    {
+        // 1. Full URL with tracking params
+        $url1 = 'https://myshop.com/products/shoes/?mc_cid=12345&mc_eid=abcde&utm_source=mailchimp';
+        $this->assertSame('/products/shoes', $this->engine->normalizeDimensionValue('page', $url1));
+
+        // 2. Relative path with tracking params
+        $url2 = 'products/shoes?utm_campaign=summer&mc_cid=999';
+        $this->assertSame('/products/shoes', $this->engine->normalizeDimensionValue('page', $url2));
+
+        // 3. Root URL
+        $url3 = 'https://myshop.com/?utm_source=mc';
+        $this->assertSame('/', $this->engine->normalizeDimensionValue('page', $url3));
+
+        // 4. Non-page dimension remains unchanged
+        $this->assertSame('US', $this->engine->normalizeDimensionValue('country', 'US'));
+    }
 }

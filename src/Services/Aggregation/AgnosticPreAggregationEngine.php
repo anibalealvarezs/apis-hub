@@ -139,6 +139,7 @@ class AgnosticPreAggregationEngine
             $groupedByScope = $this->partitionByScope($atomicRecords, $ruleDef);
 
             foreach ($groupedByScope as $scopeKey => $records) {
+                // 1. Compute unsegmented total metrics for the scope
                 $computedMetrics = $this->computeMetricsFromPayloads($records, $metricDefinitions);
 
                 foreach ($computedMetrics as $metricKey => $metricValue) {
@@ -152,6 +153,80 @@ class AgnosticPreAggregationEngine
                         sampleRecord: $records[0] ?? null
                     );
                     $metricsEmitted++;
+                }
+
+                // 2. Compute dimensional slices if any metric declares dimension_fields
+                foreach ($metricDefinitions as $metricKey => $metricDef) {
+                    $dimFields = $metricDef['dimension_fields'] ?? [];
+                    if (empty($dimFields)) {
+                        continue;
+                    }
+
+                    // Slices partitioned by declared dimension fields (e.g. ['page' => 'url'])
+                    $dimPartitions = [];
+                    foreach ($records as $record) {
+                        $dimKeyValues = [];
+                        $hasAllDimFields = true;
+                        foreach ($dimFields as $targetDim => $sourceField) {
+                            $val = $record['data'][$sourceField] ?? ($record[$sourceField] ?? null);
+                            if ($val === null || $val === '') {
+                                $hasAllDimFields = false;
+                                break;
+                            }
+                            $dimKeyValues[$targetDim] = $this->normalizeDimensionValue($targetDim, (string) $val);
+                        }
+
+                        if (!$hasAllDimFields) {
+                            continue;
+                        }
+
+                        // Unique signature for this dimension tuple
+                        $tupleKey = json_encode($dimKeyValues);
+                        if (!isset($dimPartitions[$tupleKey])) {
+                            $dimPartitions[$tupleKey] = [
+                                'dims' => $dimKeyValues,
+                                'records' => [],
+                            ];
+                        }
+                        $dimPartitions[$tupleKey]['records'][] = $record;
+                    }
+
+                    foreach ($dimPartitions as $partition) {
+                        $sliceMetrics = $this->computeMetricsFromPayloads(
+                            $partition['records'],
+                            [$metricKey => $metricDef]
+                        );
+
+                        $sliceValue = $sliceMetrics[$metricKey] ?? 0;
+                        if ($sliceValue <= 0) {
+                            continue;
+                        }
+
+                        // Build dimension pairs array for DimensionManager / KeyGenerator
+                        $dimensionPairs = [];
+                        foreach ($partition['dims'] as $dKey => $dVal) {
+                            $dimensionPairs[] = [
+                                'dimensionKey' => $dKey,
+                                'dimensionValue' => $dVal,
+                            ];
+                        }
+
+                        $dimSetId = $this->resolveDimensionSetId($dimensionPairs);
+                        $dimensionsHash = KeyGenerator::generateDimensionsHash($dimensionPairs);
+
+                        $this->persistCanonicalMetricSlice(
+                            channel: $channel,
+                            scopeKey: $scopeKey,
+                            metricKey: $metricKey,
+                            value: $sliceValue,
+                            date: $dateStr,
+                            ruleDef: $ruleDef,
+                            sampleRecord: $partition['records'][0] ?? null,
+                            dimensionSetId: $dimSetId,
+                            dimensionsHash: $dimensionsHash
+                        );
+                        $metricsEmitted++;
+                    }
                 }
             }
         }
@@ -311,9 +386,11 @@ class AgnosticPreAggregationEngine
         float|int $value,
         string $date,
         array $ruleDef = [],
-        ?array $sampleRecord = null
+        ?array $sampleRecord = null,
+        ?int $dimensionSetId = null,
+        ?string $dimensionsHash = null
     ): void {
-        $this->logger?->debug("Persisting pre-aggregated metric: [{$channel}] [{$scopeKey}] {$metricKey} = {$value} on {$date}");
+        $this->logger?->debug("Persisting pre-aggregated metric: [{$channel}] [{$scopeKey}] {$metricKey} = {$value} on {$date}" . ($dimensionSetId ? " (dim_set: {$dimensionSetId})" : ""));
 
         try {
             $channelId = $this->resolveChannelId($channel);
@@ -367,6 +444,9 @@ class AgnosticPreAggregationEngine
             if ($scopeField === 'campaign_id' && $scopeKey !== 'global' && $scopeKey !== '') {
                 $sigParams['channeledCampaign'] = (string)$scopeKey;
             }
+            if ($dimensionSetId) {
+                $sigParams['dimensionSet'] = (string)$dimensionsHash;
+            }
 
             $configSignature = KeyGenerator::generateMetricConfigKey(...$sigParams);
 
@@ -378,7 +458,7 @@ class AgnosticPreAggregationEngine
             if ($mcRow) {
                 $metricConfigId = (int)$mcRow['id'];
             } else {
-                $cols = ['channel', 'name', 'period', 'account_id', 'channeled_account_id', 'campaign_id', 'channeled_campaign_id', 'config_signature'];
+                $cols = ['channel', 'name', 'period', 'account_id', 'channeled_account_id', 'campaign_id', 'channeled_campaign_id', 'dimension_set_id', 'config_signature'];
                 $insertValues = [
                     'channel' => $channelId,
                     'name' => $metricKey,
@@ -387,6 +467,7 @@ class AgnosticPreAggregationEngine
                     'channeled_account_id' => $channeledAccountId,
                     'campaign_id' => $campaignId,
                     'channeled_campaign_id' => $channeledCampaignId,
+                    'dimension_set_id' => $dimensionSetId,
                     'config_signature' => $configSignature,
                 ];
 
@@ -399,13 +480,13 @@ class AgnosticPreAggregationEngine
                 );
             }
 
-            $dimensionsHash = KeyGenerator::generateDimensionsHash([]);
+            $effectiveDimensionsHash = $dimensionsHash ?? KeyGenerator::generateDimensionsHash([]);
 
             $metricCols = ['value', 'metadata', 'dimensions_hash', 'metric_config_id', 'metric_date'];
             $metricValues = [
                 $value,
                 null,
-                $dimensionsHash,
+                $effectiveDimensionsHash,
                 $metricConfigId,
                 $date,
             ];
@@ -427,6 +508,71 @@ class AgnosticPreAggregationEngine
                 'value' => $value,
             ]);
         }
+    }
+
+    /**
+     * Resolves or inserts dimension sets and values into dimension tables.
+     *
+     * @param array<int, array{dimensionKey: string, dimensionValue: string}> $dimensions
+     */
+    public function resolveDimensionSetId(array $dimensions): int
+    {
+        $hash = KeyGenerator::generateDimensionsHash($dimensions);
+
+        $row = $this->connection->fetchAssociative('SELECT id FROM dimension_sets WHERE hash = :hash LIMIT 1', ['hash' => $hash]);
+        if ($row) {
+            return (int) $row['id'];
+        }
+
+        $this->connection->executeStatement(
+            'INSERT INTO dimension_sets (hash) VALUES (?) ON CONFLICT (hash) DO NOTHING',
+            [$hash]
+        );
+
+        $setId = (int) $this->connection->fetchOne('SELECT id FROM dimension_sets WHERE hash = ?', [$hash]);
+
+        foreach ($dimensions as $dim) {
+            $keyName = $dim['dimensionKey'];
+            $valStr = (string) ($dim['dimensionValue'] ?? '');
+
+            // 1. Resolve dimension key
+            $keyRow = $this->connection->fetchAssociative('SELECT id FROM dimension_keys WHERE name = :name LIMIT 1', ['name' => $keyName]);
+            if ($keyRow) {
+                $keyId = (int) $keyRow['id'];
+            } else {
+                $this->connection->executeStatement(
+                    'INSERT INTO dimension_keys (name) VALUES (?) ON CONFLICT (name) DO NOTHING',
+                    [$keyName]
+                );
+                $keyId = (int) $this->connection->fetchOne('SELECT id FROM dimension_keys WHERE name = ?', [$keyName]);
+            }
+
+            // 2. Resolve dimension value
+            $valRow = $this->connection->fetchAssociative(
+                'SELECT id FROM dimension_values WHERE dimension_key_id = :kId AND value = :val LIMIT 1',
+                ['kId' => $keyId, 'val' => $valStr]
+            );
+            if ($valRow) {
+                $valId = (int) $valRow['id'];
+            } else {
+                $this->connection->executeStatement(
+                    'INSERT INTO dimension_values (dimension_key_id, value) VALUES (?, ?) ON CONFLICT (dimension_key_id, value) DO NOTHING',
+                    [$keyId, $valStr]
+                );
+                $valId = (int) $this->connection->fetchOne(
+                    'SELECT id FROM dimension_values WHERE dimension_key_id = ? AND value = ?',
+                    [$keyId, $valStr]
+                );
+            }
+
+            // 3. Link item to set
+            $this->connection->executeStatement(
+                'INSERT INTO dimension_set_items (dimension_set_id, dimension_value_id) VALUES (?, ?) ON CONFLICT DO NOTHING',
+                [$setId, $valId]
+            );
+        }
+
+        return $setId;
     }
 
     /**
@@ -453,5 +599,84 @@ class AgnosticPreAggregationEngine
         }
 
         return 0;
+    }
+
+    /**
+     * Normalizes a dimension value before grouping and storing in dimension tables.
+     */
+    public function normalizeDimensionValue(string $dimensionKey, string $value): string
+    {
+        $cleanDim = strtolower(trim($dimensionKey));
+        if (in_array($cleanDim, ['page', 'page_path', 'landing_page', 'url'], true)) {
+            return $this->normalizeUrlDimension($value);
+        }
+
+        return trim($value);
+    }
+
+    /**
+     * Canonicalizes a URL dimension into a clean path without email/ad tracking query strings.
+     */
+    protected function normalizeUrlDimension(string $url): string
+    {
+        $url = trim($url);
+        if ($url === '') {
+            return '/';
+        }
+
+        // If it starts with http:// or https://, extract path and query
+        if (preg_match('/^https?:\/\//i', $url)) {
+            $path = parse_url($url, PHP_URL_PATH);
+            $query = parse_url($url, PHP_URL_QUERY);
+            $canonical = ($path !== null && $path !== '') ? $path : '/';
+            if (!empty($query)) {
+                $canonical .= '?' . $query;
+            }
+        } else {
+            $canonical = str_starts_with($url, '/') ? $url : '/' . $url;
+        }
+
+        // Strip marketing/email tracking parameters (utm_*, mc_cid, mc_eid, etc.)
+        if (str_contains($canonical, '?')) {
+            [$basePath, $rawQuery] = explode('?', $canonical, 2);
+            parse_str($rawQuery, $queryParams);
+            if (is_array($queryParams) && !empty($queryParams)) {
+                $filtered = [];
+                $trackingPrefixes = ['utm_', 'mc_'];
+                $trackingKeys = ['gclid', 'fbclid', 'msclkid', 'ttclid', 'dclid', '_hsenc', '_hsmi', 'ref', 'source'];
+
+                foreach ($queryParams as $pKey => $pVal) {
+                    $lowerKey = strtolower((string) $pKey);
+                    $isTracking = in_array($lowerKey, $trackingKeys, true);
+                    if (!$isTracking) {
+                        foreach ($trackingPrefixes as $prefix) {
+                            if (str_starts_with($lowerKey, $prefix)) {
+                                $isTracking = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (!$isTracking) {
+                        $filtered[$pKey] = $pVal;
+                    }
+                }
+
+                if (!empty($filtered)) {
+                    ksort($filtered);
+                    $canonical = $basePath . '?' . http_build_query($filtered);
+                } else {
+                    $canonical = $basePath;
+                }
+            } else {
+                $canonical = $basePath;
+            }
+        }
+
+        // Remove trailing slash except for root '/'
+        if (strlen($canonical) > 1 && str_ends_with($canonical, '/')) {
+            $canonical = rtrim($canonical, '/');
+        }
+
+        return $canonical !== '' ? $canonical : '/';
     }
 }
