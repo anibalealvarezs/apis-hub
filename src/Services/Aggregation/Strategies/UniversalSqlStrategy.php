@@ -251,10 +251,13 @@
                         $whereClauses[] = $this->buildFilterClause('fpost.post_id', $condition, $paramName, $isPostgres);
                     } else {
                         $map = $relationMap[$relationKey];
+                        $isAttribute = !empty($map['isAttribute']);
                         $isLike = in_array($condition['operator'] ?? null, ['like', 'not_like'], true);
-                        $isNonNumericString = is_string($condition['value']) && !is_numeric($condition['value']) && !in_array($condition['operator'], ['is_null', 'is_not_null'], true);
+                        $val = $condition['value'];
+                        $isNonNumericString = is_string($val) && !is_numeric($val) && !in_array($condition['operator'] ?? null, ['is_null', 'is_not_null'], true);
+                        $hasNonNumericStringArray = is_array($val) && !empty($val) && is_string(reset($val)) && !is_numeric(reset($val));
 
-                        if (!str_ends_with($baseKey, '_id') && ($isLike || $isNonNumericString)) {
+                        if (!str_ends_with($baseKey, '_id') && ($isLike || $isNonNumericString || $isAttribute || $hasNonNumericStringArray)) {
                             $alias = $map['alias'];
                             $safeLeftJoin($map['table'], $alias, "$alias.id = mc.{$map['fk']}");
                             if (!empty($map['isJSON'])) {

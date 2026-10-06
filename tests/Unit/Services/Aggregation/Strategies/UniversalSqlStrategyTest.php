@@ -602,4 +602,48 @@ final class UniversalSqlStrategyTest extends BaseUnitTestCase
         $this->assertSame('like', $capturedParams['filter_dimensions_reaction_type'] ?? null);
         $this->assertSame('love', $capturedParams['filter_dimensions_reaction_type__1'] ?? null);
     }
+
+    public function testFilterByRelationAttributeInArray(): void
+    {
+        $capturedSql = null;
+        $capturedParams = null;
+        $connection = $this->createMock(Connection::class);
+        $connection->expects($this->once())
+            ->method('fetchAllAssociative')
+            ->willReturnCallback(static function (string $sql, array $params = []) use (&$capturedSql, &$capturedParams): array {
+                $capturedSql = $sql;
+                $capturedParams = $params;
+
+                return [['channeledcampaign' => 'Welcome Flow', 'sends' => 100]];
+            });
+
+        $plan = new AggregationPlan(
+            aggregations: ['sends' => 'sends'],
+            groupBy: ['channeledCampaign'],
+            filters: (object)[
+                'channel' => 'mailchimp',
+                'campaignType' => [
+                    'operator' => 'in',
+                    'value' => ['automation', 'automation-email'],
+                ],
+            ],
+            startDate: '2026-01-01',
+            endDate: '2026-01-31',
+            stages: [
+                'grouping' => ['normalized_pattern' => 'channeledCampaign'],
+            ],
+            candidateOptimizedStrategies: ['universal_sql']
+        );
+
+        $strategy = new UniversalSqlStrategy();
+        $rows = $strategy->execute($connection, $plan, true);
+
+        $this->assertIsArray($rows);
+        $this->assertNotNull($capturedSql);
+        $this->assertStringContainsString('LEFT JOIN channeled_campaigns rcc ON rcc.id = mc.channeled_campaign_id', (string)$capturedSql);
+        $this->assertStringContainsString('rcc.type IN (:filter_campaignType_0, :filter_campaignType_1)', (string)$capturedSql);
+        $this->assertSame('automation', $capturedParams['filter_campaignType_0'] ?? null);
+        $this->assertSame('automation-email', $capturedParams['filter_campaignType_1'] ?? null);
+    }
 }
+
