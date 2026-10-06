@@ -303,3 +303,10 @@
     - Added `sends`, `opens`, `bounces`, `unsubscribes`, and `orders` to `CanonicalMetricSqlResolver::SUPPORTED_CANONICAL_METRICS` and mapped them to SUM expressions.
     - Added default formulas for `sends`, `opens`, `bounces`, `unsubscribes`, and `orders` in `MetricDefaultFormulaBuilder`.
     - Resolved Mailchimp metrics via driver dictionary without triggering `missing_metric_equivalence_in_universal` or `missing_reducer_strategy`.
+
+### 2026-10-06 - Campaign Type Filtering Parity in UniversalSqlStrategy
+- **UniversalSqlStrategy Relation Filtering Fix**:
+    - Fixed `SQLSTATE[22P02]: Invalid text representation` when filtering on relational table attributes or string arrays (e.g., `campaignType IN ('automation', 'automation-email')`).
+    - Previously, if `$condition['value']` was an array of strings, `$isNonNumericString` evaluated to `false`, causing the query planner to mistakenly generate `mc.channeled_campaign_id IN ('automation', 'automation-email')` which failed PostgreSQL integer casting.
+    - Updated condition check in `UniversalSqlStrategy` to check for `isAttribute` or non-numeric string arrays, properly joining the relation table (e.g. `channeled_campaigns rcc`) and filtering on `$alias.{$map['field']}` (e.g. `rcc.type IN (...)`).
+
