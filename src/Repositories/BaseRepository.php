@@ -122,6 +122,8 @@
             'page_title'           => ['table' => 'pages', 'fk' => 'page_id', 'field' => 'title', 'alias' => 'rpa', 'isAttribute' => true],
             'page_platform_id'     => ['table' => 'pages', 'fk' => 'page_id', 'field' => 'platform_id', 'alias' => 'rpa', 'isAttribute' => true],
             'event'                => ['table' => 'events', 'fk' => 'event_id', 'field' => 'name', 'alias' => 'rev'],
+            'campaignType'         => ['table' => 'channeled_campaigns', 'fk' => 'channeled_campaign_id', 'field' => 'type', 'alias' => 'rcc', 'isAttribute' => true],
+            'campaign_type'        => ['table' => 'channeled_campaigns', 'fk' => 'channeled_campaign_id', 'field' => 'type', 'alias' => 'rcc', 'isAttribute' => true],
         ];
 
         /**

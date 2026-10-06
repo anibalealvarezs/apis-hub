@@ -115,14 +115,14 @@ class MarketingProcessor
         }
 
         if (!empty($uniqueChanneledCampaigns)) {
-            $cols = ['channel', 'platform_id', 'campaign_id', 'channeled_account_id', 'budget', 'status', 'objective', 'buying_type', 'data'];
+            $cols = ['channel', 'platform_id', 'campaign_id', 'channeled_account_id', 'budget', 'status', 'objective', 'buying_type', 'type', 'data'];
             $numCols = count($cols);
             $chunkSize = (int)floor(30000 / $numCols);
 
             foreach (array_chunk(array_values($uniqueChanneledCampaigns), $chunkSize) as $chunk) {
                 $channeledParams = [];
                 foreach ($chunk as $c) {
-                    /** @var object{channel: string, platformId: string|int, channeledAccountId: string|int, budget: mixed, status: string, objective: string, buyingType: string, data: mixed} $c */
+                    /** @var object{channel: string, platformId: string|int, channeledAccountId: string|int, budget: mixed, status: string, objective: string, buyingType: string, type: ?string, data: mixed} $c */
                     $channeledParams[] = self::resolveChannelId($c->channel, $manager);
                     $channeledParams[] = $c->platformId;
                     $channeledParams[] = $campaignMap[$c->platformId] ?? null;
@@ -131,12 +131,13 @@ class MarketingProcessor
                     $channeledParams[] = $c->status ?? null;
                     $channeledParams[] = $c->objective ?? null;
                     $channeledParams[] = $c->buyingType ?? null;
+                    $channeledParams[] = $c->type ?? ($c->data['type'] ?? null);
                     $channeledParams[] = json_encode($c->data);
                 }
                 $sql = Helpers::buildUpsertSql(
                     'channeled_campaigns', 
                     $cols, 
-                    ['budget', 'status', 'objective', 'buying_type', 'data'], 
+                    ['budget', 'status', 'objective', 'buying_type', 'type', 'data'], 
                     ['platform_id', 'channeled_account_id'], 
                     count($chunk)
                 );
