@@ -257,7 +257,14 @@ class AgnosticPreAggregationEngine
             $matchingRecords = array_filter($records, function ($record) use ($conditions) {
                 foreach ($conditions as $condKey => $condVal) {
                     $recordVal = $record['data'][$condKey] ?? ($record[$condKey] ?? null);
-                    if ($recordVal !== $condVal) {
+                    if ($recordVal === null && $condKey === 'bounce_type') {
+                        $recordVal = $record['data']['type'] ?? ($record['type'] ?? null);
+                    }
+                    if (is_bool($condVal)) {
+                        if ((bool)$recordVal !== $condVal) {
+                            return false;
+                        }
+                    } elseif ($recordVal !== $condVal) {
                         return false;
                     }
                 }
