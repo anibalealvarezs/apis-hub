@@ -278,7 +278,14 @@ class AgnosticPreAggregationEngine
                 'count' => count($matchingRecords),
 
                 'count_distinct' => count(array_unique(array_filter(array_map(function ($r) use ($field) {
-                    return $field ? ($r['data'][$field] ?? ($r[$field] ?? null)) : null;
+                    if (!$field) {
+                        return null;
+                    }
+                    $val = $r['data'][$field] ?? ($r[$field] ?? null);
+                    if ($val === null && $field === 'identity_hash') {
+                        $val = $r['data']['email_id'] ?? ($r['data']['identity'] ?? ($r['email_id'] ?? null));
+                    }
+                    return $val;
                 }, $matchingRecords)))),
 
                 default => count($matchingRecords),
