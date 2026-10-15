@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "145cbe31a014559a463a86f0cdfcbc31",
+    "content-hash": "f74983d5860f84e9194879768de4eec1",
     "packages": [
         {
             "name": "anibalealvarezs/amazon-api",
@@ -314,17 +314,17 @@
         },
         {
             "name": "anibalealvarezs/google-api",
-            "version": "v1.0.0",
+            "version": "v1.1.0",
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/google-api.git",
-                "reference": "0ec702f4d2441070ecf326b65266ccc4121b4ef4"
+                "reference": "d90301ac42357b4020de6c5e5b04598381dba4c1"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/google-api/anibalealvarezs-google-api-0ec702f4d2441070ecf326b65266ccc4121b4ef4-zip-b90c01.zip",
-                "reference": "0ec702f4d2441070ecf326b65266ccc4121b4ef4",
-                "shasum": "334b788c05d888f20af98259553d855441e42c73"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/google-api/anibalealvarezs-google-api-d90301ac42357b4020de6c5e5b04598381dba4c1-zip-0991ae.zip",
+                "reference": "d90301ac42357b4020de6c5e5b04598381dba4c1",
+                "shasum": "c8a71bc521840a3e6a6fb8339b07774d97392b92"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "^1.0.0",
@@ -381,26 +381,26 @@
             "support": {
                 "issues": "https://github.com/anibalealvarezs/google-api/issues"
             },
-            "time": "2026-06-23T21:06:43+00:00"
+            "time": "2026-10-15T20:24:48+00:00"
         },
         {
             "name": "anibalealvarezs/google-hub-driver",
-            "version": "v1.1.1",
+            "version": "v1.2.0",
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/google-hub-driver.git",
-                "reference": "00228db9a12849fdb4f3f142e875c3046808fbf6"
+                "reference": "c306d78447f2baa4a4dea3bb0805f5ff2f559c11"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/google-hub-driver/anibalealvarezs-google-hub-driver-00228db9a12849fdb4f3f142e875c3046808fbf6-zip-289bb7.zip",
-                "reference": "00228db9a12849fdb4f3f142e875c3046808fbf6",
-                "shasum": "0e0e6e6c4731ba8e73a9592107afb5c0c5663218"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/google-hub-driver/anibalealvarezs-google-hub-driver-c306d78447f2baa4a4dea3bb0805f5ff2f559c11-zip-c230c9.zip",
+                "reference": "c306d78447f2baa4a4dea3bb0805f5ff2f559c11",
+                "shasum": "a81985901323e74bb1497f95bd6de0f0d07578f0"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "^1.0.0",
                 "anibalealvarezs/api-driver-core": "^1.1.1",
-                "anibalealvarezs/google-api": "^1.0.0",
+                "anibalealvarezs/google-api": "^1.1.0",
                 "doctrine/orm": "^2.12.3 || ^3.0",
                 "fakerphp/faker": "^1.20",
                 "nesbot/carbon": "^2.0 || ^3.0",
@@ -428,7 +428,7 @@
                 }
             ],
             "description": "APIs-Hub driver for Google (Search Console & Analytics) integration.",
-            "time": "2026-09-21T16:19:48+00:00"
+            "time": "2026-10-15T20:34:29+00:00"
         },
         {
             "name": "anibalealvarezs/klaviyo-api",
