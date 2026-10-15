@@ -232,7 +232,7 @@ const USER_TOOLS = [
         channel: {
           type: "string",
           description:
-            "Optional: Filter connected assets by channel (e.g. 'google_search_console', 'google_analytics', 'facebook_marketing', 'shopify', 'klaviyo', 'amazon', 'tiktok')"
+            "Optional: Filter connected assets by channel (e.g. 'google_search_console', 'google_analytics', 'facebook_marketing', 'shopify', 'klaviyo', 'mailchimp', 'amazon', 'tiktok')"
         }
       }
     }
@@ -314,7 +314,7 @@ const USER_TOOLS = [
         channel: {
           type: "string",
           description:
-            "The channel identifier (e.g. 'google_search_console', 'facebook', 'facebook_marketing', 'shopify', 'klaviyo', 'amazon', 'tiktok')",
+            "The channel identifier (e.g. 'google_search_console', 'google_analytics', 'facebook_marketing', 'facebook_organic', 'shopify', 'klaviyo', 'mailchimp', 'amazon', 'tiktok')",
         },
         scope: {
           type: "string",
@@ -974,6 +974,24 @@ function createMcpServer(role = "admin", userContext = null) {
                   total_conversions: "conversions"
                 }
               }
+            },
+            {
+              scenario: "Mailchimp Email Campaign & Audience Engagement Analysis",
+              tool: "summarize_performance",
+              arguments: {
+                entity: "channeled_metric",
+                channel: "mailchimp",
+                scope: "asset",
+                filters: { channeledAccount: "50" },
+                aggregations: {
+                  total_sends: "sends",
+                  total_opens: "opens",
+                  total_clicks: "clicks",
+                  unique_clicks: "clicks_unique",
+                  total_bounces: "bounces",
+                  unsubscribes: "unsubscribes"
+                }
+              }
             }
           ]
         }
@@ -1038,6 +1056,7 @@ function createMcpServer(role = "admin", userContext = null) {
           meta: ["spendable", "clickable", "impressionable", "paid_media", "organic_social", "reach_driven"],
           google: ["spendable", "clickable", "impressionable", "seo", "traffic_tracked", "conversion_tracked", "revenue_tracked", "behavior_tracked", "analytics", "paid_media"],
           klaviyo: ["revenue_tracked", "conversion_tracked", "email_marketing"],
+          mailchimp: ["audience_tracked", "campaign_tracked", "email_marketing", "clickable", "conversion_tracked", "revenue_tracked"],
           shopify: ["revenue_tracked", "conversion_tracked", "ecommerce"],
           facebook_marketing: ["spendable", "clickable", "impressionable", "paid_media"],
           facebook_organic: ["organic_social", "reach_driven", "impressionable"],
@@ -1049,7 +1068,8 @@ function createMcpServer(role = "admin", userContext = null) {
           "spend", "clicks", "impressions", "reach", "frequency", "ctr", "cpc", "cpm",
           "sessions", "new_users", "conversions", "cost_per_conversion", "conversion_rate",
           "roas_purchase", "position", "engagement", "page_views", "event_count", "bounce_rate",
-          "average_session_duration", "total_users", "total_revenue"
+          "average_session_duration", "total_users", "total_revenue",
+          "sends", "opens", "opens_standard", "opens_proxy", "clicks_unique", "bounces", "bounces_hard", "bounces_soft", "unsubscribes", "orders", "revenue"
         ],
         derived_formulas: [
           { formula: "spend", description: "Total advertising cost" },
@@ -1061,13 +1081,39 @@ function createMcpServer(role = "admin", userContext = null) {
           { formula: "roas", description: "Return on Ad Spend (revenue / spend)" },
           { formula: "cost_per_result", description: "Cost Per Conversion / Result (spend / results)" },
           { formula: "result_rate", description: "Conversion Rate (results / clicks * 100)" },
-          { formula: "position", description: "Weighted Average Ranking Position (weighted by impressions)" }
+          { formula: "position", description: "Weighted Average Ranking Position (weighted by impressions)" },
+          { formula: "sends", description: "Total email sends dispatched" },
+          { formula: "opens", description: "Total email open events" },
+          { formula: "open_rate", description: "Email Open Rate (opens / sends * 100)" },
+          { formula: "click_to_open_rate", description: "Click-to-Open Rate (clicks / opens * 100)" },
+          { formula: "unsubscribe_rate", description: "Unsubscribe Rate (unsubscribes / sends * 100)" }
         ],
         granularities: {
           temporal: ["daily", "weekly", "monthly", "quarterly", "yearly"],
           dimensional: ["device", "country", "query", "page", "campaign", "ad_set", "placement", "dimensions.*"]
         },
         channel_datascopes: {
+          mailchimp: {
+            scopes: ["audience_level", "campaign_level", "store_level"],
+            default_scope: "audience_level",
+            scope_rules: {
+              "audience_level": {
+                description: "Audience/List-scoped aggregated engagement and subscriber metrics.",
+                metrics: ["sends", "opens", "clicks", "clicks_unique", "bounces", "unsubscribes"],
+                breakdowns: ["campaign", "dimensions.page"]
+              },
+              "campaign_level": {
+                description: "Campaign-specific email performance, link clicks, and recipient engagement.",
+                metrics: ["sends", "opens", "opens_standard", "opens_proxy", "clicks", "clicks_unique", "bounces", "unsubscribes"],
+                breakdowns: ["campaign", "dimensions.page"]
+              },
+              "store_level": {
+                description: "Connected eCommerce store attribution orders and revenue driven by campaigns.",
+                metrics: ["orders", "revenue"],
+                breakdowns: ["campaign"]
+              }
+            }
+          },
           google_search_console: {
             scopes: ["non-searchAppearance", "searchAppearance"],
             default_scope: "non-searchAppearance",
@@ -1564,39 +1610,32 @@ function createMcpServer(role = "admin", userContext = null) {
 
     if (name === "get_available_instances") {
       try {
-        const stdout = await runCliCommand(
-          "php bin/cli.php app:refresh-instances --list",
-        );
-        return { content: [{ type: "text", text: stdout }] };
-      } catch (error) {
-        try {
-          const filePath = path.join(APIS_HUB_ROOT, "config", "instances.yaml");
-          if (fs.existsSync(filePath)) {
-            const content = fs.readFileSync(filePath, "utf-8");
-            return {
-              content: [
-                {
-                  type: "text",
-                  text: `Instances from file:\n${content.substring(0, 5000)}...`,
-                },
-              ],
-            };
-          }
-          return {
-            content: [{ type: "text", text: "No instances found." }],
-            isError: true,
-          };
-        } catch (innerError) {
+        const filePath = path.join(APIS_HUB_ROOT, "config", "instances.yaml");
+        if (fs.existsSync(filePath)) {
+          const content = fs.readFileSync(filePath, "utf-8");
           return {
             content: [
               {
                 type: "text",
-                text: `Failed to get instances: ${innerError.message}`,
+                text: `Configured Instances (config/instances.yaml):\n\n${content}`,
               },
             ],
-            isError: true,
           };
         }
+        return {
+          content: [{ type: "text", text: "No instances found in config/instances.yaml." }],
+          isError: true,
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Failed to load instances: ${error.message}`,
+            },
+          ],
+          isError: true,
+        };
       }
     }
 
