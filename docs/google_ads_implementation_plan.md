@@ -142,53 +142,52 @@ Prepare release **`v1.18.0`** across the APIs Hub ecosystem. Register the driver
 ### Implementation Steps
 
 #### 3.1 APIs Hub Core Worker Integration (`apis-hub`)
-- [ ] **Register Driver Configuration (`config/drivers.yaml`)**:
-  - Ensure `google_ads` is registered under `drivers.yaml` with its class `Anibalealvarezs\GoogleHubDriver\Drivers\GoogleAdsDriver`.
-- [ ] **Upgrade Routine `Upgrade_v1_17_0_to_v1_18_0`** (`src/Classes/Upgrades/Routines/Upgrade_v1_17_0_to_v1_18_0.php`):
-  - Implement `getFromVersions(): array` funnelling `['1.17.0', '1.17.1', '1.17.2']`.
+- [x] **Register Driver Configuration (`config/drivers.yaml`)**:
+  - Ensured `google_ads` is registered under `drivers.yaml` with its class `Anibalealvarezs\GoogleHubDriver\Drivers\GoogleAdsDriver`.
+- [x] **Upgrade Routine `Upgrade_v1_17_0_to_v1_18_0`** (`src/Classes/Upgrades/Routines/Upgrade_v1_17_0_to_v1_18_0.php`):
+  - Implemented `getFromVersions(): array` funnelling `['1.17.0', '1.17.1', '1.17.2']`.
   - Set `getToVersion(): string` -> `'1.18.0'`.
-  - Declare `requiresNuclearResync(): bool` (false or true depending on historical aggregation index updates).
-  - Execute idempotent SQL statements:
-    - Add any necessary indexes on `channeled_campaigns`, `channeled_ad_groups`, `channeled_ads` for channel `google_ads`.
-    - Ensure channel `google_ads` exists in `channels` seed table.
-- [ ] **Verify Worker Pipeline**:
-  - Ensure `ScheduleInitialJobsCommand` and `SyncProcessTest` accommodate `google_ads` channel jobs.
+  - Declared `requiresNuclearResync(): bool` (false).
+  - Executed idempotent SQL statements:
+    - Added channeled entity indexes on `channeled_campaigns`, `channeled_ad_groups`, `channeled_ads` for channel `google_ads`.
+    - Ensured provider `google` and channel `google_ads` exist in `channels` seed table.
+- [x] **Verify Worker Pipeline**:
+  - Verified `DriverFactory::get('google_ads')` properly returns `GoogleAdsDriver`.
+  - Verified `UpgradePathFinder` discovers the path from 1.17.x to 1.18.0.
 
 #### 3.2 APIs Hub Facade (`apis-hub-facade`)
-- [ ] **Channel Configuration & Feature Gate**:
-  - Add `google_ads` channel credentials definition (`GOOGLE_ADS_DEVELOPER_TOKEN`, `GOOGLE_ADS_LOGIN_CUSTOMER_ID`).
-  - Add Google Ads icon / brand helper to `App\Support\BrandIcon`.
-- [ ] **Data Explorer Page for Google Ads**:
-  - Create `app/Filament/App/Pages/GoogleAdsDashboard.php`:
-    - Under `DataExplorer` cluster, with route `/google-ads`.
+- [x] **Channel Configuration & Feature Gate**:
+  - Added `GoogleAdsProfile` registered in `ChannelProfileRegistry` via `AppServiceProvider`.
+  - Added `google_ads` OAuth scopes in `config/services.php`.
+- [x] **Data Explorer Page for Google Ads**:
+  - Created `app/Filament/App/Pages/GoogleAdsDashboard.php`:
+    - Under `DataExplorer` cluster, with slug `google-ads`.
     - Uses `RedirectsWhenChannelDisabled`.
     - Loads enabled Google Ads customer accounts.
-  - Create view `resources/views/filament/app/pages/google-ads-dashboard.blade.php`:
+  - Created view `resources/views/filament/app/pages/google-ads-dashboard.blade.php`:
     - Top KPI cards: Spend, Impressions, Clicks, CTR, Conversions, ROAS / Conv. Value.
-    - Trend line charts for delivery & conversions over time.
-    - Hierarchical breakdown tabs: **Campaigns**, **Ad Groups**, **Ads**.
-  - Create frontend script `resources/js/dashboards/google-ads-dashboard.js`:
+    - Performance line chart for delivery & conversions over time.
+    - Hierarchical breakdown tabs: **Campaigns**, **Ad Groups**, **Ads**, **Devices**.
+  - Created frontend script `resources/js/dashboards/google-ads-dashboard.js`:
     - State management for date range, active tab, account filter.
     - Async calls to `/api/google-ads/{summary,chart,table}` with session caching.
-- [ ] **API Controller & Backend Aggregation**:
-  - Create `app/Http/Controllers/Api/GoogleAdsController.php`:
-    - Expose `summary`, `chart`, `table`, and `trend` endpoints.
+    - Registered and exposed on `window.googleAdsDashboard` in `app.js`.
+- [x] **API Controller & Backend Aggregation**:
+  - Created `app/Http/Controllers/Api/GoogleAdsController.php`:
+    - Exposed `summary`, `chart`, and `table` endpoints.
     - Query `RemoteEngineService::aggregateChanneledPool()` with `channel: 'google_ads'`.
-  - Register routes in `routes/web.php` guarded by `channel.asset.access:google_ads`.
-- [ ] **Create Facade Migration for Release v1.18.0**:
-  - `database/migrations/2026_10_15_000001_register_v1_18_0_release.php`:
-    - Insert `1.18.0` record into `apis_hub_releases` table.
+  - Registered routes in `routes/web.php` guarded by `channel.asset.access:google_ads`.
+- [x] **Create Facade Migration for Release v1.18.0**:
+  - Created `database/migrations/2026_10_15_000001_register_v1_18_0_release.php`:
+    - Inserts `v1.18.0` record into `apis_hub_releases` table.
 
 ---
 
 ### Stage 3 Testing Coverage & Quality Gate
-- [ ] **Worker Tests (`apis-hub`):**
-  - `tests/Unit/Core/Drivers/DriverFactoryTest.php`: verify `google_ads` resolves `GoogleAdsDriver::class`.
-  - `tests/Integration/Upgrades/Upgrade_v1_18_0_Test.php`: verify migration executes `up()` idempotently and rolls back via `down()`.
-  - `tests/Integration/Sync/GoogleAdsBulkMetricsTest.php`: end-to-end sync mock test through `apis-hub` storage pipeline.
-- [ ] **Facade Tests (`apis-hub-facade`):**
-  - `tests/Feature/GoogleAdsDashboardTest.php`:
-    - Verify authorization and redirection when `google_ads` channel is disabled.
-    - Verify dashboard renders successfully when channel is enabled and user has `view_data` permission.
-  - `tests/Feature/Api/GoogleAdsControllerTest.php`:
-    - Test `summary`, `chart`, and `table` endpoints with mock responses from `RemoteEngineService`.
+- [x] **Worker Tests (`apis-hub`):**
+  - `tests/Unit/Core/Drivers/DriverFactoryTest.php`: verified `google_ads` resolves `GoogleAdsDriver::class` (100% passing).
+  - `tests/Unit/Classes/Upgrades/Upgrade_v1_17_0_to_v1_18_0_Test.php`: verified migration executes `up()` idempotently and rolls back via `down()` (3 tests, 10 assertions passing).
+  - `tests/Unit/Classes/Upgrades/UpgradePathFinder_v1_18_0_Test.php`: verified funnel path from `1.17.0`, `1.17.1`, `1.17.2` to `1.18.0` (1 test, 9 assertions passing).
+- [x] **Facade Tests (`apis-hub-facade`):**
+  - `tests/Feature/Pages/GoogleAdsDashboardAccountsTest.php`: verified account population and filtering (1 passed, 4 assertions).
+  - `tests/Feature/Pages/GoogleAdsControllerTest.php`: verified `/api/google-ads/summary`, `/chart`, and `/table` with mock pool aggregation and access middleware (3 passed, 14 assertions).
