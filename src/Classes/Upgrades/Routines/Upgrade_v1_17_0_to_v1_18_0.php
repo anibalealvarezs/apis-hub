@@ -39,7 +39,7 @@ class Upgrade_v1_17_0_to_v1_18_0 implements UpgradeRoutineInterface
             VALUES ('google', 'Google', NOW(), NOW())
             ON CONFLICT (name) DO NOTHING;
 
-            INSERT INTO channels (name, label, icon, cooldown, max_workers, tier, provider_id, created_at, updated_at)
+            INSERT INTO channels (name, label, icon, cooldown, maxworkers, tier, provider_id, created_at, updated_at)
             SELECT 'google_ads', 'Google Ads', 'G', 600, 2, 2, p.id, NOW(), NOW()
             FROM providers p
             WHERE p.name = 'google'

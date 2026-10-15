@@ -12,7 +12,7 @@ To allow seamless tracking across multiple working sessions, each sub-stage has 
 | :--- | :--- | :--- | :--- |
 | **Stage 1** | Google SDK (`google-api-anibal`) Update | `COMPLETED` | `D:\laragon\www\google-api-anibal` |
 | **Stage 2** | Google Hub Driver (`google-hub-driver`) Update | `COMPLETED` | `D:\laragon\www\google-hub-driver` |
-| **Stage 3** | APIs Hub Core Engine & Facade Integration (Release `v1.18.0`) | `IN PROGRESS` | `D:\laragon\www\apis-hub` & `apis-hub-facade` |
+| **Stage 3** | APIs Hub Core Engine & Facade Integration (Release `v1.18.0`) | `COMPLETED` | `D:\laragon\www\apis-hub` & `apis-hub-facade` |
 
 ---
 
@@ -177,9 +177,8 @@ Prepare release **`v1.18.0`** across the APIs Hub ecosystem. Register the driver
     - Exposed `summary`, `chart`, and `table` endpoints.
     - Query `RemoteEngineService::aggregateChanneledPool()` with `channel: 'google_ads'`.
   - Registered routes in `routes/web.php` guarded by `channel.asset.access:google_ads`.
-- [x] **Create Facade Migration for Release v1.18.0**:
-  - Created `database/migrations/2026_10_15_000001_register_v1_18_0_release.php`:
-    - Inserts `v1.18.0` record into `apis_hub_releases` table.
+- [x] **Release Registration in Facade**:
+  - Registered `v1.18.0` manually via the Facade Admin UI (`/admin/apis-hub-releases`) with its upgrade commands, supported channels, and channel profile schema.
 
 ---
 
