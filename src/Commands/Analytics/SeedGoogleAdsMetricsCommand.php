@@ -211,9 +211,12 @@ class SeedGoogleAdsMetricsCommand extends Command implements SeederInterface
 
             $output->writeln("<info>📂 Processing Account: {$caName} ({$caPId})...</info>");
 
-            // Fetch campaigns
+            // Fetch campaigns (name is stored in campaigns table via campaign_id relation)
             $campaigns = $this->conn->fetchAllAssociative(
-                "SELECT id, platform_id, name, campaign_id, data FROM channeled_campaigns WHERE channeled_account_id = ?",
+                "SELECT cc.id, cc.platform_id, COALESCE(c.name, cc.platform_id) AS name, cc.campaign_id, cc.data 
+                 FROM channeled_campaigns cc
+                 LEFT JOIN campaigns c ON c.id = cc.campaign_id
+                 WHERE cc.channeled_account_id = ?",
                 [$caId]
             );
 
