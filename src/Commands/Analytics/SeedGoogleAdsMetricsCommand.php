@@ -12,6 +12,7 @@ use Anibalealvarezs\ApiDriverCore\Interfaces\SeederInterface;
 use Anibalealvarezs\ApiSkeleton\Enums\Period;
 use BackedEnum;
 use Classes\DimensionManager;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Platforms\PostgreSQLPlatform;
 use Doctrine\ORM\EntityManagerInterface;
@@ -149,6 +150,11 @@ class SeedGoogleAdsMetricsCommand extends Command implements SeederInterface
             ->setTitle(method_exists($entity, 'getName') ? $entity->getName() : null);
         $ue->id = $entity->getId();
         return $ue;
+    }
+
+    public function processMetricsMassive(Collection $metrics): void
+    {
+        // Unused in direct SQL time-series queueing, but fulfills SeederInterface contract
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
