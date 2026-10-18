@@ -59,9 +59,10 @@ class SeedGoogleAdsMetricsCommand extends Command implements SeederInterface
     protected function configure(): void
     {
         $this
-            ->setDescription('Generates realistic daily simulated performance metrics for existing Google Ads entities')
+            ->setDescription('Generates realistic daily simulated performance metrics for Google Ads entities and search terms')
             ->addOption('days', 'd', InputOption::VALUE_OPTIONAL, 'Number of daily history days to generate (default: 65)', 65)
-            ->addOption('account', 'a', InputOption::VALUE_OPTIONAL, 'Specific channeled account platform_id to target (optional)');
+            ->addOption('account', 'a', InputOption::VALUE_OPTIONAL, 'Specific channeled account platform_id to target (optional)')
+            ->addOption('init-hierarchy', 'i', InputOption::VALUE_NONE, 'Automatically create demo account, campaigns (Search, PMax, Video), ad groups, ads, and search terms if missing');
     }
 
     public function getEntityManager(): EntityManagerInterface
@@ -180,10 +181,15 @@ class SeedGoogleAdsMetricsCommand extends Command implements SeederInterface
             $sqlAccounts .= " AND platform_id = ?";
             $paramsAccounts[] = $targetAccount;
         }
-        $chanAccounts = $this->conn->fetchAllAssociative($sqlAccounts, $paramsAccounts);
+        $initHierarchy = (bool)$input->getOption('init-hierarchy');
+        if ($initHierarchy || empty($chanAccounts)) {
+            $output->writeln("<info>🛠 Ensuring demo Google Ads hierarchy and search entities...</info>");
+            $this->ensureDemoHierarchy($channelId, $targetAccount);
+            $chanAccounts = $this->conn->fetchAllAssociative($sqlAccounts, $paramsAccounts);
+        }
 
         if (empty($chanAccounts)) {
-            $output->writeln("<comment>⚠️ No channeled accounts found for Google Ads. Please sync your Google Ads account first.</comment>");
+            $output->writeln("<comment>⚠️ No channeled accounts found for Google Ads. Use --init-hierarchy to create demo accounts.</comment>");
             return Command::SUCCESS;
         }
 
@@ -379,6 +385,103 @@ class SeedGoogleAdsMetricsCommand extends Command implements SeederInterface
                             }
                         }
                     }
+
+                    // Seed Search Terms / Queries for SEARCH campaigns
+                    if (str_contains(strtoupper($channelType), 'SEARCH')) {
+                        $searchQueries = [
+                            ['text' => 'buy running shoes online', 'is_wasted' => false, 'conv_rate' => 0.08, 'cpc_range' => [1.20, 2.80]],
+                            ['text' => 'best trail running shoes 2026', 'is_wasted' => false, 'conv_rate' => 0.06, 'cpc_range' => [1.00, 2.20]],
+                            ['text' => 'running shoes discount code', 'is_wasted' => false, 'conv_rate' => 0.12, 'cpc_range' => [0.80, 1.80]],
+                            ['text' => 'lightweight marathon racing sneakers', 'is_wasted' => false, 'conv_rate' => 0.05, 'cpc_range' => [1.50, 3.50]],
+                            ['text' => 'free running shoe pattern download', 'is_wasted' => true, 'conv_rate' => 0.0, 'cpc_range' => [0.90, 2.00]],
+                            ['text' => 'how to make shoes at home tutorial', 'is_wasted' => true, 'conv_rate' => 0.0, 'cpc_range' => [0.70, 1.60]],
+                            ['text' => 'counterfeit sneakers repair near me', 'is_wasted' => true, 'conv_rate' => 0.0, 'cpc_range' => [0.80, 1.90]],
+                        ];
+
+                        foreach ($searchQueries as $sq) {
+                            $qText = $sq['text'];
+                            $qId = $this->conn->fetchOne("SELECT id FROM queries WHERE query = ?", [$qText]);
+                            if (!$qId) {
+                                $this->conn->insert('queries', [
+                                    'query' => $qText,
+                                    'created_at' => date('Y-m-d H:i:s'),
+                                    'updated_at' => date('Y-m-d H:i:s')
+                                ]);
+                                $qId = $this->conn->lastInsertId();
+                            }
+                            $qId = (int)$qId;
+
+                            $firstAg = !empty($adGroupsWithAds[0]) ? $adGroupsWithAds[0] : null;
+                            $targetAgId = $firstAg ? $firstAg['agId'] : null;
+                            $targetAgPId = $firstAg ? $firstAg['agPId'] : null;
+
+                            $qImps = (int)(rand(40, 250) * $dayMultiplier);
+                            $qCtr = rand(30, 90) / 1000;
+                            $qClicks = max(1, (int)round($qImps * $qCtr));
+                            $qCpc = rand((int)($sq['cpc_range'][0] * 100), (int)($sq['cpc_range'][1] * 100)) / 100;
+                            $qSpend = round($qClicks * $qCpc, 2);
+                            $qConvs = $sq['is_wasted'] ? 0 : max(0, (int)round($qClicks * $sq['conv_rate']));
+                            $qConvVal = $qConvs > 0 ? round($qConvs * rand(45, 130), 2) : 0.0;
+                            $qRoas = $qSpend > 0 ? round($qConvVal / $qSpend, 2) : 0.0;
+                            $qCostPerConv = $qConvs > 0 ? round($qSpend / $qConvs, 2) : 0.0;
+
+                            $qMetrics = [
+                                'spend'               => $qSpend,
+                                'clicks'              => $qClicks,
+                                'impressions'         => $qImps,
+                                'conversions'         => $qConvs,
+                                'conversion_value'    => $qConvVal,
+                                'ctr'                 => $qImps > 0 ? round($qClicks / $qImps, 4) : 0.0,
+                                'cpc'                 => $qClicks > 0 ? round($qSpend / $qClicks, 2) : 0.0,
+                                'cost_per_conversion' => $qCostPerConv,
+                                'conversion_rate'     => $qClicks > 0 ? round($qConvs / $qClicks, 4) : 0.0,
+                                'roas_purchase'       => $qRoas,
+                            ];
+
+                            foreach ($qMetrics as $mName => $mVal) {
+                                $this->queueMetric(
+                                    channel: $channelObj,
+                                    name: $mName,
+                                    date: $date,
+                                    value: $mVal,
+                                    agId: $targetAgId,
+                                    cpId: $cpId,
+                                    caId: $caId,
+                                    gAccId: $gAccId,
+                                    gCpId: $gCpId,
+                                    queryId: $qId,
+                                    accName: $caName,
+                                    caPId: $caPId,
+                                    cpPId: $cpPId,
+                                    agPId: $targetAgPId,
+                                    queryPId: $qText,
+                                    data: json_encode($qMetrics)
+                                );
+                                $totalMetricsQueued++;
+                            }
+                        }
+                    }
+
+                    // Seed YouTube / Video metrics for VIDEO campaigns
+                    if (str_contains(strtoupper($channelType), 'VIDEO')) {
+                        $videoViews = (int)(rand(300, 1500) * $dayMultiplier);
+                        $this->queueMetric(
+                            channel: $channelObj,
+                            name: 'video_views',
+                            date: $date,
+                            value: $videoViews,
+                            cpId: $cpId,
+                            caId: $caId,
+                            gAccId: $gAccId,
+                            gCpId: $gCpId,
+                            accName: $caName,
+                            caPId: $caPId,
+                            cpPId: $cpPId,
+                            data: json_encode(['video_views' => $videoViews])
+                        );
+                        $totalMetricsQueued++;
+                    }
+
                     $progressBar->advance();
                 }
             }
@@ -662,6 +765,183 @@ class SeedGoogleAdsMetricsCommand extends Command implements SeederInterface
                 $this->conn->executeStatement($sql);
             } catch (Throwable $e) {
                 // Ignore duplicate errors or log if unexpected
+            }
+        }
+    }
+
+    private function ensureDemoHierarchy(int $channelId, ?string $targetAccount = null): void
+    {
+        $platformId = $targetAccount ?: 'demo-gads-101';
+        $now = date('Y-m-d H:i:s');
+
+        // 1. Account
+        $accId = $this->conn->fetchOne("SELECT id FROM accounts WHERE name = 'Demo Business Account'");
+        if (!$accId) {
+            $this->conn->insert('accounts', [
+                'name' => 'Demo Business Account',
+                'created_at' => $now,
+                'updated_at' => $now
+            ]);
+            $accId = $this->conn->lastInsertId();
+        }
+        $accId = (int)$accId;
+
+        // 2. Channeled Account
+        $caId = $this->conn->fetchOne("SELECT id FROM channeled_accounts WHERE channel = ? AND platform_id = ?", [$channelId, $platformId]);
+        if (!$caId) {
+            $this->conn->insert('channeled_accounts', [
+                'channel' => $channelId,
+                'platform_id' => $platformId,
+                'account_id' => $accId,
+                'name' => 'Google Ads Demo Account (' . $platformId . ')',
+                'enabled' => 1,
+                'data' => json_encode(['currency' => 'USD', 'time_zone' => 'America/New_York']),
+                'created_at' => $now,
+                'updated_at' => $now
+            ]);
+            $caId = $this->conn->lastInsertId();
+        }
+        $caId = (int)$caId;
+
+        // 3. Demo Campaigns
+        $demoCampaigns = [
+            [
+                'pId' => 'camp-search-brand',
+                'name' => 'Search - Brand & High-Intent Products',
+                'type' => 'SEARCH',
+                'budget' => 150.00,
+                'adGroups' => [
+                    [
+                        'pId' => 'ag-brand-core',
+                        'name' => 'Core Running Shoes',
+                        'ads' => [
+                            ['pId' => 'ad-brand-headline-1', 'name' => 'Official Running Shoes Store - Free 2-Day Shipping'],
+                            ['pId' => 'ad-brand-headline-2', 'name' => 'Top Rated Trail Runners - Exclusive Online Discounts'],
+                        ]
+                    ],
+                    [
+                        'pId' => 'ag-brand-apparel',
+                        'name' => 'Athletic Apparel & Gear',
+                        'ads' => [
+                            ['pId' => 'ad-apparel-1', 'name' => 'Pro Running Apparel - Engineered For Speed'],
+                        ]
+                    ]
+                ]
+            ],
+            [
+                'pId' => 'camp-search-competitor',
+                'name' => 'Search - Competitor & Broad Category',
+                'type' => 'SEARCH',
+                'budget' => 100.00,
+                'adGroups' => [
+                    [
+                        'pId' => 'ag-broad-category',
+                        'name' => 'Broad Marathon Training',
+                        'ads' => [
+                            ['pId' => 'ad-broad-1', 'name' => 'Marathon Preparation Shoes - Find Your Perfect Fit'],
+                        ]
+                    ]
+                ]
+            ],
+            [
+                'pId' => 'camp-pmax-sales',
+                'name' => 'Performance Max - Omnichannel Sales',
+                'type' => 'PERFORMANCE_MAX',
+                'budget' => 200.00,
+                'adGroups' => []
+            ],
+            [
+                'pId' => 'camp-youtube-video',
+                'name' => 'YouTube - Video Action Marathon Launch',
+                'type' => 'VIDEO',
+                'budget' => 80.00,
+                'adGroups' => [
+                    [
+                        'pId' => 'ag-video-runners',
+                        'name' => 'Runners 18-45 Video Audience',
+                        'ads' => [
+                            ['pId' => 'ad-video-spot-1', 'name' => 'Marathon Launch Video (15s In-Stream)'],
+                        ]
+                    ]
+                ]
+            ]
+        ];
+
+        foreach ($demoCampaigns as $cDef) {
+            $gCpId = $this->conn->fetchOne("SELECT id FROM campaigns WHERE campaign_id = ?", [$cDef['pId']]);
+            if (!$gCpId) {
+                $this->conn->insert('campaigns', [
+                    'campaign_id' => $cDef['pId'],
+                    'name' => $cDef['name'],
+                    'created_at' => $now,
+                    'updated_at' => $now
+                ]);
+                $gCpId = $this->conn->lastInsertId();
+            }
+            $gCpId = (int)$gCpId;
+
+            $ccId = $this->conn->fetchOne(
+                "SELECT id FROM channeled_campaigns WHERE channel = ? AND platform_id = ? AND channeled_account_id = ?",
+                [$channelId, $cDef['pId'], $caId]
+            );
+            if (!$ccId) {
+                $this->conn->insert('channeled_campaigns', [
+                    'channel' => $channelId,
+                    'platform_id' => $cDef['pId'],
+                    'campaign_id' => $gCpId,
+                    'channeled_account_id' => $caId,
+                    'budget' => $cDef['budget'],
+                    'status' => 'ENABLED',
+                    'type' => $cDef['type'],
+                    'data' => json_encode(['advertising_channel_type' => $cDef['type']]),
+                    'created_at' => $now,
+                    'updated_at' => $now
+                ]);
+                $ccId = $this->conn->lastInsertId();
+            }
+            $ccId = (int)$ccId;
+
+            foreach ($cDef['adGroups'] as $agDef) {
+                $cagId = $this->conn->fetchOne(
+                    "SELECT id FROM channeled_ad_groups WHERE channel = ? AND platform_id = ? AND channeled_campaign_id = ?",
+                    [$channelId, $agDef['pId'], $ccId]
+                );
+                if (!$cagId) {
+                    $this->conn->insert('channeled_ad_groups', [
+                        'channel' => $channelId,
+                        'platform_id' => $agDef['pId'],
+                        'channeled_campaign_id' => $ccId,
+                        'channeled_account_id' => $caId,
+                        'name' => $agDef['name'],
+                        'status' => 'ENABLED',
+                        'data' => json_encode([]),
+                        'created_at' => $now,
+                        'updated_at' => $now
+                    ]);
+                    $cagId = $this->conn->lastInsertId();
+                }
+                $cagId = (int)$cagId;
+
+                foreach ($agDef['ads'] as $adDef) {
+                    $cadId = $this->conn->fetchOne(
+                        "SELECT id FROM channeled_ads WHERE channel = ? AND platform_id = ? AND channeled_ad_group_id = ?",
+                        [$channelId, $adDef['pId'], $cagId]
+                    );
+                    if (!$cadId) {
+                        $this->conn->insert('channeled_ads', [
+                            'channel' => $channelId,
+                            'platform_id' => $adDef['pId'],
+                            'channeled_account_id' => $caId,
+                            'channeled_campaign_id' => $ccId,
+                            'channeled_ad_group_id' => $cagId,
+                            'name' => $adDef['name'],
+                            'status' => 'ENABLED',
+                            'data' => json_encode([]),
+                            'created_at' => $now,
+                            'updated_at' => $now
+                        ]);
+                    }
+                }
             }
         }
     }
