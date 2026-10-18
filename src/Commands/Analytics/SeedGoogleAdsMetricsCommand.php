@@ -794,6 +794,7 @@ class SeedGoogleAdsMetricsCommand extends Command implements SeederInterface
                 'platform_id' => $platformId,
                 'account_id' => $accId,
                 'name' => 'Google Ads Demo Account (' . $platformId . ')',
+                'type' => 'google_ads_account',
                 'enabled' => 1,
                 'data' => json_encode(['currency' => 'USD', 'time_zone' => 'America/New_York']),
                 'created_at' => $now,
@@ -910,6 +911,7 @@ class SeedGoogleAdsMetricsCommand extends Command implements SeederInterface
                     $this->conn->insert('channeled_ad_groups', [
                         'channel' => $channelId,
                         'platform_id' => $agDef['pId'],
+                        'campaign_id' => $gCpId,
                         'channeled_campaign_id' => $ccId,
                         'channeled_account_id' => $caId,
                         'name' => $agDef['name'],
