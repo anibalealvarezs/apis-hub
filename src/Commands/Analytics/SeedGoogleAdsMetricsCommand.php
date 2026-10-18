@@ -688,7 +688,7 @@ class SeedGoogleAdsMetricsCommand extends Command implements SeederInterface
             $mId = $mMap[$mKey] ?? null;
             if ($mId) {
                 $chanToInsert[] = [
-                    'platform_id'         => substr(str_shuffle(str_repeat('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', 5)), 0, 15),
+                    'platform_id'         => 'seed-cm-' . $c['channel'] . '-' . $mId,
                     'channel'             => $c['channel'],
                     'metric_id'           => $mId,
                     'dimension_set_id'    => $c['dimension_set_id'],
@@ -699,7 +699,7 @@ class SeedGoogleAdsMetricsCommand extends Command implements SeederInterface
                 ];
             }
         }
-        $this->bulkInsert('channeled_metrics', $chanToInsert);
+        $this->bulkInsert('channeled_metrics', $chanToInsert, ['data', 'updated_at']);
         $this->bufferConfigs = [];
     }
 
