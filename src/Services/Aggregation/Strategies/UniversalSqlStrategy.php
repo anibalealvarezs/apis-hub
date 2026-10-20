@@ -100,7 +100,11 @@
                 $dimKey = $isDimension ? substr($field, 11) : $field;
 
                 // Check if it's a dynamic dimension
-                $isStandardRelation = in_array($field, ['account_type', 'metric_date', 'daily', 'weekly', 'monthly', 'quarterly', 'yearly', 'channel'], true)
+                $isStandardRelation = in_array($field, [
+                    'account_type', 'metric_date', 'daily', 'weekly', 'monthly', 'quarterly', 'semiannual', 'yearly', 'annually',
+                    'trailing_weekly', 'trailing_monthly', 'trailing_quarterly', 'trailing_semiannual', 'trailing_annually', 'trailing_yearly',
+                    'channel'
+                ], true)
                                       || isset($relationMap[$field])
                                       || str_ends_with($field, '_id');
 
@@ -285,7 +289,11 @@
                 }
 
                 // Dynamic dimension filter
-                $isStandardRelation = in_array($baseKey, ['account_type', 'metric_date', 'daily', 'weekly', 'monthly', 'quarterly', 'yearly', 'channel'], true)
+                $isStandardRelation = in_array($baseKey, [
+                    'account_type', 'metric_date', 'daily', 'weekly', 'monthly', 'quarterly', 'semiannual', 'yearly', 'annually',
+                    'trailing_weekly', 'trailing_monthly', 'trailing_quarterly', 'trailing_semiannual', 'trailing_annually', 'trailing_yearly',
+                    'channel'
+                ], true)
                                       || isset($relationMap[$baseKey])
                                       || str_ends_with($baseKey, '_id');
 
@@ -533,7 +541,15 @@
                 'weekly',
                 'monthly',
                 'quarterly',
+                'semiannual',
                 'yearly',
+                'annually',
+                'trailing_weekly',
+                'trailing_monthly',
+                'trailing_quarterly',
+                'trailing_semiannual',
+                'trailing_annually',
+                'trailing_yearly',
                 'channel',
                 'page',
                 'page_id',

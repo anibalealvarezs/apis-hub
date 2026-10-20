@@ -21,7 +21,7 @@
             if (count($normalized) === 1) {
                 $field = $normalized[0];
                 $rawField = $rawFields[0];
-                if (in_array($field, ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'], true)) {
+                if (in_array($field, ['daily', 'weekly', 'monthly', 'quarterly', 'semiannual', 'yearly', 'annually', 'trailing_weekly', 'trailing_monthly', 'trailing_quarterly', 'trailing_semiannual', 'trailing_annually', 'trailing_yearly'], true)) {
                     return $field;
                 }
 
@@ -52,7 +52,10 @@
             }
 
             // Handle temporal (daily/weekly/monthly/etc.) combined with a single known entity or dimension field.
-            $temporalFields = ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'];
+            $temporalFields = [
+                'daily', 'weekly', 'monthly', 'quarterly', 'semiannual', 'yearly', 'annually',
+                'trailing_weekly', 'trailing_monthly', 'trailing_quarterly', 'trailing_semiannual', 'trailing_annually', 'trailing_yearly',
+            ];
             $knownCombinableFields = [
                 'query', 'page', 'country', 'device', 'age', 'gender',
                 'ad', 'adgroup', 'account', 'campaign',
@@ -203,7 +206,10 @@
                 ];
             }
 
-            $temporalFields = ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'];
+            $temporalFields = [
+                'daily', 'weekly', 'monthly', 'quarterly', 'semiannual', 'yearly', 'annually',
+                'trailing_weekly', 'trailing_monthly', 'trailing_quarterly', 'trailing_semiannual', 'trailing_annually', 'trailing_yearly',
+            ];
             $knownEntities = ['query', 'page', 'country', 'device', 'channeledCampaign', 'channeledAccount'];
 
             $allSupported = array_reduce($fields, static fn(bool $carry, string $field): bool => 
@@ -232,7 +238,10 @@
             $configsJoins = [];
 
             $semanticDimensions = ['intent', 'language', 'brand_relation', 'business_relevance'];
-            $temporalFields = ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'];
+            $temporalFields = [
+                'daily', 'weekly', 'monthly', 'quarterly', 'semiannual', 'yearly', 'annually',
+                'trailing_weekly', 'trailing_monthly', 'trailing_quarterly', 'trailing_semiannual', 'trailing_annually', 'trailing_yearly',
+            ];
 
             foreach ($fields as $field) {
                 if (in_array($field, $temporalFields, true)) {

@@ -33,25 +33,59 @@
             $end = new DateTime($endDate);
             $periods = [];
 
-            $current = clone $start;
-            while ($current <= $end) {
-                $periodKey = match ($type) {
-                    'weekly' => $current->format('Y-\\W').str_pad($current->format('W'), 2, '0', STR_PAD_LEFT),
-                    'monthly' => $current->format('Y-m'),
-                    'quarterly' => $current->format('Y-\\Q').(string)ceil((int)$current->format('n') / 3),
-                    'yearly' => $current->format('Y'),
-                    default => $current->format('Y-m-d'),
+            if (str_starts_with($type, 'trailing_')) {
+                // Trailing/rolling intervals step backward from $end down to $start
+                $stepInterval = match ($type) {
+                    'trailing_weekly' => 'P1W',
+                    'trailing_monthly' => 'P1M',
+                    'trailing_quarterly' => 'P3M',
+                    'trailing_semiannual' => 'P6M',
+                    'trailing_annually', 'trailing_yearly' => 'P1Y',
+                    default => 'P1Y',
                 };
-                $periods[$periodKey] = true;
+                $trailingPeriods = [];
+                $cursor = clone $end;
+                while (true) {
+                    $pKey = match ($type) {
+                        'trailing_weekly' => 'Trailing 7D (to ' . $cursor->format('M d') . ')',
+                        'trailing_monthly' => 'Trailing 30D (to ' . $cursor->format('M d') . ')',
+                        'trailing_quarterly' => 'Trailing 90D (to ' . $cursor->format('M d') . ')',
+                        'trailing_semiannual' => 'Trailing 180D (to ' . $cursor->format('M d') . ')',
+                        'trailing_annually', 'trailing_yearly' => 'TTM (to ' . $cursor->format('M d, Y') . ')',
+                        default => 'Trailing (to ' . $cursor->format('Y-m-d') . ')',
+                    };
+                    $trailingPeriods[$pKey] = true;
+                    $prev = clone $cursor;
+                    $cursor->sub(new DateInterval($stepInterval));
+                    if ($prev <= $start) {
+                        break;
+                    }
+                }
+                // Reverse so chronological order (oldest to newest) is maintained
+                $periods = array_reverse($trailingPeriods, true);
+            } else {
+                $current = clone $start;
+                while ($current <= $end) {
+                    $periodKey = match ($type) {
+                        'weekly' => $current->format('Y-\\W').str_pad($current->format('W'), 2, '0', STR_PAD_LEFT),
+                        'monthly' => $current->format('Y-m'),
+                        'quarterly' => $current->format('Y-\\Q').(string)ceil((int)$current->format('n') / 3),
+                        'semiannual' => $current->format('Y-\\S').((int)$current->format('n') <= 6 ? '1' : '2'),
+                        'yearly', 'annually' => $current->format('Y'),
+                        default => $current->format('Y-m-d'),
+                    };
+                    $periods[$periodKey] = true;
 
-                $interval = match ($type) {
-                    'weekly' => 'P1W',
-                    'monthly' => 'P1M',
-                    'quarterly' => 'P3M',
-                    'yearly' => 'P1Y',
-                    default => 'P1D',
-                };
-                $current->add(new DateInterval($interval));
+                    $interval = match ($type) {
+                        'weekly' => 'P1W',
+                        'monthly' => 'P1M',
+                        'quarterly' => 'P3M',
+                        'semiannual' => 'P6M',
+                        'yearly', 'annually' => 'P1Y',
+                        default => 'P1D',
+                    };
+                    $current->add(new DateInterval($interval));
+                }
             }
 
             $otherGroups = array_values(array_filter($groupBy, static fn(string $f): bool => $f !== $temporalField));
