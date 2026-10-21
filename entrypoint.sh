@@ -186,7 +186,7 @@ if [[ "$INSTANCE_NAME" == *"master"* ]]; then
         exec php bin/swoole-server.php
     else
         echo "Master Instance ($INSTANCE_NAME): Starting PHP server on port $PORT..."
-        exec php -d zlib.output_compression=On -S 0.0.0.0:${PORT} -t . bin/index.php
+        exec php -d zlib.output_compression=On -d session.upload_progress.enabled=0 -S 0.0.0.0:${PORT} -t . bin/index.php
     fi
 else
     echo "Worker Instance ($INSTANCE_NAME): Running as persistent job processor."
