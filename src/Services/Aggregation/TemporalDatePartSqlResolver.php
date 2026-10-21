@@ -24,7 +24,15 @@ final class TemporalDatePartSqlResolver
                 'weekly' => "TO_CHAR($baseDate, 'IYYY-\"W\"IW')",
                 'monthly' => "TO_CHAR($baseDate, 'YYYY-MM')",
                 'quarterly' => "CONCAT(EXTRACT(YEAR FROM $baseDate), '-Q', EXTRACT(QUARTER FROM $baseDate))",
+                'semiannual' => "CONCAT(EXTRACT(YEAR FROM $baseDate), '-S', CASE WHEN EXTRACT(MONTH FROM $baseDate) <= 6 THEN 1 ELSE 2 END)",
                 'yearly' => "EXTRACT(YEAR FROM $baseDate)",
+                'annually' => "EXTRACT(YEAR FROM $baseDate)",
+                'trailing_weekly' => "TO_CHAR($baseDate, 'YYYY-MM-DD')",
+                'trailing_monthly' => "TO_CHAR($baseDate, 'YYYY-MM-DD')",
+                'trailing_quarterly' => "TO_CHAR($baseDate, 'YYYY-MM-DD')",
+                'trailing_semiannual' => "TO_CHAR($baseDate, 'YYYY-MM-DD')",
+                'trailing_annually' => "TO_CHAR($baseDate, 'YYYY-MM-DD')",
+                'trailing_yearly' => "TO_CHAR($baseDate, 'YYYY-MM-DD')",
             ];
 
             return $dateParts[$lowerField] ?? null;
@@ -43,7 +51,15 @@ final class TemporalDatePartSqlResolver
             'weekly' => "CONCAT(YEAR($baseDate), '-W', LPAD(WEEK($baseDate), 2, '0'))",
             'monthly' => "CONCAT(YEAR($baseDate), '-', LPAD(MONTH($baseDate), 2, '0'))",
             'quarterly' => "CONCAT(YEAR($baseDate), '-Q', QUARTER($baseDate))",
+            'semiannual' => "CONCAT(YEAR($baseDate), '-S', IF(MONTH($baseDate) <= 6, 1, 2))",
             'yearly' => "YEAR($baseDate)",
+            'annually' => "YEAR($baseDate)",
+            'trailing_weekly' => "DATE($baseDate)",
+            'trailing_monthly' => "DATE($baseDate)",
+            'trailing_quarterly' => "DATE($baseDate)",
+            'trailing_semiannual' => "DATE($baseDate)",
+            'trailing_annually' => "DATE($baseDate)",
+            'trailing_yearly' => "DATE($baseDate)",
         ];
 
         return $dateParts[$lowerField] ?? null;

@@ -17,6 +17,7 @@
     use Commands\Analytics\ReportAggregationTelemetryCommand;
     use Commands\Analytics\PlanMetricConfigIndexesCommand;
     use Commands\Analytics\ResetMetricsCommand;
+    use Commands\Analytics\SeedGoogleAdsMetricsCommand;
     use Commands\Analytics\ResetEntitiesCommand;
     use Commands\Analytics\ResetChannelCommand;
     use Commands\Analytics\RetryFailedJobCommand;
@@ -108,6 +109,7 @@
             new SetupDatabaseCommand(),
             new RecalculateMetricConfigSignaturesCommand(Helpers::getManager()),
             new SeedDemoDataCommand(Helpers::getManager()),
+            new SeedGoogleAdsMetricsCommand($entityManager),
             new ResetMetricsCommand($entityManager),
             new ResetEntitiesCommand($entityManager),
             new ResetChannelCommand($entityManager),

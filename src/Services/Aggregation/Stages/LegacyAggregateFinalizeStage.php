@@ -39,8 +39,12 @@
                 $temporalField = null;
                 $temporalType = null;
 
+                $allowedTemporal = [
+                    'daily', 'weekly', 'monthly', 'quarterly', 'semiannual', 'yearly', 'annually',
+                    'trailing_weekly', 'trailing_monthly', 'trailing_quarterly', 'trailing_semiannual', 'trailing_annually', 'trailing_yearly',
+                ];
                 foreach ($groupBy as $field) {
-                    if (in_array(strtolower((string)$field), ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'], true)) {
+                    if (in_array(strtolower((string)$field), $allowedTemporal, true)) {
                         $temporalField = (string)$field;
                         $temporalType = strtolower((string)$field);
                         break;

@@ -12,7 +12,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 #[AsCommand(
     name: 'app:classify-queries',
-    description: 'Classifies Search Console queries semantically using TypeSafe AI (Intent, Brand, Relevance).'
+    description: 'Classifies Search Console and Google Ads queries semantically using TypeSafe AI (Intent, Brand, Relevance).'
 )]
 class ClassifyQueriesCommand extends Command
 {
@@ -57,7 +57,7 @@ class ClassifyQueriesCommand extends Command
 
         $conn = $this->entityManager->getConnection();
 
-        // Retrieve active GSC assets from metric_configs
+        // Retrieve active assets from metric_configs (Google Search Console + Google Ads)
         $sql = "SELECT DISTINCT channeled_account_id FROM metric_configs WHERE channeled_account_id IS NOT NULL AND query_id IS NOT NULL";
         if (!empty($assetFilter)) {
             $sql .= " AND channeled_account_id = " . ((int) $assetFilter);
@@ -66,7 +66,7 @@ class ClassifyQueriesCommand extends Command
         $assets = $conn->fetchFirstColumn($sql);
 
         if (empty($assets)) {
-            $output->writeln("<comment>No Search Console assets found with query metrics.</comment>");
+            $output->writeln("<comment>No assets found with query metrics.</comment>");
             return Command::SUCCESS;
         }
 

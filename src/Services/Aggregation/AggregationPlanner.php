@@ -862,7 +862,7 @@
             if (count($normalized) === 1) {
                 $field = $normalized[0];
                 $rawField = $rawFields[0];
-                if (in_array($field, ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'], true)) {
+                if (in_array($field, ['daily', 'weekly', 'monthly', 'quarterly', 'semiannual', 'yearly', 'annually', 'trailing_weekly', 'trailing_monthly', 'trailing_quarterly', 'trailing_semiannual', 'trailing_annually', 'trailing_yearly'], true)) {
                     return $field;
                 }
 
@@ -885,7 +885,9 @@
 
             $knownFields = [
                 'query', 'page', 'page_id', 'page_title', 'page_platform_id',
-                'country', 'device', 'daily', 'age', 'gender',
+                'country', 'device', 'daily', 'weekly', 'monthly', 'quarterly', 'semiannual', 'yearly', 'annually',
+                'trailing_weekly', 'trailing_monthly', 'trailing_quarterly', 'trailing_semiannual', 'trailing_annually', 'trailing_yearly',
+                'age', 'gender',
                 'ad', 'ad_id', 'adgroup', 'adgroup_id', 'account', 'campaign',
                 'channeledaccount', 'channeled_account_id', 'linked_fb_page_id', 'linked_platform_entity_id',
                 'caption', 'created_time', 'media_type', 'message', 'permalink',
@@ -906,8 +908,12 @@
          */
         private function hasTemporalGrouping(array $groupBy): bool
         {
+            $temporal = [
+                'daily', 'weekly', 'monthly', 'quarterly', 'semiannual', 'yearly', 'annually',
+                'trailing_weekly', 'trailing_monthly', 'trailing_quarterly', 'trailing_semiannual', 'trailing_annually', 'trailing_yearly',
+            ];
             foreach ($groupBy as $field) {
-                if (in_array(strtolower($field), ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'], true)) {
+                if (in_array(strtolower($field), $temporal, true)) {
                     return true;
                 }
             }
