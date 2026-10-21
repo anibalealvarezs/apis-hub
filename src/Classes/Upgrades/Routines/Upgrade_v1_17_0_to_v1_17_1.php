@@ -32,4 +32,9 @@ class Upgrade_v1_17_0_to_v1_17_1 implements UpgradeRoutineInterface
     {
         $output->writeln("   <info>[1/1]</info> Verified security configuration hotfix for v1.17.1.");
     }
+
+    public function down(EntityManagerInterface $em, OutputInterface $output): void
+    {
+        $output->writeln("   <info>[1/1]</info> Reverting v1.17.1 security routine.");
+    }
 }
