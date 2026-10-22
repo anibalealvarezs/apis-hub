@@ -900,6 +900,31 @@
                 return implode('+', $normalized);
             }
 
+            $temporalFields = [
+                'daily', 'weekly', 'monthly', 'quarterly', 'semiannual', 'yearly', 'annually',
+                'trailing_weekly', 'trailing_monthly', 'trailing_quarterly', 'trailing_semiannual', 'trailing_annually', 'trailing_yearly',
+            ];
+            $entityFields = array_values(array_diff($knownFields, $temporalFields));
+
+            // Handle combination of known entity fields (excluding temporal) with dimension fields (e.g. ['query', 'dimensions.intent'])
+            $hasEntityAndDimension = count($rawFields) >= 2
+                && array_reduce($rawFields, static function (bool $carry, string $field) use ($entityFields): bool {
+                    $lower = strtolower($field);
+                    return $carry && (in_array($lower, $entityFields, true) || (str_starts_with($lower, 'dimensions.') && strlen($field) > 11));
+                }, true);
+            if ($hasEntityAndDimension) {
+                $combined = array_map(static function (string $field) use ($entityFields): string {
+                    $lower = strtolower($field);
+                    if (in_array($lower, $entityFields, true)) {
+                        return $lower;
+                    }
+                    return 'dimensions.' . substr($field, 11);
+                }, $rawFields);
+                usort($combined, static fn(string $left, string $right): int => strcmp(strtolower($left), strtolower($right)));
+
+                return implode('+', $combined);
+            }
+
             return null;
         }
 

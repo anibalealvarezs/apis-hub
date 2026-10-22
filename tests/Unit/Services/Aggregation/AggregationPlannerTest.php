@@ -356,5 +356,50 @@
             $this->assertNull($profilesStage['failure_reason']);
             $this->assertNull($plan->getFallbackReason());
         }
+
+        public function testPlansOptimizedForMixedEntityAndDimensionGrouping(): void
+        {
+            $repository = $this->createMock(BaseRepository::class);
+            $repository->method('getClassName')->willReturn('Entities\\Analytics\\Channeled\\ChanneledMetric');
+
+            $mockProfile = [
+                'key'                => 'gsc_search_cube',
+                'channel'            => 'google_search_console',
+                'asset_type'         => 'page',
+                'reducer_strategies' => [
+                    '*' => 'sum',
+                ],
+                'group_patterns'     => [
+                    ['dimensions.intent', 'query'],
+                ],
+                'filter_contract'    => [
+                    'channel'                     => ['eq'],
+                    'dimensions.searchAppearance' => ['exact', 'eq'],
+                ],
+            ];
+
+            $planner = new AggregationPlanner(
+                aggregationProfilesResolver: static fn(string $channel): array => [$mockProfile],
+                channelKeyResolver: static fn(int $channelId): ?string => 'google_search_console',
+            );
+
+            $plan = $planner->plan(
+                repository: $repository,
+                aggregations: ['clicks' => 'clicks', 'impressions' => 'impressions'],
+                groupBy: ['query', 'dimensions.intent'],
+                filters: (object)['channel' => 1, 'dimensions.searchAppearance' => 'standard'],
+                startDate: '2026-09-01',
+                endDate: '2026-09-30',
+            );
+
+            $this->assertSame('dimensions.intent+query', $plan->getStages()['grouping']['normalized_pattern']);
+            $profilesStage = $plan->getStages()['profiles'];
+            $this->assertTrue($profilesStage['checked']);
+            $this->assertTrue($profilesStage['supported']);
+            $this->assertSame('google_search_console', $profilesStage['channel']);
+            $this->assertContains('gsc_search_cube', $profilesStage['matched_profiles']);
+            $this->assertSame('optimized', $plan->getPreferredExecutionPath());
+            $this->assertNull($plan->getFallbackReason());
+        }
     }
 
