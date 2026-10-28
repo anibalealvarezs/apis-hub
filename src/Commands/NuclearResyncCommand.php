@@ -117,23 +117,35 @@ class NuclearResyncCommand extends Command
                 $logger->info("Wiping historical metrics for channels: " . implode(', ', $channels));
                 $output->writeln("<comment>Wiping historical metrics for channels: " . implode(', ', $channels) . "...</comment>");
 
-                // Cascade delete metrics via metric_configs for targeted channels
-                $deletedMetrics = $conn->executeStatement(
-                    "DELETE FROM metrics WHERE metric_config_id IN (
-                        SELECT id FROM metric_configs WHERE channel IN (?)
-                    )",
+                // Resolve channel IDs from channels table since metric_configs.channel is an INTEGER foreign key
+                $channelIds = $conn->fetchFirstColumn(
+                    "SELECT id FROM channels WHERE name IN (?)",
                     [array_values($channels)],
                     [\Doctrine\DBAL\ArrayParameterType::STRING]
                 );
 
-                $deletedConfigs = $conn->executeStatement(
-                    "DELETE FROM metric_configs WHERE channel IN (?)",
-                    [array_values($channels)],
-                    [\Doctrine\DBAL\ArrayParameterType::STRING]
-                );
+                if (!empty($channelIds)) {
+                    // Cascade delete metrics via metric_configs for targeted channels
+                    $deletedMetrics = $conn->executeStatement(
+                        "DELETE FROM metrics WHERE metric_config_id IN (
+                            SELECT id FROM metric_configs WHERE channel IN (?)
+                        )",
+                        [$channelIds],
+                        [\Doctrine\DBAL\ArrayParameterType::INTEGER]
+                    );
 
-                $logger->info("✓ Wiped {$deletedMetrics} metrics rows and {$deletedConfigs} metric_configs for channels: " . implode(', ', $channels));
-                $output->writeln("<info>✓ Wiped {$deletedMetrics} metrics rows and {$deletedConfigs} metric_configs.</info>");
+                    $deletedConfigs = $conn->executeStatement(
+                        "DELETE FROM metric_configs WHERE channel IN (?)",
+                        [$channelIds],
+                        [\Doctrine\DBAL\ArrayParameterType::INTEGER]
+                    );
+
+                    $logger->info("✓ Wiped {$deletedMetrics} metrics rows and {$deletedConfigs} metric_configs for channels: " . implode(', ', $channels));
+                    $output->writeln("<info>✓ Wiped {$deletedMetrics} metrics rows and {$deletedConfigs} metric_configs.</info>");
+                } else {
+                    $logger->info("No channel IDs found for channels: " . implode(', ', $channels) . "; skipping metrics wipe.");
+                    $output->writeln("<comment>No registered channel records found; skipping metrics wipe.</comment>");
+                }
             } catch (\Throwable $e) {
                 $logger->error("DB error wiping metrics: " . $e->getMessage());
                 $output->writeln("<error>✗ DB error wiping metrics: " . $e->getMessage() . "</error>");
