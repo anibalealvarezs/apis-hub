@@ -490,29 +490,39 @@ class JobRepository extends BaseRepository
         $result = parent::update($id, $data, $returnEntity);
 
         if ($result) {
-            try {
-                $job = $this->find($id);
-                if ($job) {
-                    $redis = Helpers::getRedisClient();
-                    $cache = CacheService::getInstance($redis);
-                    $channel = $job->getChannel();
-                    $payload = $job->getPayload();
-                    $accountId = $payload['params']['account_id'] ?? null;
-
-                    $cache->delete('sync_telemetry:global');
-                    if ($channel) {
-                        $cache->delete('sync_telemetry:channel:'.$channel);
-                        if ($accountId) {
-                            $cache->delete('sync_telemetry:channel:'.$channel.':'.$accountId);
-                        }
-                    }
-                }
-            } catch (Throwable $e) {
-                // Silently fail cache invalidation
-            }
+            $this->invalidateTelemetryCache($id);
         }
 
         return $result;
+    }
+
+    /**
+     * Helper to invalidate telemetry caches for a job.
+     */
+    private function invalidateTelemetryCache(int|Job $jobOrId): void
+    {
+        try {
+            $job = is_int($jobOrId) ? $this->find($jobOrId) : $jobOrId;
+            if ($job) {
+                $redis = Helpers::getRedisClient();
+                $cache = CacheService::getInstance($redis);
+                $channel = $job->getChannel();
+                $payload = $job->getPayload();
+                $accountId = $payload['params']['account_id'] ?? $payload['account_id'] ?? null;
+
+                $cache->delete('sync_telemetry:global');
+                if ($channel) {
+                    $cache->delete('sync_telemetry:channel:'.$channel);
+                    if ($accountId) {
+                        $cleanAcc = str_replace('act_', '', (string)$accountId);
+                        $cache->delete('sync_telemetry:channel:'.$channel.':'.$accountId);
+                        $cache->delete('sync_telemetry:channel:'.$channel.':'.$cleanAcc);
+                    }
+                }
+            }
+        } catch (Throwable $e) {
+            // Silently fail cache invalidation
+        }
     }
 
     /**
@@ -544,7 +554,12 @@ class JobRepository extends BaseRepository
             ->getQuery()
             ->execute();
 
-        return (int)$updatedRows > 0;
+        $success = (int)$updatedRows > 0;
+        if ($success) {
+            $this->invalidateTelemetryCache($id);
+        }
+
+        return $success;
     }
 
     /**
@@ -1004,7 +1019,12 @@ class JobRepository extends BaseRepository
             if ($jobId) {
                 $this->_em->commit();
 
-                return $this->find($jobId);
+                $claimedJob = $this->find($jobId);
+                if ($claimedJob) {
+                    $this->invalidateTelemetryCache($claimedJob);
+                }
+
+                return $claimedJob;
             }
 
             if ($this->_em->getConnection()->isTransactionActive()) {

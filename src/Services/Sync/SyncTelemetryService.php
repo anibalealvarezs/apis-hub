@@ -18,7 +18,7 @@
     {
         private CacheService $cacheService;
         private const string CACHE_PREFIX = 'sync_telemetry:';
-        private const int DEFAULT_TTL = 86400; // 24 hours
+        private const int DEFAULT_TTL = 30; // 30 seconds for real-time telemetry freshness
 
         public function __construct(CacheService $cacheService)
         {
@@ -57,9 +57,13 @@
                 $conn = $em->getConnection();
                 $isPostgres = Helpers::isPostgres($em);
 
-                $jsonExtract = $isPostgres
+                $rawExtract = $isPostgres
                     ? "COALESCE(j.payload->>'account_id', j.payload->'params'->>'account_id', 'global')"
                     : "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(j.payload, '$.account_id')), JSON_UNQUOTE(JSON_EXTRACT(j.payload, '$.params.account_id')), 'global')";
+
+                $jsonExtract = $isPostgres
+                    ? "REGEXP_REPLACE($rawExtract, '^act_', '')"
+                    : "CASE WHEN $rawExtract LIKE 'act_%' THEN SUBSTRING($rawExtract, 5) ELSE $rawExtract END";
 
                 $isRecentJob = $isPostgres
                     ? "(j.payload->'params'->>'type' = 'recent')"
@@ -76,7 +80,7 @@
                         SUM(CASE WHEN status = :scheduled THEN 1 ELSE 0 END) as scheduled,
                         SUM(CASE WHEN status IN (:cancelled, :delayed) THEN 0 WHEN $isRecentJob AND status IN (:scheduled) THEN 0 ELSE 1 END) as total_for_percentage
                     FROM jobs j
-                    LEFT JOIN channeled_accounts ca ON ca.platform_id = $jsonExtract
+                    LEFT JOIN channeled_accounts ca ON (ca.platform_id = $jsonExtract OR ca.platform_id = 'act_' || $jsonExtract)
                     WHERE (ca.enabled IS NOT FALSE OR $jsonExtract = 'global')
                     GROUP BY j.channel, $jsonExtract
                 ";
@@ -99,16 +103,28 @@
                     }
 
                     $accId = ltrim(trim((string)$row['account_id'], '"'), '#');
+                    if (str_starts_with($accId, 'act_')) {
+                        $accId = substr($accId, 4);
+                    }
                     if ($accId === 'null' || ($accId === '' && $row['account_id'] !== 'global')) continue;
 
-                    $chanStats[$chan]['assets'][$accId] = [
-                        'total'      => (int)$row['total'],
-                        'total_for_percentage' => (int)$row['total_for_percentage'],
-                        'completed'  => (int)$row['completed'],
-                        'failed'     => (int)$row['failed'],
-                        'processing' => (int)$row['processing'],
-                        'scheduled'  => (int)$row['scheduled']
-                    ];
+                    if (!isset($chanStats[$chan]['assets'][$accId])) {
+                        $chanStats[$chan]['assets'][$accId] = [
+                            'total'                => 0,
+                            'total_for_percentage' => 0,
+                            'completed'            => 0,
+                            'failed'               => 0,
+                            'processing'           => 0,
+                            'scheduled'            => 0,
+                        ];
+                    }
+
+                    $chanStats[$chan]['assets'][$accId]['total'] += (int)$row['total'];
+                    $chanStats[$chan]['assets'][$accId]['total_for_percentage'] += (int)$row['total_for_percentage'];
+                    $chanStats[$chan]['assets'][$accId]['completed'] += (int)$row['completed'];
+                    $chanStats[$chan]['assets'][$accId]['failed'] += (int)$row['failed'];
+                    $chanStats[$chan]['assets'][$accId]['processing'] += (int)$row['processing'];
+                    $chanStats[$chan]['assets'][$accId]['scheduled'] += (int)$row['scheduled'];
                 }
 
                 // 3. Final formatting
@@ -189,9 +205,13 @@
                 $conn = $em->getConnection();
                 $isPostgres = Helpers::isPostgres($em);
 
-                $jsonExtract = $isPostgres
+                $rawExtract = $isPostgres
                     ? "COALESCE(j.payload->>'account_id', j.payload->'params'->>'account_id', 'global')"
                     : "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(j.payload, '$.account_id')), JSON_UNQUOTE(JSON_EXTRACT(j.payload, '$.params.account_id')), 'global')";
+
+                $jsonExtract = $isPostgres
+                    ? "REGEXP_REPLACE($rawExtract, '^act_', '')"
+                    : "CASE WHEN $rawExtract LIKE 'act_%' THEN SUBSTRING($rawExtract, 5) ELSE $rawExtract END";
 
                 $isRecentJob = $isPostgres
                     ? "(j.payload->>'instance_name' LIKE '%-recent' OR j.payload->'params'->>'type' = 'recent' OR j.payload->'params'->>'startDate' = '-3 days' OR j.payload->'params'->>'start_date' = '-3 days')"
@@ -207,7 +227,7 @@
                         SUM(CASE WHEN status = :scheduled THEN 1 ELSE 0 END) as scheduled,
                         SUM(CASE WHEN status IN (:cancelled, :delayed) THEN 0 WHEN $isRecentJob AND status IN (:scheduled) THEN 0 ELSE 1 END) as total_for_percentage
                     FROM jobs j
-                    LEFT JOIN channeled_accounts ca ON ca.platform_id = $jsonExtract
+                    LEFT JOIN channeled_accounts ca ON (ca.platform_id = $jsonExtract OR ca.platform_id = 'act_' || $jsonExtract)
                     WHERE j.channel = :channel AND (ca.enabled IS NOT FALSE OR $jsonExtract = 'global')
                 ";
 
@@ -222,8 +242,10 @@
                 ];
 
                 if ($targetAccountId) {
-                    $query .= " AND $jsonExtract = :account_id";
+                    $cleanTargetId = str_replace('act_', '', $targetAccountId);
+                    $query .= " AND ($jsonExtract = :account_id OR $jsonExtract = :clean_account_id)";
                     $params['account_id'] = $targetAccountId;
+                    $params['clean_account_id'] = $cleanTargetId;
                 }
 
                 $query .= " GROUP BY $jsonExtract";
@@ -234,16 +256,28 @@
                 $assets = [];
                 foreach ($rows as $row) {
                     $accId = ltrim(trim((string)$row['account_id'], '"'), '#');
+                    if (str_starts_with($accId, 'act_')) {
+                        $accId = substr($accId, 4);
+                    }
                     if ($accId === 'null' || ($accId === '' && $row['account_id'] !== 'global')) continue;
 
-                    $assets[$accId] = [
-                        'total'      => (int)$row['total'],
-                        'total_for_percentage' => (int)$row['total_for_percentage'],
-                        'completed'  => (int)$row['completed'],
-                        'failed'     => (int)$row['failed'],
-                        'processing' => (int)$row['processing'],
-                        'scheduled'  => (int)$row['scheduled']
-                    ];
+                    if (!isset($assets[$accId])) {
+                        $assets[$accId] = [
+                            'total'                => 0,
+                            'total_for_percentage' => 0,
+                            'completed'            => 0,
+                            'failed'               => 0,
+                            'processing'           => 0,
+                            'scheduled'            => 0,
+                        ];
+                    }
+
+                    $assets[$accId]['total'] += (int)$row['total'];
+                    $assets[$accId]['total_for_percentage'] += (int)$row['total_for_percentage'];
+                    $assets[$accId]['completed'] += (int)$row['completed'];
+                    $assets[$accId]['failed'] += (int)$row['failed'];
+                    $assets[$accId]['processing'] += (int)$row['processing'];
+                    $assets[$accId]['scheduled'] += (int)$row['scheduled'];
                 }
 
                 // 3. Format assets and calculate totals
@@ -277,16 +311,21 @@
                 // 4. Enrich with names from ChanneledAccount
                 if (!empty($platformIds)) {
                     try {
+                        $searchIds = array_unique(array_merge(
+                            $platformIds,
+                            array_map(fn($id) => 'act_'.$id, $platformIds)
+                        ));
                         $caRepo = $em->getRepository(ChanneledAccount::class);
                         $channeledAccounts = $caRepo->findBy([
                             'channel'    => $channelName,
-                            'platformId' => $platformIds
+                            'platformId' => $searchIds
                         ]);
                         foreach ($channeledAccounts as $ca) {
-                            $pId = $ca->getPlatformId();
-                            if (isset($formattedAssets[$pId])) {
-                                $formattedAssets[$pId]['name'] = $ca->getName();
-                                $formattedAssets[$pId]['enabled'] = $ca->isEnabled();
+                            $rawPid = (string)$ca->getPlatformId();
+                            $cleanPid = str_starts_with($rawPid, 'act_') ? substr($rawPid, 4) : $rawPid;
+                            if (isset($formattedAssets[$cleanPid])) {
+                                $formattedAssets[$cleanPid]['name'] = $ca->getName();
+                                $formattedAssets[$cleanPid]['enabled'] = $ca->isEnabled();
                             }
                         }
                     } catch (Throwable $e) {

@@ -56,24 +56,32 @@ class ScaleDownCommand extends Command
                 continue;
             }
 
-            // 2. Check for active/pending jobs
-            $pendingCount = $jobRepo->count([
-                'status' => [JobStatus::scheduled->value, JobStatus::processing->value, JobStatus::delayed->value],
-                'payload' => ['instance_name' => $name], // Note: Repository filter might need JSON support
-            ]);
+            // 2. Check for active/pending jobs directly matching the instance in payload
+            if (Helpers::isPostgres()) {
+                $sql = "SELECT COUNT(j.id) FROM jobs j 
+                        WHERE j.status IN (:scheduled, :processing, :delayed) 
+                        AND (CAST(j.payload AS JSONB)->>'instance_name' = :name OR CAST(j.payload AS text) LIKE :pattern)";
+                $activeJobsCount = (int)$this->em->getConnection()->fetchOne($sql, [
+                    'scheduled' => JobStatus::scheduled->value,
+                    'processing' => JobStatus::processing->value,
+                    'delayed' => JobStatus::delayed->value,
+                    'name' => $name,
+                    'pattern' => '%instance_name%' . $name . '%',
+                ]);
+            } else {
+                $qb = $this->em->createQueryBuilder();
+                $activeJobsCount = (int)$qb->select('COUNT(j.id)')
+                    ->from(Job::class, 'j')
+                    ->where('j.status IN (:statuses)')
+                    ->andWhere('j.payload LIKE :pattern')
+                    ->setParameter('statuses', [JobStatus::scheduled->value, JobStatus::processing->value, JobStatus::delayed->value])
+                    ->setParameter('pattern', '%instance_name%' . $name . '%')
+                    ->getQuery()
+                    ->getSingleScalarResult();
+            }
 
-            // If getByStatus is more reliable for JSON payload filtering:
-            $remaining = $jobRepo->getJobsByStatus(
-                status: JobStatus::scheduled->value,
-                instanceName: $name
-            );
-            $processing = $jobRepo->getJobsByStatus(
-                status: JobStatus::processing->value,
-                instanceName: $name
-            );
-
-            if (! empty($remaining) || ! empty($processing)) {
-                $output->writeln("<comment>Container {$name} is BUSY (" . (count($remaining) + count($processing)) . " jobs).</comment>");
+            if ($activeJobsCount > 0) {
+                $output->writeln("<comment>Container {$name} is BUSY ({$activeJobsCount} jobs pending/processing).</comment>");
 
                 continue;
             }
