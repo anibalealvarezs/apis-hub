@@ -268,3 +268,45 @@
 - **Cause**: Standard log rotation policies or scheduled cron tasks were likely overwriting or purging the fixed `aggregation-telemetry.jsonl` file.
 - **Fix**: Updated `AggregationTelemetryEventRecorder` to implement atomic daily file rotation by appending a date suffix (`aggregation-telemetry-YYYY-MM-DD.jsonl`) to the log path.
 - **Support**: Enhanced `ReportAggregationTelemetryCommand`'s `--input` flag to accept a directory as input, automatically discovering and concatenating multiple daily `.jsonl` files for aggregate snapshot generation without breaking backward file compatibility.
+
+### 2026-09-08 - Aggregation Filter Operators Enhancement (`not_in`, `like`)
+- **Context**: Added support for advanced widget series and breakdown filtering capabilities from APIs Hub Facade.
+- **Components**:
+    - `FilterConditionResolver`: Added operator normalization for `not_in`, `not in`, and `!in` returning `['operator' => 'not_in', 'value' => ...]`.
+    - `UniversalSqlStrategy`: Added `not_in` and `like` handling in `buildFilterClause()`.
+    - For `not_in`: Implemented array placeholder expansion with NULL safety (`($col IS NULL OR $col NOT IN (:param_0, ...))`) and guard against empty lists (`1 = 1`). Supported across relational entity columns, ad accounts, and EAV dimension values.
+    - For `like`: Added standard `$col LIKE :alias` clause generation and parameter binding.
+
+### 2026-09-25 - MCP Predefined Reference Library, Derived Metrics & Dashboards Architecture
+- **Reference Library Sync**: Facade's `PredefinedKpiRegistry` (40 KPIs) and `PredefinedDerivedMetricRegistry` (26 formulas) are embedded into `project_context.json` and served via `get_analytics_catalog` (`section: "predefined_kpis"` / `"predefined_derived_metrics"`).
+- **Execution Protocol Documentation**: Updated `mcp-server/index.js` `get_mcp_guide`:
+    - Added step 7 to `workflow` clearly explaining that agents evaluate complex/statistical AST formulas and Derived Metrics (DMs) by: (1) retrieving the formula/AST from the catalog or custom KPIs, (2) fetching constituent metrics via `summarize_performance`, and (3) computing the formula/operator over the returned series.
+    - Added dedicated guide topic `kpi_calculation` with copy-paste recipes for `search_position_efficiency_query` and `true_blended_marginal_cost`.
+    - Added dedicated guide topic `derived_metrics` clarifying the two tiers:
+        1. Built-in Server Aggregations (10 SQL formulas like spend, clicks, impressions, ctr, cpc, cpm, roas, position, sessions, conversions).
+        2. Reference Library AST Blueprints (26 DMs like cpa, cvr, click_position_efficiency, blended_cpc, aov, mer) that map channel placeholders (`__SEO_CHANNEL_1__`, `__SPENDABLE_CHANNEL_1__`) and evaluate ratios/operators across constituent series.
+    - Added dedicated guide topic `dashboards` explaining dashboard structure, widget sources (`metric`, `kpi`, `derived_metric`), visualization widget roles (`tile`, `line_chart`, `bar_chart`, `pie_chart`, `gauge`, `sparkline`, `scatter_plot`, `combo_chart`, `table`, `anomaly_chart`), and guidelines for autonomous agent synthesis.
+    - Updated `get_analytics_catalog` and `get_mcp_guide` tool schemas to include the new topic enums.
+    - Added dedicated guide topics `benchmarks`, `temporal_comparison` (PoP & YoY velocity analysis), and `funnel_decomposition` (MECE root-cause diagnostic trees for ROAS and SEO).
+    - Exposed `catalog.benchmarks` in `get_analytics_catalog` with section `benchmarks`.
+
+### 2026-10-01 - EventProcessor Schema Alignment and UniversalEntity Order Routing
+- **EventProcessor SQL Schema**:
+    - Fixed PostgreSQL schema mismatch in `Classes\EventProcessor::processEvents()`. Table `channeled_events` does not have `name` or `type` columns; columns are `platform_id`, `event_id`, `channeled_account_id`, `channel`, `data`, `created_at`, `updated_at`.
+    - Added channel resolution logic for string channel names to integer channel IDs via `Channel` repository lookup.
+    - Updated unique constraint conflict columns to `['platform_id', 'channeled_account_id']` and update columns to `['event_id', 'channel', 'data', 'updated_at']`.
+- **SyncService UniversalEntity Routing**:
+    - Added `order`, `orders`, and `channeled_order` cases to `SyncService::processUniversalEntity()` dispatching to `Classes\OrderProcessor::processOrders()`.
+
+### 2026-10-02 - Email & Messaging Metric Aggregation Resolution
+- **CanonicalMetricSqlResolver & MetricDefaultFormulaBuilder**:
+    - Added `sends`, `opens`, `bounces`, `unsubscribes`, and `orders` to `CanonicalMetricSqlResolver::SUPPORTED_CANONICAL_METRICS` and mapped them to SUM expressions.
+    - Added default formulas for `sends`, `opens`, `bounces`, `unsubscribes`, and `orders` in `MetricDefaultFormulaBuilder`.
+    - Resolved Mailchimp metrics via driver dictionary without triggering `missing_metric_equivalence_in_universal` or `missing_reducer_strategy`.
+
+### 2026-10-06 - Campaign Type Filtering Parity in UniversalSqlStrategy
+- **UniversalSqlStrategy Relation Filtering Fix**:
+    - Fixed `SQLSTATE[22P02]: Invalid text representation` when filtering on relational table attributes or string arrays (e.g., `campaignType IN ('automation', 'automation-email')`).
+    - Previously, if `$condition['value']` was an array of strings, `$isNonNumericString` evaluated to `false`, causing the query planner to mistakenly generate `mc.channeled_campaign_id IN ('automation', 'automation-email')` which failed PostgreSQL integer casting.
+    - Updated condition check in `UniversalSqlStrategy` to check for `isAttribute` or non-numeric string arrays, properly joining the relation table (e.g. `channeled_campaigns rcc`) and filtering on `$alias.{$map['field']}` (e.g. `rcc.type IN (...)`).
+

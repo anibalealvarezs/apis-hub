@@ -52,7 +52,7 @@
             $filtersArr = $this->normalizeFilters($filters);
             $groupPattern = $this->resolveGroupPattern($groupBy);
             $filterOperators = $this->collectFilterOperators($filtersArr);
-            $unsupportedFilterOperators = array_values(array_diff($filterOperators, ['eq', 'neq', 'is_null', 'is_not_null']));
+            $unsupportedFilterOperators = array_values(array_diff($filterOperators, ['eq', 'neq', 'is_null', 'is_not_null', 'like', 'not_like', 'in', 'not_in']));
             $reducerAnalysis = $this->analyzeReducers($aggregations, $isMetric || $isChanneledMetric);
 
             $requestedPeriod = null;
@@ -526,6 +526,9 @@
             if (in_array($op, ['not_equal', 'not_eq', 'neq', '!=', '<>'], true)) {
                 return 'neq';
             }
+            if (in_array($op, ['not_like', 'not like', '!like'], true)) {
+                return 'not_like';
+            }
             if (in_array($op, ['equal', 'eq', '='], true)) {
                 return 'eq';
             }
@@ -611,6 +614,12 @@
             foreach ($filters as $value) {
                 if (is_object($value)) {
                     $operators[] = strtolower(trim($value->operator ?? 'eq'));
+                    continue;
+                }
+
+                if (is_array($value) && array_key_exists('operator', $value)) {
+                    $op = strtolower(trim((string)$value['operator']));
+                    $operators[] = $op !== '' ? $op : 'eq';
                     continue;
                 }
 
@@ -853,7 +862,7 @@
             if (count($normalized) === 1) {
                 $field = $normalized[0];
                 $rawField = $rawFields[0];
-                if (in_array($field, ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'], true)) {
+                if (in_array($field, ['daily', 'weekly', 'monthly', 'quarterly', 'semiannual', 'yearly', 'annually', 'trailing_weekly', 'trailing_monthly', 'trailing_quarterly', 'trailing_semiannual', 'trailing_annually', 'trailing_yearly'], true)) {
                     return $field;
                 }
 
@@ -876,7 +885,9 @@
 
             $knownFields = [
                 'query', 'page', 'page_id', 'page_title', 'page_platform_id',
-                'country', 'device', 'daily', 'age', 'gender',
+                'country', 'device', 'daily', 'weekly', 'monthly', 'quarterly', 'semiannual', 'yearly', 'annually',
+                'trailing_weekly', 'trailing_monthly', 'trailing_quarterly', 'trailing_semiannual', 'trailing_annually', 'trailing_yearly',
+                'age', 'gender',
                 'ad', 'ad_id', 'adgroup', 'adgroup_id', 'account', 'campaign',
                 'channeledaccount', 'channeled_account_id', 'linked_fb_page_id', 'linked_platform_entity_id',
                 'caption', 'created_time', 'media_type', 'message', 'permalink',
@@ -889,6 +900,31 @@
                 return implode('+', $normalized);
             }
 
+            $temporalFields = [
+                'daily', 'weekly', 'monthly', 'quarterly', 'semiannual', 'yearly', 'annually',
+                'trailing_weekly', 'trailing_monthly', 'trailing_quarterly', 'trailing_semiannual', 'trailing_annually', 'trailing_yearly',
+            ];
+            $entityFields = array_values(array_diff($knownFields, $temporalFields));
+
+            // Handle combination of known entity fields (excluding temporal) with dimension fields (e.g. ['query', 'dimensions.intent'])
+            $hasEntityAndDimension = count($rawFields) >= 2
+                && array_reduce($rawFields, static function (bool $carry, string $field) use ($entityFields): bool {
+                    $lower = strtolower($field);
+                    return $carry && (in_array($lower, $entityFields, true) || (str_starts_with($lower, 'dimensions.') && strlen($field) > 11));
+                }, true);
+            if ($hasEntityAndDimension) {
+                $combined = array_map(static function (string $field) use ($entityFields): string {
+                    $lower = strtolower($field);
+                    if (in_array($lower, $entityFields, true)) {
+                        return $lower;
+                    }
+                    return 'dimensions.' . substr($field, 11);
+                }, $rawFields);
+                usort($combined, static fn(string $left, string $right): int => strcmp(strtolower($left), strtolower($right)));
+
+                return implode('+', $combined);
+            }
+
             return null;
         }
 
@@ -897,8 +933,12 @@
          */
         private function hasTemporalGrouping(array $groupBy): bool
         {
+            $temporal = [
+                'daily', 'weekly', 'monthly', 'quarterly', 'semiannual', 'yearly', 'annually',
+                'trailing_weekly', 'trailing_monthly', 'trailing_quarterly', 'trailing_semiannual', 'trailing_annually', 'trailing_yearly',
+            ];
             foreach ($groupBy as $field) {
-                if (in_array(strtolower($field), ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'], true)) {
+                if (in_array(strtolower($field), $temporal, true)) {
                     return true;
                 }
             }

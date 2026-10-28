@@ -29,25 +29,28 @@ const APIS_HUB_ROOT = path.resolve(__dirname, "..");
  * otherwise execute directly (useful for different environments).
  */
 async function runCliCommand(command) {
-  // Prefix with docker compose if we are on the host machine
-  const dockerPrefix =
-    "docker compose exec -T facebook-marketing-entities-sync";
-  const fullCommand = `${dockerPrefix} ${command}`;
-
   try {
-    const { stdout } = await execAsync(fullCommand, {
+    const { stdout, stderr } = await execAsync(command, {
       cwd: APIS_HUB_ROOT,
     });
-    return stdout;
-  } catch (error) {
-    // Fallback to direct execution if docker fails (e.g. not running or already inside container)
+    return stdout || stderr;
+  } catch (directError) {
+    if (directError.stdout || directError.stderr) {
+      return (directError.stdout || "") + "\n" + (directError.stderr || "");
+    }
+    const dockerPrefix = "docker compose exec -T master";
+    const fullCommand = `${dockerPrefix} ${command}`;
+
     try {
-      const { stdout } = await execAsync(command, {
+      const { stdout, stderr } = await execAsync(fullCommand, {
         cwd: APIS_HUB_ROOT,
       });
-      return stdout;
+      return stdout || stderr;
     } catch (innerError) {
-      throw new Error(`Command failed: ${innerError.message}`);
+      if (innerError.stdout || innerError.stderr) {
+        return (innerError.stdout || "") + "\n" + (innerError.stderr || "");
+      }
+      throw new Error(`Command failed: ${directError.message || innerError.message}`);
     }
   }
 }
@@ -55,7 +58,389 @@ async function runCliCommand(command) {
 // Load .env relative to project root
 dotenv.config({ path: path.join(APIS_HUB_ROOT, ".env") });
 
-function createMcpServer() {
+/**
+ * Authentication and Security Middleware Helper
+ * Extracts API key from Bearer token, custom headers, or query parameters.
+ */
+function extractAuth(req) {
+  let token = null;
+
+  // 1. Authorization: Bearer <key>
+  const authHeader = req.headers["authorization"] || req.headers["Authorization"];
+  if (authHeader && typeof authHeader === "string") {
+    const parts = authHeader.split(" ");
+    if (parts.length === 2 && /^Bearer$/i.test(parts[0])) {
+      token = parts[1];
+    } else {
+      token = authHeader;
+    }
+  }
+
+  // 2. Custom headers: X-API-Key or X-Admin-API-Key
+  if (!token) {
+    token = req.headers["x-api-key"] || req.headers["x-admin-api-key"] || req.headers["api-key"];
+  }
+
+  // 3. Query string fallback: key, api_key, token
+  if (!token && req.query) {
+    token = req.query.key || req.query.api_key || req.query.token;
+  }
+
+  if (Array.isArray(token)) token = token[0];
+  if (token) token = token.trim();
+
+  const adminKey = (process.env.ADMIN_API_KEY || "").trim();
+  const appKey = (process.env.APP_API_KEY || "").trim();
+
+  // If no keys configured in .env, default to admin for development safety
+  if (!adminKey && !appKey) {
+    return { authenticated: true, role: "admin", key: token || "dev-unrestricted" };
+  }
+
+  if (token && adminKey && token === adminKey) {
+    return { authenticated: true, role: "admin", key: token };
+  }
+
+  if (token && appKey && token === appKey) {
+    return { authenticated: true, role: "user", key: token, userContext: null };
+  }
+
+  // 4. Validate against user-scoped API keys (config/user_keys.json)
+  try {
+    const userKeysPath = path.join(APIS_HUB_ROOT, "config", "user_keys.json");
+    if (fs.existsSync(userKeysPath)) {
+      const rawUserKeys = fs.readFileSync(userKeysPath, "utf-8");
+      const userKeys = JSON.parse(rawUserKeys);
+      if (Array.isArray(userKeys)) {
+        const matchingUser = userKeys.find(
+          (u) => u.api_key && u.api_key.trim() === token
+        );
+        if (matchingUser) {
+          return {
+            authenticated: true,
+            role: "user",
+            key: token,
+            userContext: {
+              userId: matchingUser.user_id,
+              userName: matchingUser.name,
+              allowedAssetGroups: matchingUser.allowed_asset_groups || [],
+              allowedAssets: matchingUser.allowed_assets || {},
+            },
+          };
+        }
+      }
+    }
+  } catch (err) {
+    console.error(`[AUTH] Error reading config/user_keys.json: ${err.message}`);
+  }
+
+  return { authenticated: false, role: null, key: token, userContext: null };
+}
+
+/**
+ * Sliding Window In-Memory Rate Limiter
+ * Default: 60 requests per minute per key/IP to prevent agent swarm abuse.
+ */
+const rateLimitMap = new Map();
+const RATE_LIMIT_WINDOW_MS = 60 * 1000;
+const MAX_REQUESTS_PER_WINDOW = 60;
+
+function checkRateLimit(identifier) {
+  const now = Date.now();
+  const record = rateLimitMap.get(identifier) || { count: 0, resetTime: now + RATE_LIMIT_WINDOW_MS };
+
+  if (now > record.resetTime) {
+    record.count = 1;
+    record.resetTime = now + RATE_LIMIT_WINDOW_MS;
+  } else {
+    record.count += 1;
+  }
+
+  rateLimitMap.set(identifier, record);
+
+  const remaining = Math.max(0, MAX_REQUESTS_PER_WINDOW - record.count);
+  const resetInSec = Math.ceil((record.resetTime - now) / 1000);
+  const exceeded = record.count > MAX_REQUESTS_PER_WINDOW;
+
+  return { exceeded, remaining, resetInSec };
+}
+
+// Memory Cache for heavy aggregation responses (TTL: 10 mins)
+const aggregationCache = new Map();
+const CACHE_TTL_MS = 10 * 60 * 1000;
+
+function getCachedAggregation(cacheKey) {
+  const item = aggregationCache.get(cacheKey);
+  if (!item) return null;
+  if (Date.now() > item.expiresAt) {
+    aggregationCache.delete(cacheKey);
+    return null;
+  }
+  return item.data;
+}
+
+function setCachedAggregation(cacheKey, data) {
+  aggregationCache.set(cacheKey, {
+    data,
+    expiresAt: Date.now() + CACHE_TTL_MS,
+  });
+}
+
+/**
+ * Tool Definitions Segregated by Role
+ */
+const USER_TOOLS = [
+  {
+    name: "get_mcp_guide",
+    description:
+      "Comprehensive interaction guide and usage specifications for AI agents connecting to this APIs Hub MCP node. Explains data discovery, filtering by connected assets, temporal/dimensional breakdowns, data scopes, error prevention, and copy-paste ready query patterns.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        topic: {
+          type: "string",
+          description:
+            "Optional: Specific guide topic ('overview', 'workflow', 'assets', 'datascopes', 'scopes', 'filters', 'breakdowns', 'formulas', 'examples')",
+          enum: [
+            "overview",
+            "workflow",
+            "assets",
+            "datascopes",
+            "scopes",
+            "filters",
+            "breakdowns",
+            "formulas",
+            "kpi_calculation",
+            "derived_metrics",
+            "dashboards",
+            "benchmarks",
+            "temporal_comparison",
+            "funnel_decomposition",
+            "examples"
+          ]
+        }
+      }
+    }
+  },
+  {
+    name: "list_connected_assets",
+    description:
+      "List all connected accounts, web properties, ad profiles, and stores linked to this project node. Returns asset IDs, display names, channels, and platform identifiers needed to formulate asset-scoped queries in summarize_performance.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        channel: {
+          type: "string",
+          description:
+            "Optional: Filter connected assets by channel (e.g. 'google_search_console', 'google_analytics', 'facebook_marketing', 'shopify', 'klaviyo', 'mailchimp', 'amazon', 'tiktok')"
+        }
+      }
+    }
+  },
+  {
+    name: "get_analytics_catalog",
+    description:
+      "Introspect and discover the full analytics capabilities of APIs Hub. Returns data scopes (scope_global, scope_channel, scope_asset), supported channels and tags, canonical metrics, formula-based derived metrics, allowed temporal/non-temporal breakdowns, and the platform-wide reference library of predefined KPIs and Derived Metrics. Use these reference formulas and AST templates as blueprints to query constituent metrics via 'summarize_performance' and evaluate composite KPIs.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        section: {
+          type: "string",
+          description: "Optional: Specific catalog section to inspect ('reference_library', 'predefined_kpis', 'predefined_derived_metrics', 'benchmarks', 'data_scopes', 'canonical_metrics', 'derived_formulas')",
+          enum: ["reference_library", "predefined_kpis", "predefined_derived_metrics", "benchmarks", "data_scopes", "canonical_metrics", "derived_formulas"]
+        },
+        scope: {
+          type: "string",
+          description: "Optional: Filter catalog by data scope ('global', 'channel', 'asset')",
+          enum: ["global", "channel", "asset"]
+        },
+        channel: {
+          type: "string",
+          description: "Optional: Channel identifier to inspect specific capabilities (e.g. 'facebook_marketing', 'google_search_console', 'shopify', 'klaviyo', 'amazon', 'tiktok')"
+        }
+      }
+    }
+  },
+  {
+    name: "list_custom_kpis",
+    description:
+      "List the custom KPIs and calculated derived metrics specifically defined for this project. Returns KPI names, calculation formulas (AST / math expression), descriptions, and filtering criteria.",
+    inputSchema: {
+      type: "object",
+      properties: {}
+    }
+  },
+  {
+    name: "list_project_dashboards",
+    description:
+      "List all configured project dashboards and their constituent widgets. Returns dashboard names, layout, widget titles, selected metrics/KPIs, source channels, and visualization controls so agents can answer questions regarding active dashboards.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        dashboard_id: {
+          type: "number",
+          description: "Optional: Specific dashboard ID to inspect its detailed widget configurations"
+        }
+      }
+    }
+  },
+  {
+    name: "list_configured_alerts",
+    description:
+      "List active threshold alerts, schedule triggers, and monitoring rules configured in the project. Returns alert names, source metrics, upper/lower limit thresholds, and schedule evaluation status.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        alert_id: {
+          type: "number",
+          description: "Optional: Specific alert ID to inspect"
+        }
+      }
+    }
+  },
+  {
+    name: "summarize_performance",
+    description:
+      "Get aggregated performance data using Channeled Metrics and intelligent formulas (spend, clicks, ctr, cpc, cpm, roas, position, etc). Matches widget capabilities, supporting multiple data scopes, breakdowns (daily, weekly, monthly, dimensional), advanced filters, and asset group isolation.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        entity: {
+          type: "string",
+          description:
+            "The entity name (use 'channeled_metric' for performance data)",
+          default: "channeled_metric"
+        },
+        channel: {
+          type: "string",
+          description:
+            "The channel identifier (e.g. 'google_search_console', 'google_analytics', 'facebook_marketing', 'facebook_organic', 'shopify', 'klaviyo', 'mailchimp', 'amazon', 'tiktok')",
+        },
+        scope: {
+          type: "string",
+          description:
+            "Data scope for calculation: 'global' (cross-channel / blended), 'channel' (single provider/channel), or 'asset' (specific ad account, store, or property)",
+          enum: ["global", "channel", "asset"]
+        },
+        aggregations: {
+          type: "object",
+          description:
+            "Object mapping alias to formula or canonical metric. Available formulas: 'spend', 'clicks', 'impressions', 'reach', 'results', 'ctr', 'cpc', 'cpm', 'roas', 'cost_per_result', 'result_rate', 'position', 'sessions', 'conversions', 'conversion_rate', 'bounce_rate'. e.g. {\"total_spend\":\"spend\",\"blended_roas\":\"roas\",\"avg_cpc\":\"cpc\"}",
+        },
+        filters: {
+          type: "object",
+          description:
+            'Optional: Object containing filters or dimensions. e.g. {"channeledAccount":"2", "device":"desktop", "country":"US"}',
+        },
+        groupBy: {
+          type: "string",
+          description:
+            "Comma separated fields to group by. Supports temporal granularities ('daily', 'weekly', 'monthly', 'quarterly', 'yearly') and dimensional breakdowns ('device', 'country', 'query', 'page', 'dimensions.*').",
+        },
+        startDate: { type: "string", description: "Start date in format Y-m-d" },
+        endDate: { type: "string", description: "End date in format Y-m-d" },
+      },
+      required: ["entity", "aggregations"],
+    },
+  },
+  {
+    name: "check_coverage",
+    description:
+      "Analyze data gap coverage for a specific channel (e.g. facebook_marketing, google_search_console)",
+    inputSchema: {
+      type: "object",
+      properties: {
+        channel: {
+          type: "string",
+          description: "The channel identifier",
+        },
+        days: {
+          type: "number",
+          description:
+            "Optional: Number of days to look back (default 30)",
+          default: 30,
+        },
+      },
+      required: ["channel"],
+    },
+  },
+  {
+    name: "get_available_instances",
+    description:
+      "List configured sync instances and their active status",
+    inputSchema: {
+      type: "object",
+      properties: {},
+    },
+  },
+];
+
+const ADMIN_TOOLS = [
+  ...USER_TOOLS,
+  {
+    name: "get_system_health",
+    description:
+      "Comprehensive diagnostic health check of the APIs Hub worker infrastructure, queue workers, Redis and databases",
+    inputSchema: {
+      type: "object",
+      properties: {},
+    },
+  },
+  {
+    name: "trigger_instance_sync",
+    description: "Manually schedule and dispatch initial jobs for an instance",
+    inputSchema: {
+      type: "object",
+      properties: {
+        instance_name: {
+          type: "string",
+          description:
+            "The name of the instance to trigger (e.g. facebook-marketing-recent)",
+        },
+      },
+      required: ["instance_name"],
+    },
+  },
+  {
+    name: "process_jobs",
+    description: "Manually execute pending job queue batch via worker CLI",
+    inputSchema: {
+      type: "object",
+      properties: {},
+    },
+  },
+  {
+    name: "inspect_job_queue",
+    description:
+      "Inspect current job queue metrics (scheduled, pending, failed, completed)",
+    inputSchema: {
+      type: "object",
+      properties: {},
+    },
+  },
+  {
+    name: "log_analyzer",
+    description:
+      "Scan server logs for recent exceptions, tracebacks or critical anomalies",
+    inputSchema: {
+      type: "object",
+      properties: {
+        limit: {
+          type: "number",
+          description: "Max errors to show per log file",
+          default: 5,
+        },
+        hours: {
+          type: "number",
+          description: "Look back timeframe in hours",
+          default: 24,
+        },
+      },
+    },
+  },
+];
+
+function createMcpServer(role = "admin", userContext = null) {
   const server = new Server(
     {
       name: "apis-hub-mcp",
@@ -68,6 +453,8 @@ function createMcpServer() {
       },
     },
   );
+
+  const activeTools = role === "admin" ? ADMIN_TOOLS : USER_TOOLS;
 
   /**
    * Resources
@@ -91,195 +478,7 @@ function createMcpServer() {
     };
   });
 
-  server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
-    const uri = request.params.uri;
-
-    if (uri === "apis-hub://config/instances") {
-      const filePath = path.join(APIS_HUB_ROOT, "config", "instances.yaml");
-      if (!fs.existsSync(filePath)) {
-        return {
-          contents: [{ uri, mimeType: "text/yaml", text: "File not found." }],
-        };
-      }
-      const content = fs.readFileSync(filePath, "utf-8");
-      return {
-        contents: [
-          {
-            uri,
-            mimeType: "text/yaml",
-            text: content,
-          },
-        ],
-      };
-    }
-
-    if (uri === "apis-hub://logs/recent") {
-      const logPath = path.join(APIS_HUB_ROOT, "logs", "jobs.log");
-      if (!fs.existsSync(logPath)) {
-        return {
-          contents: [
-            { uri, mimeType: "text/plain", text: "Log file not found." },
-          ],
-        };
-      }
-      const content = fs.readFileSync(logPath, "utf-8");
-      const lines = content.split("\n").slice(-50).join("\n");
-      return {
-        contents: [
-          {
-            uri,
-            mimeType: "text/plain",
-            text: lines,
-          },
-        ],
-      };
-    }
-
-    throw new Error(`Resource not found: ${uri}`);
-  });
-
-  /**
-   * Tools
-   */
-  server.setRequestHandler(ListToolsRequestSchema, async () => {
-    return {
-      tools: [
-        {
-          name: "get_system_health",
-          description:
-            "Get a comprehensive health check of the APIs Hub infrastructure",
-          inputSchema: {
-            type: "object",
-            properties: {},
-          },
-        },
-        {
-          name: "trigger_instance_sync",
-          description: "Trigger a manual sync for a specific instance",
-          inputSchema: {
-            type: "object",
-            properties: {
-              instance_name: {
-                type: "string",
-                description:
-                  "The name of the instance to trigger (e.g. facebook-marketing-recent)",
-              },
-            },
-            required: ["instance_name"],
-          },
-        },
-        {
-          name: "check_coverage",
-          description:
-            "Analyze data gaps for a specific channel (e.g. facebook_marketing, gsc)",
-          inputSchema: {
-            type: "object",
-            properties: {
-              channel: {
-                type: "string",
-                description: "The channel identifier",
-              },
-              days: {
-                type: "number",
-                description:
-                  "Optional: Number of days to look back (default 30)",
-                default: 30,
-              },
-            },
-            required: ["channel"],
-          },
-        },
-        {
-          name: "process_jobs",
-          description: "Manually trigger the job processing command",
-          inputSchema: {
-            type: "object",
-            properties: {},
-          },
-        },
-        {
-          name: "inspect_job_queue",
-          description:
-            "Get detailed statistics about current jobs (scheduled, failed, completed)",
-          inputSchema: {
-            type: "object",
-            properties: {},
-          },
-        },
-        {
-          name: "log_analyzer",
-          description:
-            "Scan system logs for recent errors or critical failures",
-          inputSchema: {
-            type: "object",
-            properties: {
-              limit: {
-                type: "number",
-                description: "Max errors to show per log file",
-                default: 5,
-              },
-              hours: {
-                type: "number",
-                description: "Look back timeframe in hours",
-                default: 24,
-              },
-            },
-          },
-        },
-        {
-          name: "summarize_performance",
-          description:
-            "Get aggregated performance data using Channeled Metrics and intelligent formulas (spend, clicks, ctr, etc).",
-          inputSchema: {
-            type: "object",
-            properties: {
-              entity: {
-                type: "string",
-                description:
-                  "The entity name (use 'channeled_metric' for performance data)",
-              },
-              channel: {
-                type: "string",
-                description:
-                  "The channel identifier (e.g. 'google_search_console', 'facebook')",
-              },
-              aggregations: {
-                type: "object",
-                description:
-                  "Object mapping alias to formula. Formulas: 'spend', 'clicks', 'impressions', 'reach', 'results', 'ctr', 'cpc', 'cpm', 'roas', 'cost_per_result', 'result_rate', 'position'. e.g. {\"total_spend\":\"spend\"}",
-              },
-              filters: {
-                type: "object",
-                description:
-                  'Optional: Object containing filters. e.g. {"dimensions.gender":"male"}',
-              },
-              groupBy: {
-                type: "string",
-                description:
-                  "Comma separated fields to group by (e.g. 'daily', 'weekly', 'dimensions.gender')",
-              },
-              startDate: { type: "string", description: "Start date (Y-m-d)" },
-              endDate: { type: "string", description: "End date (Y-m-d)" },
-            },
-            required: ["entity", "aggregations"],
-          },
-        },
-        {
-          name: "get_available_instances",
-          description:
-            "List all configured worker instances from instances.yaml",
-          inputSchema: {
-            type: "object",
-            properties: {},
-          },
-        },
-      ],
-    };
-  });
-
-  server.setRequestHandler(CallToolRequestSchema, async (request) => {
-    const { name, arguments: args } = request.params;
-
+  async function executeToolCall(name, args = {}) {
     if (name === "get_system_health") {
       try {
         const stdout = await runCliCommand("php bin/cli.php app:health-check");
@@ -327,6 +526,14 @@ function createMcpServer() {
 
     if (name === "check_coverage") {
       const { channel, days = 30 } = args;
+      if (!channel) {
+        return {
+          content: [
+            { type: "text", text: "Error: The 'channel' parameter is required for check_coverage (e.g. 'google_search_console', 'facebook_marketing', 'shopify', 'klaviyo')." }
+          ],
+          isError: true
+        };
+      }
       try {
         const stdout = await runCliCommand(
           `php bin/cli.php app:check-coverage --channel="${channel}" --days=${days}`,
@@ -373,10 +580,964 @@ function createMcpServer() {
       }
     }
 
+    if (name === "get_mcp_guide") {
+      const { topic = "overview" } = args;
+
+      const guideSections = {
+        overview: {
+          title: "APIs Hub MCP Server — System Architecture & Interaction Overview",
+          summary: "This MCP server bridges LLMs and Autonomous Agents directly to the high-performance OLAP and data aggregation engine of APIs Hub.",
+          key_principles: [
+            "1. Three-Tier Analytics Hierarchy: Always choose the appropriate data scope ('global', 'channel', or 'asset').",
+            "2. Read-Only Safety: All analytics tools are non-destructive and optimized with in-memory deterministic caching.",
+            "3. Asset Discovery First: Never guess asset IDs. Call 'list_connected_assets' to discover the exact IDs and channels available.",
+            "4. Formula Normalization: Metrics (spend, clicks, impressions, ctr, cpc, cpm, roas, position, sessions) are computed uniformly across Meta, Google, Shopify, Klaviyo, Amazon, and TikTok."
+          ],
+          available_topics: ["overview", "workflow", "assets", "filters", "scopes", "breakdowns", "formulas", "kpi_calculation", "derived_metrics", "dashboards", "benchmarks", "temporal_comparison", "funnel_decomposition", "examples"]
+        },
+        workflow: {
+          title: "Recommended Agent Workflow",
+          steps: [
+            {
+              step: 1,
+              tool: "list_connected_assets",
+              purpose: "Discover active accounts, websites, properties, and ad accounts linked to the project, noting their integer 'id' and 'channel'."
+            },
+            {
+              step: 2,
+              tool: "get_analytics_catalog",
+              purpose: "Inspect available canonical metrics, derived formulas, channel datascopes, valid breakdowns, and the platform-wide reference library of predefined KPIs and Derived Metrics for analytical inspiration."
+            },
+            {
+              step: 3,
+              tool: "list_custom_kpis",
+              purpose: "Check if the project has user-defined custom KPIs or formula AST expressions configured."
+            },
+            {
+              step: 4,
+              tool: "list_project_dashboards",
+              purpose: "Inspect active dashboards, widget definitions, chart types, source bindings, and visual layouts configured for this project."
+            },
+            {
+              step: 5,
+              tool: "list_configured_alerts",
+              purpose: "Review active monitoring threshold alerts, scheduled evaluations, and anomaly limits."
+            },
+            {
+              step: 6,
+              tool: "summarize_performance",
+              purpose: "Run targeted aggregation queries passing discovered asset IDs into 'filters: { channeledAccount: \"<id>\" }' or 'groupBy'."
+            },
+            {
+              step: 7,
+              tool: "kpi_and_derived_metric_evaluation",
+              purpose: "To calculate or evaluate Predefined KPIs, Custom KPIs, or Derived Metrics (DMs): (1) inspect the AST / source_series via 'get_analytics_catalog' or 'list_custom_kpis', (2) fetch the constituent base metrics using 'summarize_performance' with matching filters and breakdowns, and (3) perform the mathematical operator or regression calculation over the returned series."
+            }
+          ]
+        },
+        kpi_calculation: {
+          title: "How Autonomous Agents Execute KPI & AST Formula Calculations",
+          architecture_principle: "APIs Hub decouples raw OLAP data aggregation from virtual metric computation. While standard metrics (spend, clicks, impressions, ctr, cpc, cpm, roas, position, sessions, conversions) are aggregated server-side via 'summarize_performance', complex statistical KPIs (regressions, elasticities, MACD momentum, Granger causality, and multi-channel AST combinations) are designed to be calculated by AI agents using constituent data streams.",
+          three_step_execution_recipe: [
+            "Step 1 (Inspect Formula): Call 'get_analytics_catalog' (with section='predefined_kpis' or 'predefined_derived_metrics') or 'list_custom_kpis' to obtain the KPI's AST (Abstract Syntax Tree), calculation_type, and constituent metrics.",
+            "Step 2 (Fetch Constituents): For each metric in the AST, call 'summarize_performance' specifying the appropriate channel, scope ('global', 'channel', 'asset'), asset filter, and groupBy (e.g., 'daily', 'query', 'page').",
+            "Step 3 (Execute Math / Statistical Evaluation): Apply the AST operator ('+', '-', '*', '/', 'ratio') or statistical model (linear regression slope, moving average, percent change) across the aligned data points."
+          ],
+          concrete_example_search_position_efficiency: {
+            kpi: "search_position_efficiency_query",
+            ast_logic: "clicks / position grouped by query",
+            agent_execution: "Call 'summarize_performance' with channel='google_search_console', aggregations={ clicks: 'clicks', avg_position: 'position' }, groupBy='query'. In the returned dataset, for each query calculate efficiency = clicks / avg_position. Queries with the highest ratio yield maximum click capture per ranking rank."
+          },
+          concrete_example_cross_channel_marginal_cost: {
+            kpi: "true_blended_marginal_cost",
+            ast_logic: "(spend_ch1 + spend_ch2) / (clicks_ch1 + clicks_ch2)",
+            agent_execution: "Call 'summarize_performance' with scope='global', aggregations={ total_spend: 'spend', total_clicks: 'clicks' }, groupBy='daily'. For each day or total, calculate blended_marginal_cost = total_spend / total_clicks."
+          }
+        },
+        assets: {
+          title: "Asset Identification & Filtering Protocol",
+          explanation: "In APIs Hub, connected entities (GSC web properties, GA4 analytics streams, Meta ad accounts, Shopify stores, Klaviyo accounts) are called 'Assets' or 'Channeled Accounts'.",
+          rules: [
+            "Asset IDs are integers (e.g. 2, 46, 12).",
+            "When querying a specific asset in 'summarize_performance', pass the ID in the filters object using either 'channeledAccount' or 'account_id'. Example: filters: { \"channeledAccount\": \"2\" }.",
+            "If the user asks about a client or domain (e.g. 'marcelacrodriguez.com'), run 'list_connected_assets' first to find matching IDs."
+          ]
+        },
+        datascopes: {
+          title: "Channel-Specific Datascopes & Dimension Orthogonality",
+          critical_rule: "Each marketing and analytics channel in APIs Hub possesses exclusive, non-overlapping datascopes. Mixing metrics or dimensions across different scopes within the same channel produces ambiguous cross-joins or duplicate row counting.",
+          channels: {
+            google_search_console: {
+              scopes: {
+                "non-searchAppearance (default / standard)": {
+                  description: "Standard web search performance metrics. Safe to cross with query, dimensions.page, country, device.",
+                  enforced_filter: '{ "dimensions.searchAppearance": "standard" }',
+                  explanation: "Google Search Console stores impressions separated by searchAppearance. If you do not filter to 'standard' (or group by dimensions.searchAppearance), metrics will double count because multiple feature rows exist for identical queries."
+                },
+                "searchAppearance": {
+                  description: "Performance by Google Search feature (AMP, Good Page Experience, Merchant Listings, Review Snippets, Video).",
+                  required_group_or_filter: 'groupBy: "dimensions.searchAppearance" or filters: { "dimensions.searchAppearance": { "operator": "not_equal", "value": "standard" } }'
+                }
+              }
+            },
+            google_analytics_ga4: {
+              scopes: {
+                "traffic_matrix (session scope)": {
+                  description: "Traffic, visits, and engagement acquired in each session.",
+                  metrics: ["sessions", "bounce_rate", "average_session_duration", "engaged_sessions"],
+                  dimensions: ["dimensions.sessionDefaultChannelGroup", "dimensions.sessionSourceMedium", "dimensions.landing_page", "device", "country"]
+                },
+                "acquisition_matrix (first user scope)": {
+                  description: "First touchpoint / user acquisition attribution.",
+                  metrics: ["new_users", "total_users"],
+                  dimensions: ["dimensions.firstUserDefaultChannelGroup", "dimensions.firstUserSourceMedium"]
+                },
+                "event_matrix": {
+                  description: "Granular interaction event counting.",
+                  metrics: ["event_count", "conversions"],
+                  dimensions: ["event"]
+                },
+                "ad_touchpoint_matrix": {
+                  description: "Paid advertising attribution linking campaign, ad group, and ad.",
+                  dimensions: ["channeledCampaign", "channeledAdGroup", "channeledAd"]
+                }
+              }
+            },
+            facebook_marketing: {
+              hierarchy_rule: "Facebook Ads metrics are stored at the finest granularity ('ad' level) and roll up cleanly to ad_set, campaign, and account.",
+              dimensions: ["ad", "adGroup", "channeledCampaign", "channeledAccount", "dimensions.age", "dimensions.gender"],
+              safeguard: "Never mix age/gender breakdown with ad level attribution unless specifically analyzing demographic reach."
+            },
+            facebook_organic: {
+              scopes: {
+                "instagram_account": {
+                  description: "Metrics for the IG profile entity.",
+                  metrics: ["reach", "views", "follows", "profile_views", "website_clicks", "accounts_engaged", "total_interactions"]
+                },
+                "ig_post / media": {
+                  description: "Metrics scoped strictly to individual media / posts.",
+                  metrics: ["reach", "views", "likes", "comments", "shares", "saves", "replies", "profile_visits"],
+                  breakdown: "post"
+                },
+                "facebook_page": {
+                  description: "Page-level organic performance.",
+                  metrics: ["reach", "page_views_total", "views", "follows", "likes", "total_interactions", "video_views"]
+                },
+                "fb_post": {
+                  description: "Post-level organic performance.",
+                  metrics: ["reach", "views", "video_views", "likes", "post_clicks", "total_interactions", "comments", "shares"],
+                  breakdown: "post"
+                }
+              }
+            }
+          }
+        },
+        scopes: {
+          title: "Execution Scopes ('global', 'channel', 'asset')",
+          scopes: {
+            global: "Blended cross-network performance across all integrated providers. Do not pass a 'channel' parameter.",
+            channel: "Ecosystem performance restricted to a single provider (e.g. channel: 'google_search_console', 'google_analytics', 'facebook_marketing').",
+            asset: "Granular performance isolated to a specific account, property, or store. Must include filters: { \"channeledAccount\": \"<id>\" }."
+          }
+        },
+        filters: {
+          title: "Filter Syntax & Capabilities",
+          accepted_formats: {
+            exact_match: { "device": "desktop", "country": "US", "channeledAccount": "2" },
+            nested_dimensions: { "dimensions.gender": "male", "dimensions.country": "USA", "dimensions.searchAppearance": "standard" }
+          },
+          warning: "Do not pass complex mathematical operators in filter keys unless checking standard equality. For metric thresholds, aggregate first then evaluate in prompt reasoning."
+        },
+        breakdowns: {
+          title: "Temporal and Dimensional Breakdowns ('groupBy')",
+          temporal: ["daily", "weekly", "monthly", "quarterly", "yearly", "date"],
+          dimensional: ["device", "country", "query", "page", "campaign", "ad_set", "placement", "dimensions.*"],
+          multi_grouping: "You can group by multiple dimensions comma-separated, e.g. 'channel,device' or 'date,device'."
+        },
+        formulas: {
+          title: "Server-Side OLAP Aggregations (Computed Natively in summarize_performance)",
+          architecture_note: "These 10 standard formulas are computed directly by the OLAP SQL aggregation engine when requested in 'aggregations'. You do NOT need to manually compute them unless performing custom statistical modeling.",
+          formulas: [
+            { name: "spend", formula: "SUM(spend)", description: "Total advertising cost" },
+            { name: "clicks", formula: "SUM(clicks)", description: "Total link or ad clicks" },
+            { name: "impressions", formula: "SUM(impressions)", description: "Total impressions" },
+            { name: "ctr", formula: "clicks / impressions * 100", description: "Click-Through Rate (%)" },
+            { name: "cpc", formula: "spend / clicks", description: "Cost Per Click" },
+            { name: "cpm", formula: "spend / impressions * 1000", description: "Cost Per Mille" },
+            { name: "roas", formula: "revenue / spend", description: "Return on Ad Spend" },
+            { name: "position", formula: "weighted_avg(position by impressions)", description: "Average Search Engine Rank (weighted by impressions)" },
+            { name: "sessions", formula: "SUM(sessions)", description: "Web/Store Traffic Sessions" },
+            { name: "conversions", formula: "SUM(conversions)", description: "Total Goal / Purchase Conversions" }
+          ]
+        },
+        derived_metrics: {
+          title: "Predefined Derived Metrics (DMs) — Platform Reference Library & Evaluation",
+          concept: "Derived Metrics (DMs) represent mathematical combinations of two or more time-series or channel metrics (e.g. CPA = Spend / Results, SEO Efficiency = Clicks / Position, Blended CPC = (Spend_Ch1 + Spend_Ch2) / (Clicks_Ch1 + Clicks_Ch2)).",
+          reference_library_access: "Call 'get_analytics_catalog' with section='predefined_derived_metrics' to retrieve all 26 platform-wide reference blueprints with their complete ASTs, source series definitions, required capability tags, and formats.",
+          structure_of_a_dm: {
+            required_tags: "Channel capability tags that must be active (e.g., ['spendable', 'clickable'], ['seo', 'impressionable'], ['organic_social', 'reach_driven']).",
+            source_series: "Constituent series labeled with keys ('a', 'b', etc.). Channel placeholders (e.g., '__SPENDABLE_CHANNEL_1__', '__SEO_CHANNEL_1__', '__CLICKABLE_CHANNEL_1__') represent the active channel to bind.",
+            ast: "Abstract Syntax Tree with operator ('/', '*', '+', '-') and left/right metric pointers.",
+            format: "'currency', 'percentage', 'decimal', or 'integer'."
+          },
+          evaluation_recipe: [
+            "1. Inspect Blueprint: Fetch DM definition from 'get_analytics_catalog(section: \"predefined_derived_metrics\")' or project's custom list via 'list_custom_kpis'.",
+            "2. Map Channel Placeholders: Replace placeholders like '__SEO_CHANNEL_1__' with the real channel from 'list_connected_assets' (e.g. 'google_search_console').",
+            "3. Query Constituents: Call 'summarize_performance' for each source series with the corresponding metric (e.g. series 'a' = spend, series 'b' = clicks) and desired breakdown/date range.",
+            "4. Compute AST: Combine the series point-by-point or on totals according to the AST operator (e.g. series_a / series_b)."
+          ],
+          available_predefined_dms: [
+            { key: "cpc", name: "Cost per Click", formula: "spend / clicks", categories: ["cost", "paid_media"] },
+            { key: "ctr", name: "Click-Through Rate", formula: "clicks / impressions", categories: ["performance", "paid_media"] },
+            { key: "cpa", name: "Cost per Acquisition / Result", formula: "spend / results", categories: ["cost", "paid_media", "results"] },
+            { key: "cvr", name: "Conversion Rate", formula: "results / clicks", categories: ["results", "paid_media"] },
+            { key: "roas", name: "Return on Ad Spend", formula: "revenue / spend", categories: ["revenue", "paid_media"] },
+            { key: "cost_per_conversion", name: "Cost per Conversion", formula: "spend / conversions", categories: ["cost", "paid_media"] },
+            { key: "result_rate", name: "Result Rate", formula: "results / impressions", categories: ["results", "paid_media"] },
+            { key: "cost_per_engagement", name: "Cost per Engagement", formula: "spend / engagements", categories: ["cost", "engagement"] },
+            { key: "engagement_click_rate", name: "Engagement Click Rate", formula: "clicks / engagements", categories: ["engagement", "paid_media"] },
+            { key: "organic_engagement_rate", name: "Organic Engagement Rate", formula: "engaged_users / reach", categories: ["organic", "social"] },
+            { key: "organic_reach_efficiency", name: "Organic Reach per Impression", formula: "reach / impressions", categories: ["organic", "social"] },
+            { key: "organic_impression_engagement", name: "Engagement per Impression", formula: "engaged_users / impressions", categories: ["organic", "social"] },
+            { key: "seo_ctr", name: "SEO Click-Through Rate", formula: "clicks / impressions", categories: ["seo", "clicks"] },
+            { key: "click_position_efficiency", name: "Click Position Efficiency", formula: "clicks / position", categories: ["seo", "performance"] },
+            { key: "impression_position_efficiency", name: "Impression Position Efficiency", formula: "impressions / position", categories: ["seo", "impressions"] },
+            { key: "blended_cpc", name: "Blended Cross-Channel CPC", formula: "(spend_1 + spend_2) / (clicks_1 + clicks_2)", categories: ["cross-channel", "cost"] },
+            { key: "blended_roas", name: "Blended Cross-Channel ROAS", formula: "(rev_1 + rev_2) / (spend_1 + spend_2)", categories: ["cross-channel", "revenue"] },
+            { key: "blended_ctr", name: "Blended Cross-Channel CTR", formula: "(clicks_1 + clicks_2) / (imp_1 + imp_2)", categories: ["cross-channel", "performance"] },
+            { key: "aov", name: "Average Order Value", formula: "revenue / conversions", categories: ["ecommerce", "revenue"] },
+            { key: "cart_conversion_rate", name: "Cart to Order Conversion Rate", formula: "conversions / add_to_cart", categories: ["ecommerce", "funnel"] },
+            { key: "revenue_per_visitor", name: "Revenue per Visitor", formula: "revenue / sessions", categories: ["ecommerce", "traffic"] },
+            { key: "blended_mer", name: "Marketing Efficiency Ratio (MER)", formula: "store_revenue / total_ad_spend", categories: ["cross-channel", "executive"] },
+            { key: "seo_vs_paid_clicks", name: "SEO vs Paid Clicks Ratio", formula: "seo_clicks / paid_clicks", categories: ["cross-channel", "seo", "paid_media"] },
+            { key: "paid_organic_impression_ratio", name: "Paid-to-Organic Impression Ratio", formula: "organic_impressions / paid_impressions", categories: ["cross-channel", "social"] },
+            { key: "organic_reach_vs_seo_ctr", name: "Organic Reach vs SEO CTR", formula: "organic_reach / seo_clicks", categories: ["cross-channel", "social", "seo"] },
+            { key: "revenue_per_click", name: "Revenue per Click (Combined)", formula: "revenue / total_clicks", categories: ["cross-channel", "revenue"] }
+          ]
+        },
+        dashboards: {
+          title: "Dashboards & Visual Widgets Architecture",
+          purpose: "Dashboards in APIs Hub provide real-time, customizable monitoring views that aggregate performance across channels, KPIs, and derived metrics. An autonomous agent should inspect dashboards to understand what KPIs and visual representations the business prioritizes.",
+          discovery_tool: "Call 'list_project_dashboards' to inspect configured dashboards, widget collections, grid layouts, and source bindings.",
+          dashboard_structure: {
+            id: "Unique dashboard integer ID.",
+            name: "Display title (e.g. 'Executive Summary', 'SEO & Organic Growth', 'Paid Media Performance').",
+            is_default: "Boolean indicating if this is the primary overview dashboard.",
+            widgets: "Array of configured visualization widgets."
+          },
+          widget_sources: {
+            metric: "Direct raw OLAP metric aggregation (e.g., total spend, impressions, clicks from a specific channel).",
+            kpi: "Statistical Analytics Engine KPI (e.g. Anomaly detection, MACD momentum, Linear trendline, Granger causality).",
+            derived_metric: "Calculated series from an AST blueprint (e.g. CPA, Click Position Efficiency, Blended ROAS)."
+          },
+          widget_types_and_roles: {
+            tile: "Number Tile — Displays a single high-impact total or average with trend arrow. Ideal for executive summaries (e.g. total revenue, overall MER).",
+            line_chart: "Continuous Time-Series — Displays trends over daily/weekly intervals. Best for tracking trajectory, velocity, or seasonality.",
+            bar_chart: "Categorical Comparison — Compares discrete volumes side-by-side across channels, campaigns, or devices.",
+            pie_chart: "Part-to-Whole Share — Shows proportion distribution (e.g. channel budget allocation, device share).",
+            gauge: "Target Progress — Measures progress or current percentage against an SLA, threshold, or goal.",
+            sparkline: "Minimalist Trendline — Compact inline visual indicating directional momentum without heavy axis clutter.",
+            scatter_plot: "Correlation & Elasticity — Identifies correlation between two continuous variables (e.g., ad spend vs organic search volume).",
+            combo_chart: "Dual-Axis Overlay — Combines bars (volume like clicks) and lines (rates like CTR or CPA) across time.",
+            table: "Granular Tabular View — Multi-dimensional row-by-row matrix (e.g., top 20 search queries with clicks, impressions, CTR, position).",
+            anomaly_chart: "Statistical Outlier Watch — Line chart with standard deviation bands that highlights anomalies in red."
+          },
+          agent_interpretation_guideline: "When an agent is asked 'What does our dashboard show?' or 'How is our main dashboard performing?', the agent should: (1) call 'list_project_dashboards' to identify the active widgets and their source KPIs/metrics, (2) query 'summarize_performance' for the corresponding metrics and date range, and (3) synthesize an executive interpretation highlighting trend direction, goal achievement, and outliers."
+        },
+        benchmarks: {
+          title: "Marketing Benchmarks & Target Evaluation Guidelines",
+          purpose: "Enables agents to assess whether observed metrics represent strong, average, or concerning performance when explicit client targets are not provided in project alerts or metadata.",
+          standard_channel_benchmarks: {
+            google_search_console: {
+              top_3_ctr: "25% - 35% for Position 1; 12% - 16% for Position 2; 8% - 11% for Position 3.",
+              top_10_ctr: "2% - 4% for Positions 4-10.",
+              diagnostic_rule: "If an organic query ranks in Position <= 3 but has CTR < 5%, evaluate title and snippet copy for intent mismatch or rich snippet competition."
+            },
+            google_analytics_ga4: {
+              average_bounce_rate: "40% - 60% for content/blogs; 25% - 45% for e-commerce.",
+              engagement_rate: "55% - 70% is healthy across direct and organic search.",
+              session_duration: "1.5 - 3.5 minutes for content and shopping sites."
+            },
+            facebook_marketing: {
+              average_ctr: "0.90% - 1.60% (e-commerce / retail); 0.70% - 1.10% (B2B).",
+              average_cpc: "$0.80 - $2.50 depending on audience geography and vertical.",
+              healthy_frequency: "1.5 - 3.0 per 7-day window. Frequency > 4.5 accompanied by rising CPC signals audience saturation / creative fatigue."
+            },
+            ecommerce_funnel: {
+              healthy_conversion_rate: "1.8% - 3.5% (Sessions to Completed Orders).",
+              cart_abandonment_rate: "65% - 75% baseline.",
+              blended_mer: "3.0x - 5.0x for mature brands; 1.8x - 2.5x for rapid acquisition phases."
+            }
+          }
+        },
+        temporal_comparison: {
+          title: "Period-over-Period (PoP) & Year-over-Year (YoY) Velocity Analysis",
+          methodology: "Accurate marketing intelligence requires comparing current period performance against prior periods to measure momentum, seasonality, and campaign impact.",
+          delta_formulas: {
+            absolute_delta: "Current_Value - Prior_Value",
+            percentage_delta: "((Current_Value - Prior_Value) / Prior_Value) * 100",
+            velocity_indicator: "Positive delta indicates growth; for cost metrics (CPA, CPC), negative delta indicates efficiency gain."
+          },
+          recipe_pop_comparison: [
+            "1. Define Current Window: e.g., startDate='2026-09-01', endDate='2026-09-25' (25 days).",
+            "2. Define Prior Window: Calculate equivalent length prior offset, e.g., startDate='2026-08-07', endDate='2026-08-31' (25 days).",
+            "3. Query Both Windows: Call 'summarize_performance' once for each period with identical aggregations, scope, and filters.",
+            "4. Calculate Deltas: For each key metric (spend, clicks, conversions, ctr, cpc), compute the % change: ((current - prior) / prior) * 100."
+          ],
+          recipe_yoy_comparison: [
+            "1. Shift Current Window by exactly 1 year (365 days) or 52 weeks (matching day-of-week).",
+            "2. Query both periods via 'summarize_performance'.",
+            "3. Isolate macro/seasonal growth from tactical campaign performance."
+          ]
+        },
+        funnel_decomposition: {
+          title: "Funnel Decomposition & Root-Cause Attribution Tree",
+          principle: "When high-level performance shifts (e.g. ROAS or Revenue changes), autonomous agents should follow a systematic MECE decomposition tree instead of guessing.",
+          roas_decomposition_tree: {
+            formula: "ROAS = (Revenue / Spend) = (Conversions * AOV) / (Clicks * CPC) = (CVR * AOV) / CPC",
+            diagnostic_steps: [
+              {
+                step: 1,
+                check: "Did ROAS decline due to Cost (CPC) or Yield (CVR * AOV)?",
+                action: "Calculate Delta(CPC) and Delta(Conversion_Rate). If CPC rose > 20%, inspect auction competition, audience fatigue (frequency), and creative CTR."
+              },
+              {
+                step: 2,
+                check: "If Yield declined, was it Conversion Rate (CVR) or Order Value (AOV)?",
+                action: "If CVR dropped, inspect landing page load time, out-of-stock items, or mobile vs desktop checkout breakdown. If AOV dropped, check promotional discounting or product mix changes."
+              }
+            ]
+          },
+          seo_traffic_decomposition_tree: {
+            formula: "Organic Search Clicks = Total Search Impressions * CTR",
+            diagnostic_steps: [
+              {
+                step: 1,
+                check: "Did Clicks drop due to lower Market Demand (Impressions) or lower Capture (CTR)?",
+                action: "Query 'summarize_performance' with groupBy='query' and aggregations={ clicks: 'clicks', impressions: 'impressions', ctr: 'ctr', position: 'position' }."
+              },
+              {
+                step: 2,
+                check: "If Impressions dropped: Did average ranking position slip, or did overall seasonal search volume decline?",
+                action: "Inspect avg_position delta. If position is stable but impressions dropped, the keyword demand is seasonal. If position slipped from 2.1 to 8.4, algorithm updates or competitor outranking occurred."
+              }
+            ]
+          }
+        },
+        examples: {
+          title: "Copy-Paste Ready Query Recipes",
+          recipes: [
+            {
+              scenario: "SEO Audit: Top ranking queries and CTR for a website",
+              tool: "summarize_performance",
+              arguments: {
+                entity: "channeled_metric",
+                channel: "google_search_console",
+                scope: "asset",
+                filters: { channeledAccount: "2" },
+                groupBy: "device",
+                aggregations: {
+                  total_clicks: "clicks",
+                  total_impressions: "impressions",
+                  click_through_rate: "ctr",
+                  avg_position: "position"
+                },
+                startDate: "2026-09-01",
+                endDate: "2026-09-24"
+              }
+            },
+            {
+              scenario: "Cross-Channel Executive Blended Performance",
+              tool: "summarize_performance",
+              arguments: {
+                entity: "channeled_metric",
+                scope: "global",
+                groupBy: "channel,device",
+                aggregations: {
+                  blended_clicks: "clicks",
+                  blended_impressions: "impressions",
+                  blended_ctr: "ctr"
+                }
+              }
+            },
+            {
+              scenario: "GA4 Traffic and Session Analysis",
+              tool: "summarize_performance",
+              arguments: {
+                entity: "channeled_metric",
+                channel: "google_analytics",
+                scope: "asset",
+                filters: { channeledAccount: "46" },
+                groupBy: "device",
+                aggregations: {
+                  total_sessions: "sessions",
+                  total_conversions: "conversions"
+                }
+              }
+            },
+            {
+              scenario: "Mailchimp Email Campaign & Audience Engagement Analysis",
+              tool: "summarize_performance",
+              arguments: {
+                entity: "channeled_metric",
+                channel: "mailchimp",
+                scope: "asset",
+                filters: { channeledAccount: "50" },
+                aggregations: {
+                  total_sends: "sends",
+                  total_opens: "opens",
+                  total_clicks: "clicks",
+                  unique_clicks: "clicks_unique",
+                  total_bounces: "bounces",
+                  unsubscribes: "unsubscribes"
+                }
+              }
+            }
+          ]
+        }
+      };
+
+      const selected = guideSections[topic] || guideSections.overview;
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(selected, null, 2)
+          }
+        ]
+      };
+    }
+
+    if (name === "list_connected_assets") {
+      const { channel } = args;
+      let cmd = "php bin/cli.php app:list-assets --pretty";
+      if (channel) {
+        cmd += ` --channel="${channel}"`;
+      }
+
+      try {
+        const stdout = await runCliCommand(cmd);
+        return { content: [{ type: "text", text: stdout }] };
+      } catch (error) {
+        // Fallback: Query via instances.yaml or direct PDO if CLI encounters bootstrap exception
+        return {
+          content: [
+            { type: "text", text: `Asset listing failed: ${error.message}` }
+          ],
+          isError: true
+        };
+      }
+    }
+
+    if (name === "get_analytics_catalog") {
+      const { scope, channel, section } = args;
+      const catalog = {
+        data_scopes: {
+          scope_global: {
+            name: "Global Scope",
+            description: "Cross-channel blended metrics aggregated across all active providers.",
+            applicable_channels: ["all"],
+            sample_metrics: ["total_spend", "total_clicks", "total_impressions", "blended_roas", "blended_cpa", "true_blended_marginal_cost"]
+          },
+          scope_channel: {
+            name: "Channel Scope",
+            description: "Metrics specific to a marketing provider or platform channel.",
+            applicable_channels: ["meta", "google", "shopify", "klaviyo", "amazon", "tiktok"],
+            sample_metrics: ["spend", "clicks", "impressions", "reach", "frequency", "ctr", "cpc", "cpm", "roas", "spend_elasticity"]
+          },
+          scope_asset: {
+            name: "Asset Scope",
+            description: "Sub-channel metrics isolated to specific ad accounts, profiles, stores or properties.",
+            applicable_channels: ["facebook_marketing", "facebook_organic", "google_search_console", "google_analytics", "google_ads"],
+            sample_metrics: ["position", "sessions", "conversions", "bounce_rate", "asset_ctr_anomaly", "organic_vs_paid_clicks"]
+          }
+        },
+        supported_channels: {
+          meta: ["spendable", "clickable", "impressionable", "paid_media", "organic_social", "reach_driven"],
+          google: ["spendable", "clickable", "impressionable", "seo", "traffic_tracked", "conversion_tracked", "revenue_tracked", "behavior_tracked", "analytics", "paid_media"],
+          klaviyo: ["revenue_tracked", "conversion_tracked", "email_marketing"],
+          mailchimp: ["audience_tracked", "campaign_tracked", "email_marketing", "clickable", "conversion_tracked", "revenue_tracked"],
+          shopify: ["revenue_tracked", "conversion_tracked", "ecommerce"],
+          facebook_marketing: ["spendable", "clickable", "impressionable", "paid_media"],
+          facebook_organic: ["organic_social", "reach_driven", "impressionable"],
+          google_search_console: ["clickable", "impressionable", "seo"],
+          google_analytics: ["traffic_tracked", "conversion_tracked", "revenue_tracked", "behavior_tracked", "analytics"],
+          google_ads: ["spendable", "clickable", "impressionable", "paid_media"]
+        },
+        canonical_metrics: [
+          "spend", "clicks", "impressions", "reach", "frequency", "ctr", "cpc", "cpm",
+          "sessions", "new_users", "conversions", "cost_per_conversion", "conversion_rate",
+          "roas_purchase", "position", "engagement", "page_views", "event_count", "bounce_rate",
+          "average_session_duration", "total_users", "total_revenue",
+          "sends", "opens", "opens_standard", "opens_proxy", "clicks_unique", "bounces", "bounces_hard", "bounces_soft", "unsubscribes", "orders", "revenue"
+        ],
+        derived_formulas: [
+          { formula: "spend", description: "Total advertising cost" },
+          { formula: "clicks", description: "Total link or ad clicks" },
+          { formula: "impressions", description: "Total visual impressions" },
+          { formula: "ctr", description: "Click-Through Rate (clicks / impressions * 100)" },
+          { formula: "cpc", description: "Cost Per Click (spend / clicks)" },
+          { formula: "cpm", description: "Cost Per Mille (spend / impressions * 1000)" },
+          { formula: "roas", description: "Return on Ad Spend (revenue / spend)" },
+          { formula: "cost_per_result", description: "Cost Per Conversion / Result (spend / results)" },
+          { formula: "result_rate", description: "Conversion Rate (results / clicks * 100)" },
+          { formula: "position", description: "Weighted Average Ranking Position (weighted by impressions)" },
+          { formula: "sends", description: "Total email sends dispatched" },
+          { formula: "opens", description: "Total email open events" },
+          { formula: "open_rate", description: "Email Open Rate (opens / sends * 100)" },
+          { formula: "click_to_open_rate", description: "Click-to-Open Rate (clicks / opens * 100)" },
+          { formula: "unsubscribe_rate", description: "Unsubscribe Rate (unsubscribes / sends * 100)" }
+        ],
+        granularities: {
+          temporal: ["daily", "weekly", "monthly", "quarterly", "yearly"],
+          dimensional: ["device", "country", "query", "page", "campaign", "ad_set", "placement", "dimensions.*"]
+        },
+        channel_datascopes: {
+          mailchimp: {
+            scopes: ["audience_level", "campaign_level", "store_level"],
+            default_scope: "audience_level",
+            scope_rules: {
+              "audience_level": {
+                description: "Audience/List-scoped aggregated engagement and subscriber metrics.",
+                metrics: ["sends", "opens", "clicks", "clicks_unique", "bounces", "unsubscribes"],
+                breakdowns: ["campaign", "dimensions.page"]
+              },
+              "campaign_level": {
+                description: "Campaign-specific email performance, link clicks, and recipient engagement.",
+                metrics: ["sends", "opens", "opens_standard", "opens_proxy", "clicks", "clicks_unique", "bounces", "unsubscribes"],
+                breakdowns: ["campaign", "dimensions.page"]
+              },
+              "store_level": {
+                description: "Connected eCommerce store attribution orders and revenue driven by campaigns.",
+                metrics: ["orders", "revenue"],
+                breakdowns: ["campaign"]
+              }
+            }
+          },
+          google_search_console: {
+            scopes: ["non-searchAppearance", "searchAppearance"],
+            default_scope: "non-searchAppearance",
+            scope_rules: {
+              "non-searchAppearance": {
+                description: "Standard web search queries, landing pages, devices, and countries. Always requires dimensions.searchAppearance='standard' to avoid duplicate counting across search features.",
+                enforced_filter: { "dimensions.searchAppearance": "standard" },
+                metrics: ["clicks", "impressions", "ctr", "position"],
+                breakdowns: ["query", "dimensions.page", "country", "device"]
+              },
+              "searchAppearance": {
+                description: "Aggregations by Google Search feature (AMP, Good Page Experience, Review Snippets, etc). Cannot be combined with query/page dimensions without causing multi-attribution ambiguity.",
+                metrics: ["clicks", "impressions", "ctr", "position"],
+                breakdowns: ["dimensions.searchAppearance"]
+              }
+            }
+          },
+          google_analytics: {
+            scopes: ["traffic_matrix", "acquisition_matrix", "event_matrix", "ad_touchpoint_matrix"],
+            default_scope: "traffic_matrix",
+            scope_rules: {
+              "traffic_matrix": {
+                description: "Session-level traffic and landing page metrics.",
+                metrics: ["sessions", "bounce_rate", "average_session_duration", "screen_page_views"],
+                breakdowns: ["dimensions.sessionDefaultChannelGroup", "dimensions.sessionSourceMedium", "dimensions.landing_page", "device", "country"]
+              },
+              "acquisition_matrix": {
+                description: "First-user attribution and user acquisition.",
+                metrics: ["new_users", "total_users"],
+                breakdowns: ["dimensions.firstUserDefaultChannelGroup", "dimensions.firstUserSourceMedium"]
+              },
+              "event_matrix": {
+                description: "Event-level interactions and goal conversions.",
+                metrics: ["event_count", "conversions"],
+                breakdowns: ["event"]
+              },
+              "ad_touchpoint_matrix": {
+                description: "Paid touchpoints linking campaigns, ad groups, and ads.",
+                metrics: ["conversions", "total_revenue"],
+                breakdowns: ["channeledCampaign", "channeledAdGroup", "channeledAd"]
+              }
+            }
+          },
+          facebook_marketing: {
+            scopes: ["ad_level", "adset_level", "campaign_level", "account_level"],
+            default_scope: "ad_level",
+            scope_rules: {
+              "ad_level": {
+                description: "Finest atomized granularity. All metrics are collected at the ad level and roll up hierarchically.",
+                metrics: ["spend", "clicks", "impressions", "reach", "frequency", "ctr", "cpc", "cpm", "roas_purchase"],
+                breakdowns: ["ad", "adGroup", "channeledCampaign", "channeledAccount", "dimensions.age", "dimensions.gender"]
+              }
+            }
+          },
+          facebook_organic: {
+            scopes: ["instagram_account", "ig_post", "facebook_page", "fb_post"],
+            default_scope: "instagram_account",
+            scope_rules: {
+              "instagram_account": {
+                description: "Account-level organic reach, views, and profile clicks.",
+                metrics: ["reach", "views", "follows", "profile_views", "website_clicks", "accounts_engaged", "total_interactions"],
+                breakdowns: ["dimensions.contact_button_type", "dimensions.follow_type"]
+              },
+              "ig_post": {
+                description: "Media/post-level engagement and comments.",
+                metrics: ["reach", "views", "likes", "comments", "shares", "saves", "profile_visits"],
+                breakdowns: ["post", "dimensions.media_product_type"]
+              },
+              "facebook_page": {
+                description: "Facebook Page aggregate metrics.",
+                metrics: ["reach", "page_views_total", "views", "follows", "likes", "total_interactions", "video_views"],
+                breakdowns: ["dimensions.reaction_type"]
+              },
+              "fb_post": {
+                description: "Facebook post interactions.",
+                metrics: ["reach", "views", "video_views", "likes", "post_clicks", "total_interactions", "comments", "shares"],
+                breakdowns: ["post"]
+              }
+            }
+          }
+        },
+        recipes_and_guidance: {
+          guide_tool: "Call 'get_mcp_guide' with topic='datascopes' or topic='examples' for detailed recipes.",
+          discovery_tool: "Call 'list_connected_assets' to discover exact asset IDs for filters: { channeledAccount: '<id>' }."
+        },
+        benchmarks: {
+          google_search_console: {
+            top_3_ctr: "25% - 35% (Pos 1); 12% - 16% (Pos 2); 8% - 11% (Pos 3)",
+            top_10_ctr: "2% - 4% (Pos 4-10)",
+            health_rule: "Position <= 3 with CTR < 5% signals snippet mismatch or rich snippet displacement."
+          },
+          google_analytics_ga4: {
+            bounce_rate: "40% - 60% (content/blog); 25% - 45% (ecommerce)",
+            engagement_rate: "55% - 70% (healthy across search/direct)",
+            session_duration_minutes: "1.5 - 3.5 mins"
+          },
+          facebook_marketing: {
+            ctr: "0.90% - 1.60% (ecommerce); 0.70% - 1.10% (B2B)",
+            cpc: "$0.80 - $2.50 (geography and competition dependent)",
+            frequency_7d: "1.5 - 3.0 (frequency > 4.5 signals creative exhaustion)"
+          },
+          ecommerce_funnel: {
+            cvr: "1.8% - 3.5% (sessions to orders)",
+            cart_abandonment_rate: "65% - 75%",
+            blended_mer: "3.0x - 5.0x (mature brands); 1.8x - 2.5x (growth phase)"
+          }
+        }
+      };
+
+      // Load reference library of predefined platform KPIs & Derived Metrics from project_context.json if available
+      try {
+        const filePath = path.join(APIS_HUB_ROOT, "config", "project_context.json");
+        const fileExists = fs.existsSync(filePath);
+        if (fileExists) {
+          const raw = fs.readFileSync(filePath, "utf-8");
+          const ctx = JSON.parse(raw);
+          if (ctx.reference_library) {
+            catalog.reference_library = {
+              notice: "These predefined KPIs and Derived Metrics are platform-wide reference definitions and templates provided for analytical inspiration and deep analysis. They are NOT active custom KPIs created specifically for this project.",
+              predefined_kpis_count: Object.keys(ctx.reference_library.predefined_kpis || {}).length,
+              predefined_kpis: ctx.reference_library.predefined_kpis || {},
+              predefined_derived_metrics_count: Object.keys(ctx.reference_library.predefined_derived_metrics || {}).length,
+              predefined_derived_metrics: ctx.reference_library.predefined_derived_metrics || {}
+            };
+          } else {
+            catalog.reference_library_debug = {
+              filePath,
+              fileExists: true,
+              synced_at: ctx.synced_at || null,
+              ctxKeys: Object.keys(ctx),
+              hasReferenceLibrary: false
+            };
+          }
+        } else {
+          catalog.reference_library_debug = {
+            filePath,
+            fileExists: false
+          };
+        }
+      } catch (e) {
+        catalog.reference_library_debug = { error: e.message };
+      }
+
+      if (section) {
+        if (section === "reference_library") {
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify(catalog.reference_library || { 
+                notice: "Reference library not loaded yet.",
+                debug: catalog.reference_library_debug || "No exception, but ctx.reference_library was falsy or config/project_context.json was not found."
+              }, null, 2)
+            }]
+          };
+        }
+        if (section === "predefined_kpis") {
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify({
+                notice: catalog.reference_library?.notice || "Platform-wide reference library",
+                count: catalog.reference_library?.predefined_kpis_count || 0,
+                predefined_kpis: catalog.reference_library?.predefined_kpis || {}
+              }, null, 2)
+            }]
+          };
+        }
+        if (section === "predefined_derived_metrics") {
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify({
+                notice: catalog.reference_library?.notice || "Platform-wide reference library",
+                count: catalog.reference_library?.predefined_derived_metrics_count || 0,
+                predefined_derived_metrics: catalog.reference_library?.predefined_derived_metrics || {}
+              }, null, 2)
+            }]
+          };
+        }
+        if (section === "benchmarks") {
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify(catalog.benchmarks || {}, null, 2)
+            }]
+          };
+        }
+        if (catalog[section]) {
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify({ section, data: catalog[section] }, null, 2)
+            }]
+          };
+        }
+      }
+
+      if (scope) {
+        const scopeKey = scope.startsWith("scope_") ? scope : `scope_${scope}`;
+        if (catalog.data_scopes[scopeKey]) {
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify({ scope: scopeKey, details: catalog.data_scopes[scopeKey] }, null, 2)
+            }]
+          };
+        }
+      }
+
+      if (channel) {
+        const channelCapabilities = catalog.supported_channels[channel];
+        const datascopes = catalog.channel_datascopes[channel] || null;
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              channel,
+              capabilities: channelCapabilities || "Channel not specifically registered or uses generic adapter",
+              datascopes: datascopes || "Channel uses unified un-scoped metrics",
+              available_canonical_metrics: catalog.canonical_metrics,
+              allowed_breakdowns: catalog.granularities,
+              recipes_and_guidance: catalog.recipes_and_guidance
+            }, null, 2)
+          }]
+        };
+      }
+
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(catalog, null, 2)
+        }]
+      };
+    }
+
+    if (name === "list_custom_kpis") {
+      try {
+        const filePath = path.join(APIS_HUB_ROOT, "config", "project_context.json");
+        if (fs.existsSync(filePath)) {
+          const raw = fs.readFileSync(filePath, "utf-8");
+          const ctx = JSON.parse(raw);
+          const kpis = ctx.custom_kpis || [];
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(
+                  {
+                    status: "success",
+                    count: kpis.length,
+                    custom_kpis: kpis,
+                  },
+                  null,
+                  2
+                ),
+              },
+            ],
+          };
+        }
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                status: "success",
+                count: 0,
+                custom_kpis: [],
+                message: "No custom KPIs configured or project context not yet synchronized.",
+              }, null, 2),
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [{ type: "text", text: `Failed to load custom KPIs: ${error.message}` }],
+          isError: true,
+        };
+      }
+    }
+
+    if (name === "list_project_dashboards") {
+      const { dashboard_id } = args;
+      try {
+        const filePath = path.join(APIS_HUB_ROOT, "config", "project_context.json");
+        if (fs.existsSync(filePath)) {
+          const raw = fs.readFileSync(filePath, "utf-8");
+          const ctx = JSON.parse(raw);
+          const dashboards = ctx.dashboards || [];
+
+          if (dashboard_id) {
+            const found = dashboards.find((d) => d.id === Number(dashboard_id));
+            if (found) {
+              return {
+                content: [{ type: "text", text: JSON.stringify(found, null, 2) }],
+              };
+            }
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: JSON.stringify({ error: `Dashboard with ID ${dashboard_id} not found.` }, null, 2),
+                },
+              ],
+              isError: true,
+            };
+          }
+
+          // Return high-level dashboard summaries with widget counts and metadata
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(
+                  {
+                    status: "success",
+                    count: dashboards.length,
+                    dashboards: dashboards.map((d) => ({
+                      id: d.id,
+                      name: d.name,
+                      description: d.description,
+                      is_default: d.is_default,
+                      widgets_count: d.widgets_count,
+                      widgets: d.widgets.map((w) => ({
+                        id: w.id,
+                        title: w.title,
+                        name: w.name,
+                        widget_type: w.widget_type,
+                        source_type: w.source_type,
+                        source_config: w.source_config,
+                      })),
+                    })),
+                  },
+                  null,
+                  2
+                ),
+              },
+            ],
+          };
+        }
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                status: "success",
+                count: 0,
+                dashboards: [],
+                message: "No dashboards configured or project context not yet synchronized.",
+              }, null, 2),
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [{ type: "text", text: `Failed to load dashboards: ${error.message}` }],
+          isError: true,
+        };
+      }
+    }
+
+    if (name === "list_configured_alerts") {
+      const { alert_id } = args;
+      try {
+        let alerts = [];
+        // First check project_context.json, then fallback to alerts.json
+        const contextPath = path.join(APIS_HUB_ROOT, "config", "project_context.json");
+        const alertsPath = path.join(APIS_HUB_ROOT, "config", "alerts.json");
+
+        if (fs.existsSync(contextPath)) {
+          const raw = fs.readFileSync(contextPath, "utf-8");
+          const ctx = JSON.parse(raw);
+          alerts = ctx.alerts || [];
+        } else if (fs.existsSync(alertsPath)) {
+          const raw = fs.readFileSync(alertsPath, "utf-8");
+          alerts = JSON.parse(raw) || [];
+        }
+
+        if (alert_id) {
+          const found = alerts.find((a) => a.id === Number(alert_id));
+          if (found) {
+            return {
+              content: [{ type: "text", text: JSON.stringify(found, null, 2) }],
+            };
+          }
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify({ error: `Alert with ID ${alert_id} not found.` }, null, 2),
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  status: "success",
+                  count: alerts.length,
+                  alerts,
+                },
+                null,
+                2
+              ),
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [{ type: "text", text: `Failed to load alerts: ${error.message}` }],
+          isError: true,
+        };
+      }
+    }
+
     if (name === "summarize_performance") {
       const {
         entity,
         channel,
+        scope,
         aggregations,
         groupBy,
         startDate,
@@ -384,15 +1545,47 @@ function createMcpServer() {
         filters,
       } = args;
 
-      // Ensure aggregations and filters are stringified for the CLI
+      // Enforce user-scoped asset isolation if caller is restricted
+      let effectiveFilters = filters && typeof filters === "object" ? { ...filters } : {};
+      if (userContext && userContext.allowedAssets && Object.keys(userContext.allowedAssets).length > 0) {
+        if (channel && userContext.allowedAssets[channel]) {
+          const allowedChannelAssets = userContext.allowedAssets[channel];
+          // Restrict ad_account / site / instance to only allowed IDs
+          if (Array.isArray(allowedChannelAssets) && allowedChannelAssets.length > 0) {
+            const targetId = allowedChannelAssets.length === 1 ? allowedChannelAssets[0] : allowedChannelAssets;
+            effectiveFilters["channeledAccount"] = targetId;
+            effectiveFilters["account_id"] = targetId;
+          }
+        }
+      }
+
+      // Safeguard: GSC stores impressions separated by searchAppearance.
+      // If the caller does not group by dimensions.searchAppearance and did not explicitly specify a searchAppearance filter,
+      // default to 'standard' to prevent duplicate row counting and skewed metrics.
+      if (channel === "google_search_console") {
+        const isGroupingByAppearance = typeof groupBy === "string" && (
+          groupBy.includes("searchAppearance") || groupBy.includes("search_appearance")
+        );
+        if (!isGroupingByAppearance && !effectiveFilters["dimensions.searchAppearance"]) {
+          effectiveFilters["dimensions.searchAppearance"] = "standard";
+        }
+      }
+
       const aggregationsStr =
         typeof aggregations === "object"
           ? JSON.stringify(aggregations)
           : aggregations;
       const filtersStr =
-        filters && typeof filters === "object"
-          ? JSON.stringify(filters)
-          : filters;
+        Object.keys(effectiveFilters).length > 0
+          ? JSON.stringify(effectiveFilters)
+          : "";
+
+      // Deterministic Cache Key to avoid redundant CLI & DB invocations by agents
+      const cacheKey = JSON.stringify({ entity, channel, aggregationsStr, groupBy, startDate, endDate, filtersStr, userId: userContext?.userId });
+      const cached = getCachedAggregation(cacheKey);
+      if (cached) {
+        return { content: [{ type: "text", text: cached }] };
+      }
 
       let cmd = `php bin/cli.php app:aggregate --entity="${entity}" --aggregations='${aggregationsStr}' --pretty`;
       if (channel) cmd += ` --channel="${channel}"`;
@@ -403,6 +1596,7 @@ function createMcpServer() {
 
       try {
         const stdout = await runCliCommand(cmd);
+        setCachedAggregation(cacheKey, stdout);
         return { content: [{ type: "text", text: stdout }] };
       } catch (error) {
         return {
@@ -416,45 +1610,59 @@ function createMcpServer() {
 
     if (name === "get_available_instances") {
       try {
-        const stdout = await runCliCommand(
-          "php bin/cli.php app:refresh-instances --list",
-        );
-        return { content: [{ type: "text", text: stdout }] };
-      } catch (error) {
-        // Fallback if --list is not available or fails
-        try {
-          const filePath = path.join(APIS_HUB_ROOT, "config", "instances.yaml");
-          if (fs.existsSync(filePath)) {
-            const content = fs.readFileSync(filePath, "utf-8");
-            return {
-              content: [
-                {
-                  type: "text",
-                  text: `Instances from file:\n${content.substring(0, 5000)}...`,
-                },
-              ],
-            };
-          }
-          return {
-            content: [{ type: "text", text: "No instances found." }],
-            isError: true,
-          };
-        } catch (innerError) {
+        const filePath = path.join(APIS_HUB_ROOT, "config", "instances.yaml");
+        if (fs.existsSync(filePath)) {
+          const content = fs.readFileSync(filePath, "utf-8");
           return {
             content: [
               {
                 type: "text",
-                text: `Failed to get instances: ${innerError.message}`,
+                text: `Configured Instances (config/instances.yaml):\n\n${content}`,
               },
             ],
-            isError: true,
           };
         }
+        return {
+          content: [{ type: "text", text: "No instances found in config/instances.yaml." }],
+          isError: true,
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Failed to load instances: ${error.message}`,
+            },
+          ],
+          isError: true,
+        };
       }
     }
 
     throw new Error(`Tool not found: ${name}`);
+  }
+
+  server.setRequestHandler(ListToolsRequestSchema, async () => {
+    return { tools: activeTools };
   });
+
+  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    const { name, arguments: args } = request.params;
+    const isAllowed = activeTools.some((t) => t.name === name);
+    if (!isAllowed) {
+      throw new Error(`Unauthorized tool call: Administrative privileges required for tool '${name}'`);
+    }
+    return await executeToolCall(name, args);
+  });
+
+  server.MCP_TOOLS = activeTools;
+  server.executeToolCall = async (name, args) => {
+    const isAllowed = activeTools.some((t) => t.name === name);
+    if (!isAllowed) {
+      throw new Error(`Unauthorized tool call: Administrative privileges required for tool '${name}'`);
+    }
+    return await executeToolCall(name, args);
+  };
 
   return server;
 }
@@ -489,42 +1697,94 @@ if (MODE === "sse") {
 
   // MANEJO DE DISCOVERY: Iniciar flujo SSE solo en la ruta específica
   app.get("/mcp/sse", async (req, res) => {
-    // Si es un GET al SSE, iniciar stream
     console.error(`[DISC] Discovery GET detectado en ${req.url}`);
 
-    res.setHeader("Content-Type", "text/event-stream");
-    res.setHeader("Cache-Control", "no-cache, no-transform");
-    res.setHeader("Connection", "keep-alive");
-    res.setHeader("X-Accel-Buffering", "no");
-    res.flushHeaders();
+    // Autenticación de la conexión SSE
+    const auth = extractAuth(req);
+    if (!auth.authenticated) {
+      console.error(`[AUTH] Conexión SSE rechazada: Clave no válida o ausente.`);
+      return res.status(401).json({
+        error: "Unauthorized",
+        message: "Valid API key required via Authorization header (Bearer <key>), X-API-Key, or ?key=<key>",
+      });
+    }
 
-    const protocol = req.headers["x-forwarded-proto"] || req.protocol;
+    // Rate Limiting Check
+    const rateIdentifier = auth.key || req.ip || "unknown";
+    const rateCheck = checkRateLimit(rateIdentifier);
+    res.setHeader("X-RateLimit-Limit", MAX_REQUESTS_PER_WINDOW);
+    res.setHeader("X-RateLimit-Remaining", rateCheck.remaining);
+    res.setHeader("X-RateLimit-Reset", rateCheck.resetInSec);
+
+    if (rateCheck.exceeded) {
+      console.error(`[RATE_LIMIT] Conexión SSE rechazada por rate limit: ${rateIdentifier}`);
+      return res.status(429).json({
+        error: "Too Many Requests",
+        message: `Rate limit exceeded (Max ${MAX_REQUESTS_PER_WINDOW} req/min). Retry in ${rateCheck.resetInSec} seconds.`,
+      });
+    }
+
+    res.setHeader("X-Accel-Buffering", "no");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "*");
+
+    const protocol = req.headers["x-forwarded-proto"] || req.protocol || "https";
     const host = req.get("host");
     const baseUrl = `${protocol}://${host}`;
     const endpoint = `${baseUrl}/mcp/messages`;
 
-    // HACK: Intercept res.write to force an absolute URL for the Go SDK,
-    // since the standard SSEServerTransport always emits a relative URL.
+    // Intercept to write absolute URL in endpoint event for Go MCP clients (like Antigravity)
     const originalWrite = res.write.bind(res);
     res.write = (chunk, encoding, callback) => {
+      let data = chunk;
       if (typeof chunk === 'string' && chunk.startsWith('event: endpoint\ndata: /')) {
-        chunk = chunk.replace('data: /', `data: ${baseUrl}/`);
+        data = chunk.replace('data: /', `data: ${baseUrl}/`);
+      } else if (Buffer.isBuffer(chunk)) {
+        const str = chunk.toString();
+        if (str.startsWith('event: endpoint\ndata: /')) {
+          data = str.replace('data: /', `data: ${baseUrl}/`);
+        }
       }
-      return originalWrite(chunk, encoding, callback);
+      const result = originalWrite(data, encoding, callback);
+      if (typeof res.flush === 'function') {
+        res.flush();
+      }
+      return result;
     };
 
     const transport = new SSEServerTransport(endpoint, res);
-    sessions.set(transport.sessionId, transport);
-    console.error(
-      `[DISC] Sesión iniciada desde descubrimiento: ${transport.sessionId}`,
-    );
+    sessions.set(transport.sessionId, {
+      transport,
+      role: auth.role,
+      key: auth.key,
+      userContext: auth.userContext,
+    });
+    console.error(`[DISC] Sesión iniciada: ${transport.sessionId} con rol: ${auth.role}`);
 
-    const server = createMcpServer();
+    const server = createMcpServer(auth.role, auth.userContext);
     await server.connect(transport);
 
+    // Keepalive ping every 15s to prevent proxy/Cloudflare timeout
+    const keepAliveTimer = setInterval(() => {
+      try {
+        if (!res.writableEnded) {
+          res.write(": keepalive\n\n");
+          if (typeof res.flush === 'function') {
+            res.flush();
+          }
+        }
+      } catch (e) {
+        clearInterval(keepAliveTimer);
+      }
+    }, 15000);
+
     res.on("close", () => {
-      console.error(`[DISC] Conexión cerrada. Eliminando sesión ${transport.sessionId}`);
-      sessions.delete(transport.sessionId);
+      clearInterval(keepAliveTimer);
+      console.error(`[DISC] Conexión SSE cerrada para sesión ${transport.sessionId}`);
+      setTimeout(() => {
+        sessions.delete(transport.sessionId);
+      }, 300000); // 5 minutos de retención
     });
   });
 
@@ -537,64 +1797,277 @@ if (MODE === "sse") {
 
     if (Array.isArray(sessionId)) sessionId = sessionId[0];
 
-    // Fallback logic removed to prevent picking up dead sessions.
-
-    // Safe fallback for clients that don't pass sessionId in the URL (like Antigravity)
+    // Fallback: usar la última sesión viva si el cliente no la envía en la URL
     if (!sessionId && sessions.size > 0) {
       sessionId = Array.from(sessions.keys())[sessions.size - 1];
     }
 
-    if (!sessionId) {
-      console.error(
-        `[MSG] Error: Sin sesiones activas para responder al POST.`,
-      );
-      return res
-        .status(401)
-        .send("No active session. Please initiate a GET request first.");
+    const sessionData = sessionId ? sessions.get(sessionId) : null;
+    const transport = sessionData ? sessionData.transport : null;
+
+    // Verificar autenticación: ya sea por encabezados en este POST o por la sesión activa establecida
+    const directAuth = extractAuth(req);
+    let effectiveRole = null;
+    let effectiveKey = null;
+    let effectiveUserContext = null;
+
+    if (directAuth.authenticated) {
+      effectiveRole = directAuth.role;
+      effectiveKey = directAuth.key;
+      effectiveUserContext = directAuth.userContext;
+    } else if (sessionData && sessionData.role) {
+      effectiveRole = sessionData.role;
+      effectiveKey = sessionData.key;
+      effectiveUserContext = sessionData.userContext;
+    } else {
+      console.error(`[AUTH] Mensaje POST rechazado: No autenticado`);
+      return res.status(401).json({
+        jsonrpc: "2.0",
+        error: {
+          code: -32000,
+          message: "Unauthorized: Valid API key required",
+        },
+      });
     }
 
-    const transport = sessions.get(sessionId);
+    // Rate limiting para llamadas de mensajes
+    const rateIdentifier = effectiveKey || req.ip || "unknown";
+    const rateCheck = checkRateLimit(rateIdentifier);
+    res.setHeader("X-RateLimit-Limit", MAX_REQUESTS_PER_WINDOW);
+    res.setHeader("X-RateLimit-Remaining", rateCheck.remaining);
+    res.setHeader("X-RateLimit-Reset", rateCheck.resetInSec);
+
+    if (rateCheck.exceeded) {
+      console.error(`[RATE_LIMIT] Mensaje rechazado por rate limit: ${rateIdentifier}`);
+      return res.status(429).json({
+        jsonrpc: "2.0",
+        error: {
+          code: -32000,
+          message: `Rate limit exceeded (Max ${MAX_REQUESTS_PER_WINDOW} req/min). Retry in ${rateCheck.resetInSec} seconds.`,
+        },
+      });
+    }
+
+    const body = req.body;
+
+    // Detect if this is a JSON-RPC request / notification
+    if (body && body.jsonrpc === "2.0") {
+      const method = body.method;
+      const id = body.id;
+
+      // Notifications don't expect a result payload
+      if (!id && (method?.startsWith("notifications/") || method === "notifications/initialized")) {
+        if (transport) {
+          try {
+            await transport.handleMessage(body);
+          } catch (e) {
+            console.error(`Error handling notification via transport: ${e.message}`);
+          }
+        }
+        return res.status(200).json({ jsonrpc: "2.0" });
+      }
+
+      // server/discover or discovery requests
+      if (method === "server/discover" || method === "discovery") {
+        const discoverResult = {
+          jsonrpc: "2.0",
+          id,
+          result: {
+            protocolVersion: "2024-11-05",
+            serverInfo: {
+              name: "apis-hub-mcp",
+              version: "1.0.0",
+            },
+            capabilities: {
+              tools: {},
+              resources: {},
+            },
+          },
+        };
+        if (transport) {
+          try {
+            transport.send(discoverResult).catch(() => {});
+          } catch (e) {}
+        }
+        return res.status(200).json(discoverResult);
+      }
+
+      // Initialize request
+      if (method === "initialize") {
+        const initResult = {
+          jsonrpc: "2.0",
+          id,
+          result: {
+            protocolVersion: body.params?.protocolVersion || "2024-11-05",
+            capabilities: {
+              tools: {},
+              resources: {},
+            },
+            serverInfo: {
+              name: "apis-hub-mcp",
+              version: "1.0.0",
+            },
+          },
+        };
+        if (transport) {
+          try {
+            transport.send(initResult).catch(() => {});
+          } catch (e) {}
+        }
+        return res.status(200).json(initResult);
+      }
+
+      // Tools List request: filtered by caller's role (admin vs user)
+      if (method === "tools/list") {
+        const serverInstance = createMcpServer(effectiveRole, effectiveUserContext);
+        const listResult = {
+          jsonrpc: "2.0",
+          id,
+          result: {
+            tools: serverInstance.MCP_TOOLS || [],
+          },
+        };
+        if (transport) {
+          try {
+            transport.send(listResult).catch(() => {});
+          } catch (e) {}
+        }
+        return res.status(200).json(listResult);
+      }
+
+      // Tool Call request: role authorization enforced
+      if (method === "tools/call") {
+        const serverInstance = createMcpServer(effectiveRole, effectiveUserContext);
+        const toolName = body.params?.name;
+        const toolArgs = body.params?.arguments || {};
+        try {
+          const executionResult = await serverInstance.executeToolCall(toolName, toolArgs);
+          const callResponse = {
+            jsonrpc: "2.0",
+            id,
+            result: executionResult,
+          };
+          if (transport) {
+            try {
+              transport.send(callResponse).catch(() => {});
+            } catch (e) {}
+          }
+          return res.status(200).json(callResponse);
+        } catch (callErr) {
+          const errResponse = {
+            jsonrpc: "2.0",
+            id,
+            error: {
+              code: -32603,
+              message: callErr.message || "Internal error",
+            },
+          };
+          if (transport) {
+            try {
+              transport.send(errResponse).catch(() => {});
+            } catch (e) {}
+          }
+          return res.status(200).json(errResponse);
+        }
+      }
+
+      // Resources List request
+      if (method === "resources/list") {
+        const resList = {
+          jsonrpc: "2.0",
+          id,
+          result: {
+            resources: [
+              {
+                uri: "apis-hub://config/instances",
+                name: "Current Instances Configuration",
+                mimeType: "text/yaml",
+                description: "The current instances.yaml generated from rules",
+              },
+              {
+                uri: "apis-hub://logs/recent",
+                name: "Recent Jobs Logs",
+                mimeType: "text/plain",
+                description: "Recent logs from jobs.log",
+              },
+            ],
+          },
+        };
+        if (transport) {
+          try {
+            transport.send(resList).catch(() => {});
+          } catch (e) {}
+        }
+        return res.status(200).json(resList);
+      }
+    }
+
+    // Standard SSE transport handling if not intercepted
     if (transport) {
       try {
-        // PATCH: Si el SDK limpió el _sseResponse debido a un evento 'close' erróneo de Express,
-        // lo restauramos forzosamente para que no tire el error 500 y procese el mensaje.
         if (!transport._sseResponse) {
-           transport._sseResponse = transport.res;
+          transport._sseResponse = transport.res;
         }
         await transport.handlePostMessage(req, res, req.body);
+        return;
       } catch (err) {
-        const errorLog = `[${new Date().toISOString()}] ERROR in handlePostMessage: ${err.message}\n${err.stack}\n`;
-        fs.appendFileSync(path.join(APIS_HUB_ROOT, "mcp-debug.log"), errorLog);
-        res.status(500).send(`APIHUB-ERROR: ${err.message}. DEBUG: ${req.debugLogStr}`);
+        console.error(`Error en handlePostMessage: ${err.message}`);
       }
-    } else {
-      res.status(404).send("Session expired. Please reconnect.");
     }
+
+    res.status(404).send("Session expired. Please reconnect.");
   }
 
-  app.post("/mcp/messages", (req, res, next) => {
-    // Reject StreamableHttp probes (chunked POST streams) to prevent express.text from hanging indefinitely.
-    if (req.headers['transfer-encoding'] === 'chunked') {
-      return res.status(400).send("APIHUB-ERROR: StreamableHttp transport is not supported on this server. Please use SSE transport.");
-    }
-    next();
-  }, express.text({ type: '*/*' }), async (req, res) => {
-    // Usamos express.text para leer el body como string y evitar fallos de raw-body no nativo
-    let parsedBody = {};
-    if (req.body && typeof req.body === 'string') {
-      try {
-        parsedBody = JSON.parse(req.body);
-      } catch (e) {
-        console.error("Express text JSON parse failed:", e);
+  const postMiddleware = [
+    (req, res, next) => {
+      if (req.headers["transfer-encoding"] === "chunked") {
+        return res.status(400).send("StreamableHttp not supported");
       }
-    } else if (req.body && typeof req.body === 'object') {
-      parsedBody = req.body;
-    }
-    
-    req.body = parsedBody;
+      res.setHeader("Content-Type", "application/json");
 
-    await handleIncomingMessage(req, res);
-  });
+      // Antigravity Go client strictly unmarshals the HTTP response body as a JSON-RPC message.
+      // If the SDK's SSEServerTransport calls res.writeHead(202).end('Accepted'),
+      // replace 'Accepted' with a valid JSON-RPC body '{"jsonrpc":"2.0"}'.
+      const originalEnd = res.end.bind(res);
+      res.end = (chunk, encoding, callback) => {
+        if (
+          chunk === "Accepted" ||
+          (Buffer.isBuffer(chunk) && chunk.toString() === "Accepted")
+        ) {
+          const reqId = req.body?.id;
+          const fallbackBody = reqId !== undefined
+            ? JSON.stringify({ jsonrpc: "2.0", id: reqId, result: {} })
+            : JSON.stringify({ jsonrpc: "2.0" });
+          return originalEnd(fallbackBody, "utf-8", callback);
+        }
+        return originalEnd(chunk, encoding, callback);
+      };
+
+      next();
+    },
+    express.text({ type: "*/*" }),
+    async (req, res) => {
+      let parsedBody = {};
+      if (req.body && typeof req.body === "string") {
+        try {
+          parsedBody = JSON.parse(req.body);
+        } catch (e) {}
+      } else if (req.body && typeof req.body === "object") {
+        parsedBody = req.body;
+      }
+      req.body = parsedBody;
+      if (
+        !req.headers["content-type"] ||
+        !req.headers["content-type"].includes("application/json")
+      ) {
+        req.headers["content-type"] = "application/json";
+      }
+      await handleIncomingMessage(req, res);
+    },
+  ];
+
+  app.post("/mcp/messages", ...postMiddleware);
+  app.post("/mcp/sse", ...postMiddleware);
 
   // Wait for PHP server to be ready before starting MCP (useful in Docker)
   const waitForPhp = async () => {

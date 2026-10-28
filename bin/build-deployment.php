@@ -266,10 +266,8 @@
                 'ports'          => [
                         "$mcpPort:3000"
                 ],
-                'volumes'        => $isLocal ? [
+                'volumes'        => [
                         "$projectPathHost:/app",
-                        '/app/mcp-server/node_modules'
-                ] : [
                         '/app/mcp-server/node_modules'
                 ],
                 'deploy'         => [

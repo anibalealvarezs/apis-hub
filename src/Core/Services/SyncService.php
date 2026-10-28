@@ -5,6 +5,7 @@
     use Anibalealvarezs\ApiDriverCore\Classes\UniversalEntity;
     use Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory;
     use Anibalealvarezs\ApiDriverCore\Enums\AssetCategory;
+    use Anibalealvarezs\ApiDriverCore\Interfaces\QueryClassifiableInterface;
     use Classes\DriverInitializer;
     use Classes\MarketingProcessor;
     use Classes\ProductionEntityMapper;
@@ -119,16 +120,22 @@
                         }
 
                         // If it's a collection of entities, use appropriate processors
-                        if ($first instanceof UniversalEntity && $type) {
-                            $this->processUniversalEntity($type, $data, $manager);
+                        if ($first instanceof UniversalEntity) {
+                            $entityType = $type ?? ($first->category ?? $first->type);
+                            if ($entityType) {
+                                $this->processUniversalEntity($entityType, $data, $manager);
+                            }
                         }
 
                         return ['metrics' => 0, 'rows' => 0, 'duplicates' => 0];
                     }
 
-                    if ($data instanceof UniversalEntity && $type) {
-                        $collection = new ArrayCollection([$data]);
-                        $this->processUniversalEntity($type, $collection, $manager);
+                    if ($data instanceof UniversalEntity) {
+                        $entityType = $type ?? ($data->category ?? $data->type);
+                        if ($entityType) {
+                            $collection = new ArrayCollection([$data]);
+                            $this->processUniversalEntity($entityType, $collection, $manager);
+                        }
 
                         return null;
                     }
@@ -177,6 +184,8 @@
                         'accounts'            => Account::class,
                         'events'              => Event::class,
                         'channeled_events'    => ChanneledEvent::class,
+                        'stores'              => \Entities\Analytics\Store::class,
+                        'channeled_stores'    => \Entities\Analytics\Channeled\ChanneledStore::class,
                     ];
 
                     if (!isset($repoMap[$type])) {
@@ -193,7 +202,7 @@
 
                     $category = match ($type) {
                         'pages' => AssetCategory::PAGEABLE,
-                        'channeled_accounts' => AssetCategory::IDENTITY,
+                        'channeled_accounts', 'channeled_stores', 'stores' => AssetCategory::IDENTITY,
                         'channeled_campaigns' => AssetCategory::CAMPAIGN,
                         'channeled_ad_groups' => AssetCategory::GROUPING,
                         'channeled_ads', 'posts' => AssetCategory::UNIT,
@@ -347,6 +356,64 @@
                     return $result; // Return the original error response
                 }
 
+                // 4. Post-Sync Enrichment: Check if driver/channel supports semantic query classification
+                if ($driver instanceof QueryClassifiableInterface && $driver::supportsQueryClassification()) {
+                    try {
+                        $classificationService = new \Services\Sync\QueryClassificationService($this->logger);
+                        if ($classificationService->isAvailable()) {
+                            $driverLabel = method_exists($driver, 'getProviderLabel') ? $driver::getProviderLabel() : $channelName;
+                            $this->logger->info("[SyncService] Starting post-sync semantic query classification for {$driverLabel}.");
+                            $processAsset = function (int $id) use ($classificationService) {
+                                while (true) {
+                                    $res = $classificationService->classifyForAsset($id, batchSize: 100);
+                                    $candidates = $res['candidates'] ?? 0;
+                                    $classified = $res['classified'] ?? 0;
+                                    if ($candidates === 0 || $classified === 0 || $candidates < 100) {
+                                        break;
+                                    }
+                                }
+                            };
+
+                            // Retrieve channeled_account_ids for this sync
+                            $assetId = $finalConfig['channeled_account_id'] ?? null;
+                            if ($assetId) {
+                                $processAsset((int) $assetId);
+                            } else {
+                                // Process all assets associated with queries
+                                $conn = Helpers::getManager()->getConnection();
+                                $assets = $conn->fetchFirstColumn("SELECT DISTINCT channeled_account_id FROM metric_configs WHERE channeled_account_id IS NOT NULL AND query_id IS NOT NULL");
+                                foreach ($assets as $aId) {
+                                    $processAsset((int) $aId);
+                                }
+                            }
+                            $this->logger->info("[SyncService] Post-sync semantic query classification completed.");
+                        }
+                    } catch (\Throwable $aiEx) {
+                        $this->logger->warning("[SyncService] Non-blocking AI classification error: " . $aiEx->getMessage());
+                    }
+                }
+
+                // POST-SYNC: Agnostic Pre-Aggregation Engine (Atomic events -> Daily metrics rollup)
+                if ($driver instanceof \Anibalealvarezs\ApiDriverCore\Interfaces\PreAggregationProviderInterface) {
+                    try {
+                        $this->logger->info("[SyncService] Executing post-sync pre-aggregation rollup for channel: $channelName");
+                        $preAggEngine = new \Services\Aggregation\AgnosticPreAggregationEngine($manager->getConnection(), $this->logger);
+                        $preAggResult = $preAggEngine->rollup(
+                            rules: $driver::getPreAggregationRules(),
+                            channel: $channelName,
+                            startDate: $startDate,
+                            endDate: $endDate,
+                            attributionWindowDays: $driver::getDefaultAttributionWindowDays()
+                        );
+                        $this->logger->info(sprintf(
+                            "[SyncService] Pre-aggregation rollup completed. Rows rolled up: %d",
+                            $preAggResult['rows_rolled_up'] ?? 0
+                        ));
+                    } catch (\Throwable $aggEx) {
+                        $this->logger->warning("[SyncService] Non-blocking pre-aggregation rollup error: " . $aggEx->getMessage());
+                    }
+                }
+
                 return new Response(json_encode([
                     'success' => true,
                     'message' => 'Sync completed successfully',
@@ -414,6 +481,11 @@
                 case 'customers':
                 case 'channeled_customer':
                     \Classes\CustomerProcessor::processCustomers($collection, $manager);
+                    break;
+                case 'order':
+                case 'orders':
+                case 'channeled_order':
+                    \Classes\OrderProcessor::processOrders($collection, $manager);
                     break;
                 case 'event':
                 case 'events':

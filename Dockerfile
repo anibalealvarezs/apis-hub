@@ -22,6 +22,9 @@ COPY --from=mlocati/php-extension-installer /usr/bin/install-php-extensions /usr
 # Cache bust to ensure pcntl is compiled into the image
 RUN install-php-extensions pdo_mysql pdo_pgsql zip imap redis xdebug swoole pcntl
 
+# Mitigate CVE-2026-109618 / CVE-2026-109619 (Heap UAF in rfc1867 session.upload_progress)
+RUN echo "session.upload_progress.enabled = 0" > /usr/local/etc/php/conf.d/docker-security-mitigations.ini
+
 # Instalar Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 

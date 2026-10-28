@@ -50,6 +50,11 @@ class EvaluationContext
         return $this->metricData[$metricAlias] ?? 0;
     }
 
+    public function getMetricDataByNode(string $hashKey, string $rawAlias): array|float|int
+    {
+        return $this->metricData[$hashKey] ?? $this->metricData[$rawAlias] ?? 0;
+    }
+
     /**
      * Get all pre-resolved derived metric results.
      *

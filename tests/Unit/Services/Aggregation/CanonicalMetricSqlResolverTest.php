@@ -194,6 +194,32 @@ final class CanonicalMetricSqlResolverTest extends BaseUnitTestCase
         $this->assertSame(['gsc_clicks', 'gsc_clicks_daily'], $resolved['raw_names']);
         $this->assertStringContainsString("'gsc_clicks'", (string)$resolved['sql_expression']);
     }
+
+    public function testResolvesMailchimpMetricsViaDriverRegistryDictionary(): void
+    {
+        $resolver = new CanonicalMetricSqlResolver(
+            projectConfigResolver: static fn (): array => [],
+            driverDictionaryResolver: null,
+            driverRegistryResolver: static fn (): array => [
+                'mailchimp' => [
+                    'driver' => FakeMailchimpCanonicalMetricProviderDriver::class,
+                ],
+            ],
+        );
+
+        $resolved = $resolver->resolveMarketingMetric(
+            requestedMetric: 'sends',
+            channel: 'mailchimp',
+            nameCol: 'LOWER(mc.name)',
+            periodCol: 'LOWER(mc.period)',
+        );
+
+        $this->assertSame('driver', $resolved['source']);
+        $this->assertSame(['sends', 'emails_sent'], $resolved['raw_names']);
+        $this->assertNotNull($resolved['sql_expression']);
+        $this->assertStringContainsString("'sends'", (string)$resolved['sql_expression']);
+        $this->assertStringContainsString("'emails_sent'", (string)$resolved['sql_expression']);
+    }
 }
 
 final class FakeCanonicalMetricProviderDriver implements CanonicalMetricDictionaryProviderInterface
@@ -259,6 +285,30 @@ final class FakeGoogleCanonicalMetricProviderDriver implements CanonicalMetricDi
     {
         return [
             'clicks' => ['gsc_clicks', 'gsc_clicks_daily'],
+        ];
+    }
+
+    public static function getPlatformEntityIdField(): string
+    {
+        return 'id';
+    }
+}
+
+final class FakeMailchimpCanonicalMetricProviderDriver implements CanonicalMetricDictionaryProviderInterface
+{
+    /**
+     * @return array<string, array<int, string>|string>
+     */
+    public static function getCanonicalMetricDictionary(): array
+    {
+        return [
+            'sends' => ['sends', 'emails_sent'],
+            'opens' => ['opens_total', 'opens_standard'],
+            'clicks' => ['clicks_total', 'clicks_unique'],
+            'bounces' => ['bounces_total', 'bounces_hard', 'bounces_soft'],
+            'unsubscribes' => ['unsubscribes'],
+            'orders' => ['orders_count'],
+            'revenue' => ['revenue', 'total_revenue'],
         ];
     }
 

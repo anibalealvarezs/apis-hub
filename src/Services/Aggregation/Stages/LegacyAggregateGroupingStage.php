@@ -42,6 +42,20 @@
                 if (($context->isMetric() || $isChanneledMetric) && ($isDimension || ($field !== 'account_type' && !in_array($field, $standardRelations, true) && !str_ends_with($field, '_id') && !in_array($field, $dateFields, true) && !$hasEntityField($field)))) {
                     $dimRootAlias = $isChanneledMetric ? 'e' : 'mc';
                     $dimAlias = 'dim_'.preg_replace('/[^a-z0-9]/i', '_', $dimKey);
+
+                    $semanticDimensions = ['intent', 'language', 'brand_relation', 'business_relevance'];
+                    if (in_array($dimKey, $semanticDimensions, true)) {
+                        $isAccountSemantic = in_array($dimKey, ['brand_relation', 'business_relevance'], true);
+                        if ($isAccountSemantic) {
+                            $safeLeftJoin($dimRootAlias, 'account_query_classifications', $dimAlias, "$dimRootAlias.query_id = $dimAlias.query_id AND $dimRootAlias.channeled_account_id = $dimAlias.channeled_account_id");
+                        } else {
+                            $safeLeftJoin($dimRootAlias, 'query_classifications', $dimAlias, "$dimRootAlias.query_id = $dimAlias.query_id");
+                        }
+                        $qb->addSelect("COALESCE($dimAlias.$dimKey, 'unclassified') AS $quotedField")
+                            ->addGroupBy("$dimAlias.$dimKey");
+                        continue;
+                    }
+
                     $qb->setParameter("key_$dimAlias", $dimKey);
                     $safeLeftJoin($dimRootAlias, 'dimension_set_items', "dsi_$dimAlias", "$dimRootAlias.dimension_set_id = dsi_$dimAlias.dimension_set_id AND dsi_$dimAlias.dimension_value_id IN (
                     SELECT sub_dv.id FROM dimension_values sub_dv 

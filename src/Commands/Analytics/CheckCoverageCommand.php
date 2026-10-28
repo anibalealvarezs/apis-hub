@@ -52,10 +52,10 @@ class CheckCoverageCommand extends Command
 
             // SQL to find dates present in the channeled_metrics table for the specific channel
             $limitDate = (new \DateTime())->modify("-$days days")->format('Y-m-d 00:00:00');
-            $sql = "SELECT DISTINCT CAST(platformCreatedAt AS DATE) as date 
+            $sql = "SELECT DISTINCT CAST(platform_created_at AS DATE) as date 
                     FROM channeled_metrics 
                     WHERE channel = :channel 
-                    AND platformCreatedAt >= :limit_date
+                    AND platform_created_at >= :limit_date
                     ORDER BY date DESC";
 
             $stmt = $conn->prepare($sql);

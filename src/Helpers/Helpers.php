@@ -51,6 +51,9 @@
         private static ?array $entitiesConfig = null;
         private static ?array $projectConfig = null;
         private static ?string $appMode = null;
+        private static ?array $runtimeEnvFile = null;
+        private static ?string $runtimeEnvPath = null;
+        private static ?int $runtimeEnvMtime = null;
 
         /**
          * Resets all cached configurations to force a reload from files.
@@ -68,11 +71,113 @@
             self::$appMode = null;
             self::$entityManager = null;
             self::$redisClient = null;
+            self::$runtimeEnvFile = null;
+            self::$runtimeEnvPath = null;
+            self::$runtimeEnvMtime = null;
 
             // Reset DriverFactory instances to ensure they pick up new config
             if (class_exists('\Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory')) {
                 DriverFactory::reset();
             }
+        }
+
+        /**
+         * Resolves an environment value at runtime, treating the local .env file
+         * as the authoritative source.
+         *
+         * Long-running processes (Swoole workers) snapshot the process environment
+         * at boot, so credentials updated afterwards in .env are never reflected by
+         * getenv(). This helper re-parses .env (with a cheap filemtime cache) so
+         * values pushed at runtime (e.g. TypeSafe API key hot-reload) are recognized
+         * immediately by every worker without a container restart.
+         *
+         * Resolution priority: .env file -> getenv() -> $_ENV -> $_SERVER -> default.
+         *
+         * @param string $key
+         * @param string|null $default
+         * @return string|null
+         */
+        public static function getEnvValue(string $key, ?string $default = null): ?string
+        {
+            $parsed = self::parseRuntimeEnvFile();
+
+            if (array_key_exists($key, $parsed)) {
+                return $parsed[$key];
+            }
+
+            $value = getenv($key);
+            if ($value !== false && $value !== '') {
+                return (string) $value;
+            }
+
+            foreach (['_ENV', '_SERVER'] as $superglobal) {
+                $value = $GLOBALS[$superglobal][$key] ?? null;
+                if (is_string($value) && $value !== '') {
+                    return $value;
+                }
+            }
+
+            return $default;
+        }
+
+        /**
+         * Forces the next getEnvValue() call to re-read the .env file, bypassing
+         * the filemtime cache. Call after hot-writing .env to guarantee the
+         * current process observes the new value immediately.
+         *
+         * @return void
+         */
+        public static function resetEnvCache(): void
+        {
+            self::$runtimeEnvFile = null;
+            self::$runtimeEnvPath = null;
+            self::$runtimeEnvMtime = null;
+        }
+
+        /**
+         * Parses the active .env file (same resolution as the boot loader) and
+         * caches the result keyed by file path + filemtime.
+         *
+         * @return array
+         */
+        private static function parseRuntimeEnvFile(): array
+        {
+            $envFileName = getenv('ENV_FILE') ?: '.env';
+            $path = dirname(self::getConfigDir()).'/'.$envFileName;
+
+            if (!is_file($path)) {
+                return [];
+            }
+
+            clearstatcache(true, $path);
+            $mtime = (int) @filemtime($path);
+
+            if (self::$runtimeEnvFile !== null && self::$runtimeEnvPath === $path && self::$runtimeEnvMtime === $mtime) {
+                return self::$runtimeEnvFile;
+            }
+
+            $parsed = [];
+            $lines = @file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+            if (is_array($lines)) {
+                foreach ($lines as $line) {
+                    if (str_starts_with(trim($line), '#')) {
+                        continue;
+                    }
+                    if (!str_contains($line, '=')) {
+                        continue;
+                    }
+                    [$name, $value] = explode('=', $line, 2);
+                    $name = trim($name);
+                    $value = trim($value, " \t\n\r\0\x0B\"'");
+                    $parsed[$name] = $value;
+                }
+            }
+
+            self::$runtimeEnvFile = $parsed;
+            self::$runtimeEnvPath = $path;
+            self::$runtimeEnvMtime = $mtime;
+
+            return $parsed;
         }
 
         /**
@@ -631,6 +736,26 @@
                 if ($driverClass && class_exists($driverClass) && method_exists($driverClass, 'getEnvMapping')) {
                     $mapping = $driverClass::getEnvMapping();
                     foreach ($mapping as $targetChan => $envMap) {
+                        // An empty map carries no ENV_VAR => config_key pairs, so skip it before
+                        // seeding $config[$targetChan], otherwise a channel absent from the tenant
+                        // config would be created as an empty (and thus disabled) channel.
+                        if ($envMap === []) {
+                            continue;
+                        }
+
+                        // A non-array here is a driver contract violation, not a valid mapping.
+                        // Report it instead of warning on a bare foreach, and skip the injection
+                        // so a malformed driver cannot seed a bogus channel key into the config.
+                        if (!is_array($envMap)) {
+                            error_log(sprintf(
+                                'ERROR: Helpers::getChannelsConfig - %s::getEnvMapping() returned %s for key "%s"; expected [channel => [ENV_VAR => config_key]]. Skipping env injection for it.',
+                                $driverClass,
+                                get_debug_type($envMap),
+                                (string) $targetChan
+                            ));
+                            continue;
+                        }
+
                         if (!isset($config[$targetChan])) {
                             $config[$targetChan] = [];
                         }
@@ -838,6 +963,51 @@
             }
 
             return $keys;
+        }
+
+        /**
+         * Get user-scoped API keys configuration from config/user_keys.json
+         *
+         * @return array
+         */
+        public static function getUserApiKeys(): array
+        {
+            $path = __DIR__ . '/../../config/user_keys.json';
+            if (!file_exists($path)) {
+                return [];
+            }
+
+            $content = file_get_contents($path);
+            if (!$content) {
+                return [];
+            }
+
+            $decoded = json_decode($content, true);
+            return is_array($decoded) ? $decoded : [];
+        }
+
+        /**
+         * Find a user-scoped API key entry matching the provided key.
+         *
+         * @param string|null $key
+         * @return array|null
+         */
+        public static function findUserApiKey(?string $key): ?array
+        {
+            if (empty($key)) {
+                return null;
+            }
+
+            $trimmed = trim($key);
+            $userKeys = self::getUserApiKeys();
+
+            foreach ($userKeys as $entry) {
+                if (!empty($entry['api_key']) && hash_equals($entry['api_key'], $trimmed)) {
+                    return $entry;
+                }
+            }
+
+            return null;
         }
 
         /**

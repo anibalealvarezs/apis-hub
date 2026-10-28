@@ -40,12 +40,14 @@
             $activeJobs = array_merge($scheduledJobs, $processingJobs);
             $activeJobsCount = count($activeJobs);
 
-            // 2. Fetch Channel Tiers Dynamically
+            // 2. Fetch Channel Tiers & Max Workers Dynamically
             $channelsRepo = $this->entityManager->getRepository(\Entities\Analytics\Channel::class);
             $channels = $channelsRepo->findAll();
             $channelTiers = [];
+            $channelMaxWorkers = [];
             foreach ($channels as $c) {
                 $channelTiers[$c->getName()] = method_exists($c, 'getTier') ? ($c->getTier() ?? 2) : 2;
+                $channelMaxWorkers[$c->getName()] = method_exists($c, 'getMaxWorkers') ? ($c->getMaxWorkers() ?? 3) : 3;
             }
 
             // 3. Calculate Demand Per Tier
@@ -103,6 +105,17 @@
 
                 $tier2Count = max($rawTier2, $countTier2);
                 $tier4Count = max($rawTier4, $countTier4);
+
+                // Cap worker counts up to channel concurrency limits
+                $tier2ChannelLimit = array_sum(array_intersect_key($channelMaxWorkers, $activeChannelsTier2));
+                if ($tier2ChannelLimit > 0) {
+                    $tier2Count = min($tier2Count, $tier2ChannelLimit);
+                }
+
+                $tier4ChannelLimit = array_sum(array_intersect_key($channelMaxWorkers, $activeChannelsTier4));
+                if ($tier4ChannelLimit > 0) {
+                    $tier4Count = min($tier4Count, $tier4ChannelLimit);
+                }
                 
                 // Guarantee at least 1 worker per active channel to ensure parallel execution
                 if ($tier2Count < $uniqueChannelsTier2) {

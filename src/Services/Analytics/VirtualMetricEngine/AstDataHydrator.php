@@ -138,15 +138,47 @@ class AstDataHydrator
                 if ($groupField) {
                     $seriesData = [];
                     foreach ($rows as $row) {
-                        $key = $row[$groupField] ?? $row['date'] ?? 'unknown';
-                        $seriesData[$key] = $row[$metric] ?? 0;
+                        $key = $row[$groupField] ?? null;
+                        if ($key === null) {
+                            foreach ($row as $k => $v) {
+                                if (strcasecmp((string)$k, (string)$groupField) === 0) {
+                                    $key = $v;
+                                    break;
+                                }
+                            }
+                        }
+                        $key = $key ?? $row['date'] ?? 'unknown';
+
+                        $val = $row[$metric] ?? null;
+                        if ($val === null) {
+                            foreach ($row as $k => $v) {
+                                if (strcasecmp((string)$k, (string)$metric) === 0) {
+                                    $val = $v;
+                                    break;
+                                }
+                            }
+                        }
+                        $val = $val ?? 0;
+
+                        $seriesData[(string)$key] = is_numeric($val) ? (float)$val : 0.0;
                     }
                     $metricData[$hashKey] = $seriesData;
                 } else {
                     if (!empty($rows) && isset($rows[0])) {
-                        $metricData[$hashKey] = $rows[0][$metric] ?? 0;
+                        $firstRow = $rows[0];
+                        $val = $firstRow[$metric] ?? null;
+                        if ($val === null) {
+                            foreach ($firstRow as $k => $v) {
+                                if (strcasecmp((string)$k, (string)$metric) === 0) {
+                                    $val = $v;
+                                    break;
+                                }
+                            }
+                        }
+                        $val = $val ?? 0;
+                        $metricData[$hashKey] = is_numeric($val) ? (float)$val : 0.0;
                     } else {
-                        $metricData[$hashKey] = 0;
+                        $metricData[$hashKey] = 0.0;
                     }
                 }
             }

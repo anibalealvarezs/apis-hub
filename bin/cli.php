@@ -17,11 +17,14 @@
     use Commands\Analytics\ReportAggregationTelemetryCommand;
     use Commands\Analytics\PlanMetricConfigIndexesCommand;
     use Commands\Analytics\ResetMetricsCommand;
+    use Commands\Analytics\SeedGoogleAdsMetricsCommand;
     use Commands\Analytics\ResetEntitiesCommand;
     use Commands\Analytics\ResetChannelCommand;
     use Commands\Analytics\RetryFailedJobCommand;
     use Commands\Analytics\RetryFailedJobsCommand;
+    use Commands\Analytics\ListAssetsCommand;
     use Commands\Analytics\SwooleWorkerCommand;
+    use Commands\Analytics\EvaluateAlertsCommand;
     use Commands\HealthCheckCommand;
     use Commands\Crud\AggregateEntityCommand;
     use Commands\Crud\CreateEntityCommand;
@@ -40,6 +43,7 @@
     use Commands\InstallDriversCommand;
     use Commands\NuclearResyncCommand;
     use Commands\UpgradeVersionCommand;
+    use Commands\ClassifyQueriesCommand;
     use Doctrine\ORM\Tools\Console\ConsoleRunner;
     use Doctrine\ORM\Tools\Console\EntityManagerProvider\SingleManagerProvider;
     use Exceptions\ConfigurationException;
@@ -105,6 +109,7 @@
             new SetupDatabaseCommand(),
             new RecalculateMetricConfigSignaturesCommand(Helpers::getManager()),
             new SeedDemoDataCommand(Helpers::getManager()),
+            new SeedGoogleAdsMetricsCommand($entityManager),
             new ResetMetricsCommand($entityManager),
             new ResetEntitiesCommand($entityManager),
             new ResetChannelCommand($entityManager),
@@ -117,6 +122,9 @@
             new RetryFailedJobsCommand($entityManager),
             new NuclearResyncCommand($entityManager),
             new UpgradeVersionCommand($entityManager),
+            new EvaluateAlertsCommand($entityManager),
+            new ClassifyQueriesCommand($entityManager),
+            new ListAssetsCommand(),
         ];
 
         foreach ($commands as $command) {

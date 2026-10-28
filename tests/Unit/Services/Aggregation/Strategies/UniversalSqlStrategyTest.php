@@ -406,4 +406,244 @@ final class UniversalSqlStrategyTest extends BaseUnitTestCase
         $this->assertStringContainsString('fpost.post_id = :filter_post', (string)$capturedSql);
         $this->assertSame('18121430740577061', $capturedParams['filter_post'] ?? null);
     }
+
+    public function testRelationEntityLikeFilterJoinsTableAndWrapsWildcard(): void
+    {
+        $capturedSql = null;
+        $capturedParams = [];
+
+        $connection = $this->createMock(Connection::class);
+        $connection->expects($this->once())
+            ->method('fetchAllAssociative')
+            ->willReturnCallback(static function (string $sql, array $params = []) use (&$capturedSql, &$capturedParams): array {
+                $capturedSql = $sql;
+                $capturedParams = $params;
+
+                return [[
+                    'daily' => '2026-09-08',
+                    'clicks' => 42,
+                ]];
+            });
+
+        $repository = $this->createMock(BaseRepository::class);
+        $repository->expects($this->once())->method('appendOptimizedStrategyMeta');
+
+        $plan = new AggregationPlan(
+            aggregations: ['clicks' => 'clicks'],
+            groupBy: ['daily'],
+            filters: (object)[
+                'channel' => 'google_search_console',
+                'query' => ['operator' => 'like', 'value' => 'marc'],
+            ],
+            startDate: '2026-09-01',
+            endDate: '2026-09-08',
+            context: [
+                'repository' => $repository,
+            ],
+            stages: [
+                'grouping' => ['normalized_pattern' => 'daily'],
+            ],
+            candidateOptimizedStrategies: ['universal_sql']
+        );
+
+        $strategy = new UniversalSqlStrategy();
+        $rows = $strategy->execute($connection, $plan, true);
+
+        $this->assertIsArray($rows);
+        $this->assertNotNull($capturedSql);
+        $this->assertStringContainsString('LEFT JOIN queries rq ON rq.id = mc.query_id', (string)$capturedSql);
+        $this->assertStringContainsString('rq.query ILIKE :filter_query', (string)$capturedSql);
+        $this->assertSame('%marc%', $capturedParams['filter_query'] ?? null);
+    }
+
+    public function testQueryNotLikeFilterJoinsQueriesTable(): void
+    {
+        $capturedSql = null;
+        $capturedParams = null;
+
+        $connection = $this->createMock(Connection::class);
+        $connection->method('fetchAllAssociative')
+            ->willReturnCallback(function (string $sql, array $params) use (&$capturedSql, &$capturedParams) {
+                $capturedSql = $sql;
+                $capturedParams = $params;
+                return [[
+                    'daily' => '2026-09-01',
+                    'clicks' => 10,
+                ]];
+            });
+
+        $repository = $this->createMock(BaseRepository::class);
+        $repository->expects($this->once())->method('appendOptimizedStrategyMeta');
+
+        $plan = new AggregationPlan(
+            aggregations: ['clicks' => 'clicks'],
+            groupBy: ['daily'],
+            filters: (object)[
+                'channel' => 'google_search_console',
+                'query' => ['operator' => 'not_like', 'value' => 'marc'],
+            ],
+            startDate: '2026-09-01',
+            endDate: '2026-09-08',
+            context: [
+                'repository' => $repository,
+            ],
+            stages: [
+                'grouping' => ['normalized_pattern' => 'daily'],
+            ],
+            candidateOptimizedStrategies: ['universal_sql']
+        );
+
+        $strategy = new UniversalSqlStrategy();
+        $rows = $strategy->execute($connection, $plan, true);
+
+        $this->assertIsArray($rows);
+        $this->assertNotNull($capturedSql);
+        $this->assertStringContainsString('LEFT JOIN queries rq ON rq.id = mc.query_id', (string)$capturedSql);
+        $this->assertStringContainsString('(rq.query IS NULL OR rq.query NOT ILIKE :filter_query)', (string)$capturedSql);
+        $this->assertSame('%marc%', $capturedParams['filter_query'] ?? null);
+    }
+
+    public function testGoogleSearchConsoleMultipleRulesOnSameDimensionConnectWithAnd(): void
+    {
+        $capturedSql = null;
+        $capturedParams = null;
+
+        $connection = $this->createMock(Connection::class);
+        $connection->method('fetchAllAssociative')
+            ->willReturnCallback(function (string $sql, array $params) use (&$capturedSql, &$capturedParams) {
+                $capturedSql = $sql;
+                $capturedParams = $params;
+                return [[
+                    'daily' => '2026-09-01',
+                    'clicks' => 10,
+                ]];
+            });
+
+        $repository = $this->createMock(BaseRepository::class);
+        $repository->expects($this->once())->method('appendOptimizedStrategyMeta');
+
+        $plan = new AggregationPlan(
+            aggregations: ['clicks' => 'clicks'],
+            groupBy: ['daily'],
+            filters: (object)[
+                'channel' => 'google_search_console',
+                'query' => ['operator' => 'not_like', 'value' => 'marc'],
+                'query__1' => ['operator' => 'neq', 'value' => 'unknown'],
+            ],
+            startDate: '2026-09-01',
+            endDate: '2026-09-08',
+            context: [
+                'repository' => $repository,
+            ],
+            stages: [
+                'grouping' => ['normalized_pattern' => 'daily'],
+            ],
+            candidateOptimizedStrategies: ['universal_sql']
+        );
+
+        $strategy = new UniversalSqlStrategy();
+        $rows = $strategy->execute($connection, $plan, true);
+
+        $this->assertIsArray($rows);
+        $this->assertNotNull($capturedSql);
+        $this->assertStringContainsString('(rq.query IS NULL OR rq.query NOT ILIKE :filter_query)', (string)$capturedSql);
+        $this->assertStringContainsString('rq.query <> :filter_query__1', (string)$capturedSql);
+        $this->assertSame('%marc%', $capturedParams['filter_query'] ?? null);
+        $this->assertSame('unknown', $capturedParams['filter_query__1'] ?? null);
+    }
+
+    public function testDynamicDimensionMultipleRulesOnSameDimensionConnectWithAnd(): void
+    {
+        $capturedSql = null;
+        $capturedParams = null;
+
+        $connection = $this->createMock(Connection::class);
+        $connection->method('fetchAllAssociative')
+            ->willReturnCallback(function (string $sql, array $params) use (&$capturedSql, &$capturedParams) {
+                $capturedSql = $sql;
+                $capturedParams = $params;
+                return [[
+                    'daily' => '2026-09-01',
+                    'reach' => 10,
+                ]];
+            });
+
+        $repository = $this->createMock(BaseRepository::class);
+        $repository->expects($this->once())->method('appendOptimizedStrategyMeta');
+
+        $plan = new AggregationPlan(
+            aggregations: ['reach' => 'reach'],
+            groupBy: ['daily'],
+            filters: (object)[
+                'channel' => 'facebook_organic',
+                'dimensions.reaction_type' => ['operator' => 'neq', 'value' => 'like'],
+                'dimensions.reaction_type__1' => ['operator' => 'neq', 'value' => 'love'],
+            ],
+            startDate: '2026-09-01',
+            endDate: '2026-09-08',
+            context: [
+                'repository' => $repository,
+            ],
+            stages: [
+                'grouping' => ['normalized_pattern' => 'daily'],
+            ],
+            candidateOptimizedStrategies: ['universal_sql']
+        );
+
+        $strategy = new UniversalSqlStrategy();
+        $rows = $strategy->execute($connection, $plan, true);
+
+        $this->assertIsArray($rows);
+        $this->assertNotNull($capturedSql);
+        $this->assertStringContainsString('WHERE LOWER(sub_dk.name) = :key_dim_filter_reaction_type', (string)$capturedSql);
+        $this->assertStringContainsString('dv_dim_filter_reaction_type.value <> :filter_dimensions_reaction_type', (string)$capturedSql);
+        $this->assertStringContainsString('dv_dim_filter_reaction_type.value <> :filter_dimensions_reaction_type__1', (string)$capturedSql);
+        $this->assertSame('reaction_type', $capturedParams['key_dim_filter_reaction_type'] ?? null);
+        $this->assertSame('like', $capturedParams['filter_dimensions_reaction_type'] ?? null);
+        $this->assertSame('love', $capturedParams['filter_dimensions_reaction_type__1'] ?? null);
+    }
+
+    public function testFilterByRelationAttributeInArray(): void
+    {
+        $capturedSql = null;
+        $capturedParams = null;
+        $connection = $this->createMock(Connection::class);
+        $connection->expects($this->once())
+            ->method('fetchAllAssociative')
+            ->willReturnCallback(static function (string $sql, array $params = []) use (&$capturedSql, &$capturedParams): array {
+                $capturedSql = $sql;
+                $capturedParams = $params;
+
+                return [['channeledcampaign' => 'Welcome Flow', 'sends' => 100]];
+            });
+
+        $plan = new AggregationPlan(
+            aggregations: ['sends' => 'sends'],
+            groupBy: ['channeledCampaign'],
+            filters: (object)[
+                'channel' => 'mailchimp',
+                'campaignType' => [
+                    'operator' => 'in',
+                    'value' => ['automation', 'automation-email'],
+                ],
+            ],
+            startDate: '2026-01-01',
+            endDate: '2026-01-31',
+            stages: [
+                'grouping' => ['normalized_pattern' => 'channeledCampaign'],
+            ],
+            candidateOptimizedStrategies: ['universal_sql']
+        );
+
+        $strategy = new UniversalSqlStrategy();
+        $rows = $strategy->execute($connection, $plan, true);
+
+        $this->assertIsArray($rows);
+        $this->assertNotNull($capturedSql);
+        $this->assertStringContainsString('LEFT JOIN channeled_campaigns rcc ON rcc.id = mc.channeled_campaign_id', (string)$capturedSql);
+        $this->assertStringContainsString('rcc.type IN (:filter_campaignType_0, :filter_campaignType_1)', (string)$capturedSql);
+        $this->assertSame('automation', $capturedParams['filter_campaignType_0'] ?? null);
+        $this->assertSame('automation-email', $capturedParams['filter_campaignType_1'] ?? null);
+    }
 }
+

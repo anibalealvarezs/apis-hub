@@ -73,5 +73,34 @@
             $this->assertSame(0, $maleByDate['2026-05-02']['clicks']);
             $this->assertSame(0, $maleByDate['2026-05-03']['clicks']);
         }
+
+        /**
+         * @throws Exception
+         */
+        public function testFillsMissingTrailingAnnuallyBuckets(): void
+        {
+            $results = [
+                ['trailing_annually' => 'TTM (to Oct 19, 2026)', 'clicks' => 500],
+            ];
+
+            $rows = (new TemporalGapFiller())->fill(
+                results: $results,
+                temporalField: 'trailing_annually',
+                type: 'trailing_annually',
+                startDate: '2024-10-20',
+                endDate: '2026-10-19',
+                aggregations: ['clicks' => 'clicks'],
+                groupBy: ['trailing_annually'],
+            );
+
+            // Should contain TTM (to Oct 19, 2026), TTM (to Oct 19, 2025), TTM (to Oct 19, 2024)
+            $this->assertCount(3, $rows);
+            $this->assertSame('TTM (to Oct 19, 2024)', $rows[0]['trailing_annually']);
+            $this->assertSame(0, $rows[0]['clicks']);
+            $this->assertSame('TTM (to Oct 19, 2025)', $rows[1]['trailing_annually']);
+            $this->assertSame(0, $rows[1]['clicks']);
+            $this->assertSame('TTM (to Oct 19, 2026)', $rows[2]['trailing_annually']);
+            $this->assertSame(500, $rows[2]['clicks']);
+        }
     }
 

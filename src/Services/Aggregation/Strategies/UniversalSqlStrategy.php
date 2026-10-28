@@ -100,11 +100,31 @@
                 $dimKey = $isDimension ? substr($field, 11) : $field;
 
                 // Check if it's a dynamic dimension
-                $isStandardRelation = in_array($field, ['account_type', 'metric_date', 'daily', 'weekly', 'monthly', 'quarterly', 'yearly', 'channel'], true)
+                $isStandardRelation = in_array($field, [
+                    'account_type', 'metric_date', 'daily', 'weekly', 'monthly', 'quarterly', 'semiannual', 'yearly', 'annually',
+                    'trailing_weekly', 'trailing_monthly', 'trailing_quarterly', 'trailing_semiannual', 'trailing_annually', 'trailing_yearly',
+                    'channel'
+                ], true)
                                       || isset($relationMap[$field])
                                       || str_ends_with($field, '_id');
 
                 if (!$isStandardRelation || $isDimension) {
+                    $semanticDimensions = ['intent', 'language', 'brand_relation', 'business_relevance'];
+                    if (in_array($dimKey, $semanticDimensions, true)) {
+                        $isAccountSemantic = in_array($dimKey, ['brand_relation', 'business_relevance'], true);
+                        $semAlias = 'sem_'.preg_replace('/[^a-z0-9]/i', '_', $dimKey);
+                        if ($isAccountSemantic) {
+                            $safeLeftJoin('account_query_classifications', $semAlias, "$semAlias.query_id = mc.query_id AND $semAlias.channeled_account_id = mc.channeled_account_id");
+                        } else {
+                            $safeLeftJoin('query_classifications', $semAlias, "$semAlias.query_id = mc.query_id");
+                        }
+
+                        $selectFields[] = "COALESCE($semAlias.$dimKey, 'unclassified') AS $quotedField";
+                        $groupByFields[] = "$semAlias.$dimKey";
+                        $orderMap[$field] = "$semAlias.$dimKey";
+                        continue;
+                    }
+
                     // Dimension join logic
                     $dimAlias = 'dim_'.preg_replace('/[^a-z0-9]/i', '_', $dimKey);
                     $sqlParams["key_$dimAlias"] = strtolower($dimKey);
@@ -192,37 +212,39 @@
 
             // Handle Filters
             foreach ($filtersArr as $key => $value) {
-                $isDimension = str_starts_with($key, 'dimensions.');
-                $dimKey = $isDimension ? substr($key, 11) : $key;
+                $baseKey = preg_replace('/__\d+$/', '', (string)$key);
+                $isDimension = str_starts_with($key, 'dimensions.') || str_starts_with($baseKey, 'dimensions.');
+                $rawDimKey = $isDimension ? substr($key, 11) : $key;
+                $dimKey = preg_replace('/__\d+$/', '', $rawDimKey);
 
                 $paramName = 'filter_'.preg_replace('/[^a-z0-9]/i', '_', $key);
                 $condition = $filterResolver->resolve($value);
 
                 // Exclude some internal filters that shouldn't generate SQL WHERE clauses directly
-                if (in_array($key, ['snapshot_delta', 'latest_snapshot', 'period'], true)) {
+                if (in_array($baseKey, ['snapshot_delta', 'latest_snapshot', 'period'], true)) {
                     continue;
                 }
 
-                if (in_array($key, ['post', 'post_id'], true) && $this->shouldFilterPostByPlatformId($condition)) {
+                if (in_array($baseKey, ['post', 'post_id'], true) && $this->shouldFilterPostByPlatformId($condition)) {
                     $safeLeftJoin('posts', 'fpost', 'fpost.id = mc.post_id');
-                    $whereClauses[] = $this->buildFilterClause('fpost.post_id', $condition, $paramName);
+                    $whereClauses[] = $this->buildFilterClause('fpost.post_id', $condition, $paramName, $isPostgres);
 
                     if ($condition['value'] !== null) {
-                        if ($condition['operator'] === 'in' && is_array($condition['value'])) {
+                        if (in_array($condition['operator'], ['in', 'not_in'], true) && is_array($condition['value'])) {
                             foreach ($condition['value'] as $i => $v) {
-                                $sqlParams["{$paramName}_{$i}"] = $this->formatFilterValue($v);
+                                $sqlParams["{$paramName}_{$i}"] = $this->formatFilterValue($v, $condition['operator']);
                             }
                         } else {
-                            $sqlParams[$paramName] = $this->formatFilterValue($condition['value']);
+                            $sqlParams[$paramName] = $this->formatFilterValue($condition['value'], $condition['operator']);
                         }
                     }
                     continue;
                 }
 
-                if (isset($relationMap[$key])) {
-                    $relationKey = $key;
-                } elseif (str_ends_with($key, '_id') && isset($relationMap[substr($key, 0, -3)])) {
-                    $relationKey = substr($key, 0, -3);
+                if (isset($relationMap[$baseKey])) {
+                    $relationKey = $baseKey;
+                } elseif (str_ends_with($baseKey, '_id') && isset($relationMap[substr($baseKey, 0, -3)])) {
+                    $relationKey = substr($baseKey, 0, -3);
                 } else {
                     $relationKey = null;
                 }
@@ -230,29 +252,75 @@
                 if ($relationKey !== null) {
                     if ($relationKey === 'post' && $this->shouldFilterPostByPlatformId($condition)) {
                         $safeLeftJoin('posts', 'fpost', 'fpost.id = mc.post_id');
-                        $whereClauses[] = $this->buildFilterClause('fpost.post_id', $condition, $paramName);
+                        $whereClauses[] = $this->buildFilterClause('fpost.post_id', $condition, $paramName, $isPostgres);
                     } else {
-                        $whereClauses[] = $this->buildFilterClause("mc.{$relationMap[$relationKey]['fk']}", $condition, $paramName);
+                        $map = $relationMap[$relationKey];
+                        $isAttribute = !empty($map['isAttribute']);
+                        $isLike = in_array($condition['operator'] ?? null, ['like', 'not_like'], true);
+                        $val = $condition['value'];
+                        $isNonNumericString = is_string($val) && !is_numeric($val) && !in_array($condition['operator'] ?? null, ['is_null', 'is_not_null'], true);
+                        $hasNonNumericStringArray = is_array($val) && !empty($val) && is_string(reset($val)) && !is_numeric(reset($val));
+
+                        if (!str_ends_with($baseKey, '_id') && ($isLike || $isNonNumericString || $isAttribute || $hasNonNumericStringArray)) {
+                            $alias = $map['alias'];
+                            $safeLeftJoin($map['table'], $alias, "$alias.id = mc.{$map['fk']}");
+                            if (!empty($map['isJSON'])) {
+                                $jsonPath = $map['jsonPath'] ?? 'name';
+                                $targetCol = $isPostgres ? "$alias.data->>'$jsonPath'" : "JSON_UNQUOTE(JSON_EXTRACT($alias.data, '$.$jsonPath'))";
+                            } else {
+                                $targetCol = "$alias.{$map['field']}";
+                            }
+                            $whereClauses[] = $this->buildFilterClause($targetCol, $condition, $paramName, $isPostgres);
+                        } else {
+                            $whereClauses[] = $this->buildFilterClause("mc.{$map['fk']}", $condition, $paramName, $isPostgres);
+                        }
                     }
 
                     if ($condition['value'] !== null) {
-                        if ($condition['operator'] === 'in' && is_array($condition['value'])) {
+                        if (in_array($condition['operator'], ['in', 'not_in'], true) && is_array($condition['value'])) {
                             foreach ($condition['value'] as $i => $v) {
-                                $sqlParams["{$paramName}_{$i}"] = $this->formatFilterValue($v);
+                                $sqlParams["{$paramName}_{$i}"] = $this->formatFilterValue($v, $condition['operator']);
                             }
                         } else {
-                            $sqlParams[$paramName] = $this->formatFilterValue($condition['value']);
+                            $sqlParams[$paramName] = $this->formatFilterValue($condition['value'], $condition['operator']);
                         }
                     }
                     continue;
                 }
 
                 // Dynamic dimension filter
-                $isStandardRelation = in_array($key, ['account_type', 'metric_date', 'daily', 'weekly', 'monthly', 'quarterly', 'yearly', 'channel'], true)
-                                      || isset($relationMap[$key])
-                                      || str_ends_with($key, '_id');
+                $isStandardRelation = in_array($baseKey, [
+                    'account_type', 'metric_date', 'daily', 'weekly', 'monthly', 'quarterly', 'semiannual', 'yearly', 'annually',
+                    'trailing_weekly', 'trailing_monthly', 'trailing_quarterly', 'trailing_semiannual', 'trailing_annually', 'trailing_yearly',
+                    'channel'
+                ], true)
+                                      || isset($relationMap[$baseKey])
+                                      || str_ends_with($baseKey, '_id');
 
                 if (!$isStandardRelation || $isDimension) {
+                    $semanticDimensions = ['intent', 'language', 'brand_relation', 'business_relevance'];
+                    if (in_array($dimKey, $semanticDimensions, true)) {
+                        $isAccountSemantic = in_array($dimKey, ['brand_relation', 'business_relevance'], true);
+                        $semAlias = 'sem_filter_'.preg_replace('/[^a-z0-9]/i', '_', $key);
+                        if ($isAccountSemantic) {
+                            $safeLeftJoin('account_query_classifications', $semAlias, "$semAlias.query_id = mc.query_id AND $semAlias.channeled_account_id = mc.channeled_account_id");
+                        } else {
+                            $safeLeftJoin('query_classifications', $semAlias, "$semAlias.query_id = mc.query_id");
+                        }
+
+                        $whereClauses[] = $this->buildFilterClause("$semAlias.$dimKey", $condition, $paramName, $isPostgres);
+                        if ($condition['value'] !== null) {
+                            if (in_array($condition['operator'], ['in', 'not_in'], true) && is_array($condition['value'])) {
+                                foreach ($condition['value'] as $i => $v) {
+                                    $sqlParams["{$paramName}_{$i}"] = $this->formatFilterValue($v, $condition['operator']);
+                                }
+                            } else {
+                                $sqlParams[$paramName] = $this->formatFilterValue($condition['value'], $condition['operator']);
+                            }
+                        }
+                        continue;
+                    }
+
                     $dimAlias = 'dim_filter_'.preg_replace('/[^a-z0-9]/i', '_', $dimKey);
                     $sqlParams["key_$dimAlias"] = strtolower($dimKey);
 
@@ -263,14 +331,14 @@
                 )");
                     $safeLeftJoin('dimension_values', "dv_$dimAlias", "dsi_$dimAlias.dimension_value_id = dv_$dimAlias.id");
 
-                    $whereClauses[] = $this->buildFilterClause("dv_$dimAlias.value", $condition, $paramName);
+                    $whereClauses[] = $this->buildFilterClause("dv_$dimAlias.value", $condition, $paramName, $isPostgres);
                     if ($condition['value'] !== null) {
-                        if ($condition['operator'] === 'in' && is_array($condition['value'])) {
+                        if (in_array($condition['operator'], ['in', 'not_in'], true) && is_array($condition['value'])) {
                             foreach ($condition['value'] as $i => $v) {
-                                $sqlParams["{$paramName}_{$i}"] = $this->formatFilterValue($v);
+                                $sqlParams["{$paramName}_{$i}"] = $this->formatFilterValue($v, $condition['operator']);
                             }
                         } else {
-                            $sqlParams[$paramName] = $this->formatFilterValue($condition['value']);
+                            $sqlParams[$paramName] = $this->formatFilterValue($condition['value'], $condition['operator']);
                         }
                     }
                     continue;
@@ -382,7 +450,13 @@
                 $groupSql
                 $orderSql";
 
-            return $connection->fetchAllAssociative($sql, $sqlParams);
+            error_log("[UniversalSqlDebug] Executing SQL: " . preg_replace('/\s+/', ' ', $sql) . " | Params: " . json_encode($sqlParams));
+
+            $rows = $connection->fetchAllAssociative($sql, $sqlParams);
+
+            error_log("[UniversalSqlDebug] Rows returned: " . count($rows) . " | Sample: " . json_encode(array_slice($rows, 0, 2)));
+
+            return $rows;
         }
 
         /**
@@ -467,7 +541,15 @@
                 'weekly',
                 'monthly',
                 'quarterly',
+                'semiannual',
                 'yearly',
+                'annually',
+                'trailing_weekly',
+                'trailing_monthly',
+                'trailing_quarterly',
+                'trailing_semiannual',
+                'trailing_annually',
+                'trailing_yearly',
                 'channel',
                 'page',
                 'page_id',
@@ -690,7 +772,7 @@
             return 'daily';
         }
 
-        private function buildFilterClause(string $col, array $condition, string $alias): string
+        private function buildFilterClause(string $col, array $condition, string $alias, bool $isPostgres = false): string
         {
             if ($condition['operator'] === 'in' && is_array($condition['value'])) {
                 if (empty($condition['value'])) {
@@ -703,17 +785,36 @@
                 return "$col IN (" . implode(', ', $placeholders) . ")";
             }
 
+            if ($condition['operator'] === 'not_in' && is_array($condition['value'])) {
+                if (empty($condition['value'])) {
+                    return "1 = 1";
+                }
+                $placeholders = [];
+                foreach (array_keys($condition['value']) as $i) {
+                    $placeholders[] = ":{$alias}_{$i}";
+                }
+                return "($col IS NULL OR $col NOT IN (" . implode(', ', $placeholders) . "))";
+            }
+
+            $likeClause = $isPostgres ? "$col ILIKE :$alias" : "LOWER($col) LIKE LOWER(:$alias)";
+            $notLikeClause = $isPostgres
+                ? "($col IS NULL OR $col NOT ILIKE :$alias)"
+                : "($col IS NULL OR LOWER($col) NOT LIKE LOWER(:$alias))";
+
             return match ($condition['operator']) {
                 'neq'         => "$col <> :$alias",
+                'like'        => $likeClause,
+                'not_like'    => $notLikeClause,
                 'is_null'     => "$col IS NULL",
                 'is_not_null' => "$col IS NOT NULL",
                 'in'          => "$col IN (:$alias)",
+                'not_in'      => "($col IS NULL OR $col NOT IN (:$alias))",
                 'eq'          => "$col = :$alias",
                 default       => "$col = :$alias",
             };
         }
 
-        private function formatFilterValue(mixed $value): mixed
+        private function formatFilterValue(mixed $value, ?string $operator = null): mixed
         {
             if (is_array($value)) {
                 // DBAL can handle arrays for IN clauses if connection is properly configured, 
@@ -723,6 +824,9 @@
             }
             if (is_bool($value)) {
                 return $value ? 1 : 0;
+            }
+            if (in_array($operator, ['like', 'not_like'], true) && is_string($value)) {
+                return str_contains($value, '%') ? $value : "%{$value}%";
             }
             return $value;
         }

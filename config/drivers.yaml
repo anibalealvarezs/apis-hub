@@ -117,3 +117,19 @@ google_business_profile:
   driver: 'Anibalealvarezs\GoogleHubDriver\Drivers\GoogleBusinessProfileDriver'
   auth: 'Anibalealvarezs\GoogleHubDriver\Auth\GoogleAuthProvider'
   entities: ["metrics", "entities"]
+mailchimp:
+  resource_key: audiences
+  driver: 'Anibalealvarezs\MailchimpHubDriver\Drivers\MailchimpDriver'
+  auth: 'Anibalealvarezs\MailchimpHubDriver\Auth\MailchimpAuthProvider'
+  processor: ['Classes\Requests\MetricRequests', "persist"]
+  entities:
+    [
+      "metrics",
+      "campaigns",
+      "audiences",
+      "stores",
+      "links",
+      "events",
+      "orders",
+    ]
+

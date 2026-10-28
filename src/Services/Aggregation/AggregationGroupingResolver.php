@@ -21,7 +21,7 @@
             if (count($normalized) === 1) {
                 $field = $normalized[0];
                 $rawField = $rawFields[0];
-                if (in_array($field, ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'], true)) {
+                if (in_array($field, ['daily', 'weekly', 'monthly', 'quarterly', 'semiannual', 'yearly', 'annually', 'trailing_weekly', 'trailing_monthly', 'trailing_quarterly', 'trailing_semiannual', 'trailing_annually', 'trailing_yearly'], true)) {
                     return $field;
                 }
 
@@ -51,8 +51,58 @@
                 return implode('+', $normalized);
             }
 
-            if (count($normalized) === 2 && in_array('daily', $normalized) && in_array('channeledcampaign', $normalized)) {
-                return 'daily+channeledCampaign';
+            // Handle combination of known entity fields with dimension fields (e.g. ['query', 'dimensions.intent'])
+            $hasEntityAndDimension = count($rawFields) >= 2
+                && array_reduce($rawFields, static function (bool $carry, string $field) use ($knownEntityFields): bool {
+                    $lower = strtolower($field);
+                    return $carry && (in_array($lower, $knownEntityFields, true) || (str_starts_with($lower, 'dimensions.') && strlen($field) > 11));
+                }, true);
+            if ($hasEntityAndDimension) {
+                $combined = array_map(static function (string $field) use ($knownEntityFields): string {
+                    $lower = strtolower($field);
+                    if (in_array($lower, $knownEntityFields, true)) {
+                        return $lower;
+                    }
+                    return 'dimensions.' . substr($field, 11);
+                }, $rawFields);
+                usort($combined, static fn(string $left, string $right): int => strcmp(strtolower($left), strtolower($right)));
+
+                return implode('+', $combined);
+            }
+
+            // Handle temporal (daily/weekly/monthly/etc.) combined with a single known entity or dimension field.
+            $temporalFields = [
+                'daily', 'weekly', 'monthly', 'quarterly', 'semiannual', 'yearly', 'annually',
+                'trailing_weekly', 'trailing_monthly', 'trailing_quarterly', 'trailing_semiannual', 'trailing_annually', 'trailing_yearly',
+            ];
+            $knownCombinableFields = [
+                'query', 'page', 'country', 'device', 'age', 'gender',
+                'ad', 'adgroup', 'account', 'campaign',
+                'channeledaccount', 'channeledcampaign',
+            ];
+            if (count($normalized) === 2) {
+                $temporalPart = null;
+                $entityPart   = null;
+                foreach ($normalized as $idx => $norm) {
+                    if (in_array($norm, $temporalFields, true)) {
+                        $temporalPart = $norm;
+                    } elseif (in_array($norm, $knownCombinableFields, true)) {
+                        $entityPart = $norm;
+                    } elseif (str_starts_with($norm, 'dimensions.') && strlen($norm) > 11) {
+                        $entityPart = $norm;
+                    }
+                }
+
+                if ($temporalPart !== null && $entityPart !== null) {
+                    // Preserve original casing for known camelCase identifiers (e.g. channeledCampaign)
+                    $entityLabel = match ($entityPart) {
+                        'channeledcampaign' => 'channeledCampaign',
+                        'channeledaccount'  => 'channeledAccount',
+                        default            => $entityPart,
+                    };
+
+                    return $temporalPart . '+' . $entityLabel;
+                }
             }
 
             return null;
@@ -83,7 +133,8 @@
                     continue;
                 }
 
-                $dimensionKeys[] = trim(substr((string)$key, 11));
+                $rawKey = trim(substr((string)$key, 11));
+                $dimensionKeys[] = preg_replace('/__\d+$/', '', $rawKey);
             }
 
             $excludedKeys = $this->getOptimizedDimensionSetExcludedKeys($relationMap);
@@ -103,7 +154,7 @@
 
         public function getOptimizedDimensionSetExcludedKeys(array $relationMap): array
         {
-            return [];
+            return ['intent', 'language', 'brand_relation', 'business_relevance'];
         }
 
         /**
@@ -174,37 +225,109 @@
                 ];
             }
 
-            $isAllDimensions = array_reduce($fields, static fn(bool $carry, string $field): bool => $carry && str_starts_with($field, 'dimensions.'), true);
-            if ($isAllDimensions) {
-                return $this->buildDimensionSetCombinationGroupingConfig($fields, $isPostgres, $quoteChar);
+            $temporalFields = [
+                'daily', 'weekly', 'monthly', 'quarterly', 'semiannual', 'yearly', 'annually',
+                'trailing_weekly', 'trailing_monthly', 'trailing_quarterly', 'trailing_semiannual', 'trailing_annually', 'trailing_yearly',
+            ];
+            $knownEntities = ['query', 'page', 'country', 'device', 'channeledCampaign', 'channeledAccount'];
+
+            $allSupported = array_reduce($fields, static fn(bool $carry, string $field): bool => 
+                $carry && (
+                    in_array($field, $temporalFields, true) ||
+                    in_array($field, $knownEntities, true) ||
+                    str_starts_with($field, 'dimensions.') ||
+                    isset($relationMap[$field])
+                ), true
+            );
+
+            if (!$allSupported) {
+                return null;
             }
 
-            $isAllEntities = array_reduce($fields, static fn(bool $carry, string $field): bool => $carry && (in_array($field, ['query', 'page', 'country', 'device', 'daily', 'channeledCampaign'], true)), true);
-            if ($isAllEntities) {
-                return $this->buildEntityCombinationGroupingConfig($fields, $isPostgres, $quoteChar, $relationMap);
-            }
-
-            return null;
+            return $this->buildCombinationGroupingConfig($fields, $isPostgres, $quoteChar, $relationMap);
         }
 
-        private function buildEntityCombinationGroupingConfig(array $fields, bool $isPostgres, string $quoteChar, array $relationMap): array
+        private function buildCombinationGroupingConfig(array $fields, bool $isPostgres, string $quoteChar, array $relationMap): array
         {
             $finalSelect = [];
             $groupBy = [];
-            $joins = [];
             $outerSelect = [];
             $orderMap = [];
             $configsSelect = [];
             $configsJoins = [];
 
+            $semanticDimensions = ['intent', 'language', 'brand_relation', 'business_relevance'];
+            $temporalFields = [
+                'daily', 'weekly', 'monthly', 'quarterly', 'semiannual', 'yearly', 'annually',
+                'trailing_weekly', 'trailing_monthly', 'trailing_quarterly', 'trailing_semiannual', 'trailing_annually', 'trailing_yearly',
+            ];
+
             foreach ($fields as $field) {
-                if ($field === 'daily') {
-                    $alias = $quoteChar.'daily'.$quoteChar;
+                if (in_array($field, $temporalFields, true)) {
+                    $alias = $quoteChar.$field.$quoteChar;
                     $finalSelect[] = "m.metric_date AS $alias";
                     $groupBy[] = $alias;
                     $outerSelect[] = $alias;
-                    $orderMap['daily'] = "f.$alias";
-                    $orderMap['date'] = "f.$alias";
+                    $orderMap[$field] = "f.$alias";
+                    if ($field === 'daily') {
+                        $orderMap['date'] = "f.$alias";
+                    }
+                    continue;
+                }
+
+                if (str_starts_with($field, 'dimensions.')) {
+                    $dkName = str_replace('dimensions.', '', $field);
+                    $alias = $quoteChar.$field.$quoteChar;
+                    $safeDk = preg_replace('/[^a-z0-9]/i', '_', $dkName);
+
+                    if (in_array($dkName, $semanticDimensions, true)) {
+                        $isAccountSemantic = in_array($dkName, ['brand_relation', 'business_relevance'], true);
+                        $tAlias = "t_sem_$safeDk";
+                        if ($isAccountSemantic) {
+                            $configsJoins[] = "LEFT JOIN account_query_classifications $tAlias ON $tAlias.query_id = mc.query_id AND $tAlias.channeled_account_id = mc.channeled_account_id";
+                        } else {
+                            $configsJoins[] = "LEFT JOIN query_classifications $tAlias ON $tAlias.query_id = mc.query_id";
+                        }
+
+                        $configsSelect[] = "COALESCE($tAlias.$dkName, 'unclassified') AS $alias";
+                        $finalSelect[] = "mc.$alias";
+                        $groupBy[] = $alias;
+                        $outerSelect[] = $alias;
+                        $orderMap[$field] = "f.$alias";
+                        continue;
+                    }
+
+                    $dvAlias = "dv_$safeDk";
+                    $dsiAlias = "dsi_$safeDk";
+                    $dkAlias = "dk_$safeDk";
+
+                    $tAlias = "t_$safeDk";
+                    $configsJoins[] = "LEFT JOIN (
+                    SELECT dsi.dimension_set_id, dv.value
+                    FROM dimension_set_items dsi
+                    JOIN dimension_values dv ON dv.id = dsi.dimension_value_id
+                    JOIN dimension_keys dk ON dk.id = dv.dimension_key_id
+                    WHERE LOWER(dk.name) = LOWER('".str_replace("'", "''", $dkName)."')
+                ) $tAlias ON $tAlias.dimension_set_id = mc.dimension_set_id";
+
+                    $fbExpr = "'N/A'";
+                    if ($dkName === 'page') {
+                        $fbAlias = "t_landing_page";
+                        $configsJoins[] = "LEFT JOIN (
+                        SELECT dsi.dimension_set_id, dv.value
+                        FROM dimension_set_items dsi
+                        JOIN dimension_values dv ON dv.id = dsi.dimension_value_id
+                        JOIN dimension_keys dk ON dk.id = dv.dimension_key_id
+                        WHERE LOWER(dk.name) = LOWER('landing_page')
+                    ) $fbAlias ON $fbAlias.dimension_set_id = mc.dimension_set_id";
+                        $fbExpr = "$fbAlias.value, 'N/A'";
+                    }
+
+                    $configsSelect[] = "COALESCE($tAlias.value, $fbExpr) AS $alias";
+                    $finalSelect[] = "mc.$alias";
+                    $groupBy[] = $alias;
+                    $outerSelect[] = $alias;
+                    $orderMap[$field] = "f.$alias";
                     continue;
                 }
 
@@ -229,7 +352,7 @@
             return [
                 'final_select'   => $finalSelect,
                 'group_by'       => $groupBy,
-                'joins'          => [], // Joins are now in configs_joins
+                'joins'          => [],
                 'outer_select'   => $outerSelect,
                 'order_map'      => $orderMap,
                 'configs_select' => $configsSelect,
@@ -246,10 +369,30 @@
             $configsSelect = [];
             $configsJoins = [];
 
+            $semanticDimensions = ['intent', 'language', 'brand_relation', 'business_relevance'];
+
             foreach ($fields as $field) {
                 $dkName = str_replace('dimensions.', '', $field);
                 $alias = $quoteChar.$field.$quoteChar;
                 $safeDk = preg_replace('/[^a-z0-9]/i', '_', $dkName);
+
+                if (in_array($dkName, $semanticDimensions, true)) {
+                    $isAccountSemantic = in_array($dkName, ['brand_relation', 'business_relevance'], true);
+                    $tAlias = "t_sem_$safeDk";
+                    if ($isAccountSemantic) {
+                        $configsJoins[] = "LEFT JOIN account_query_classifications $tAlias ON $tAlias.query_id = mc.query_id AND $tAlias.channeled_account_id = mc.channeled_account_id";
+                    } else {
+                        $configsJoins[] = "LEFT JOIN query_classifications $tAlias ON $tAlias.query_id = mc.query_id";
+                    }
+
+                    $configsSelect[] = "COALESCE($tAlias.$dkName, 'unclassified') AS $alias";
+                    $finalSelect[] = "mc.$alias";
+                    $groupBy[] = $alias;
+                    $outerSelect[] = $alias;
+                    $orderMap[$field] = "f.$alias";
+                    continue;
+                }
+
                 $dvAlias = "dv_$safeDk";
                 $dsiAlias = "dsi_$safeDk";
                 $dkAlias = "dk_$safeDk";

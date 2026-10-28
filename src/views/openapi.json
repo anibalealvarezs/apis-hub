@@ -47,12 +47,19 @@
                     "aggregations"
                 ],
                 "properties": {
+                    "scope": {
+                        "type": "string",
+                        "enum": ["global", "channel", "asset"],
+                        "description": "Calculation scope: 'global' (cross-channel blended), 'channel' (marketing platform), or 'asset' (ad account/property isolation).",
+                        "example": "global"
+                    },
                     "aggregations": {
                         "type": "object",
-                        "description": "Mapping of resulting aliases to DQL aggregate functions (SUM, AVG, COUNT, MIN, MAX).",
+                        "description": "Mapping of resulting aliases to DQL aggregate functions (SUM, AVG) or canonical formulas ('spend', 'clicks', 'impressions', 'reach', 'ctr', 'cpc', 'cpm', 'roas', 'position', 'conversions', 'bounce_rate').",
                         "example": {
-                            "total_sales": "SUM(e.price)",
-                            "avg_rating": "AVG(e.rating)"
+                            "total_spend": "spend",
+                            "blended_roas": "roas",
+                            "avg_cpc": "cpc"
                         }
                     },
                     "groupBy": {
@@ -60,11 +67,23 @@
                         "items": {
                             "type": "string"
                         },
-                        "description": "Fields to group the aggregation results by.",
+                        "description": "Fields or granularities to group the aggregation results by. Supports temporal ('daily', 'weekly', 'monthly', 'quarterly', 'yearly') and dimensional breakdowns ('device', 'country', 'query', 'page', 'dimensions.gender').",
                         "example": [
-                            "brand",
-                            "model"
+                            "daily",
+                            "dimensions.device"
                         ]
+                    },
+                    "startDate": {
+                        "type": "string",
+                        "format": "date",
+                        "description": "Start date for aggregation (YYYY-MM-DD).",
+                        "example": "2026-01-01"
+                    },
+                    "endDate": {
+                        "type": "string",
+                        "format": "date",
+                        "description": "End date for aggregation (YYYY-MM-DD).",
+                        "example": "2026-01-31"
                     },
                     "filters": {
                         "$ref": "#/components/schemas/FilterObject"

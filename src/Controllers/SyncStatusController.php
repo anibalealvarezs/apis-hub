@@ -23,6 +23,31 @@ class SyncStatusController extends BaseController
     }
 
     /**
+     * GET /api/v1/ping
+     *
+     * Lightweight client-facing heartbeat endpoint to test public API key validity.
+     *
+     * @param Request $request
+     * @return JsonResponse
+     */
+    public function ping(Request $request): JsonResponse
+    {
+        if (!$this->isAuthorized($request)) {
+            return new JsonResponse([
+                'status' => 'error',
+                'error' => 'Unauthorized',
+                'message' => 'Invalid or missing API Key.'
+            ], 401);
+        }
+
+        return new JsonResponse([
+            'status' => 'ok',
+            'message' => 'APIs Hub API connection verified successfully.',
+            'timestamp' => (new \DateTimeImmutable())->format(\DateTimeInterface::ATOM)
+        ], 200);
+    }
+
+    /**
      * GET /api/sync/status
      *
      * Params:
@@ -115,6 +140,108 @@ class SyncStatusController extends BaseController
         } catch (\Throwable $e) {
             return new JsonResponse([
                 'error' => 'Failed to reschedule auth-failed jobs',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * GET /api/v1/classification-coverage
+     *
+     * Params:
+     * - asset_id: int (channeled_account_id)
+     */
+    public function getClassificationCoverage(Request $request): JsonResponse
+    {
+        if (!$this->isAuthorized($request)) {
+            return new JsonResponse(['error' => 'Unauthorized'], 401);
+        }
+
+        $assetId = $request->query->get('asset_id');
+
+        try {
+            $conn = Helpers::getManager()->getConnection();
+
+            if ($assetId) {
+                // Total queries for this asset
+                $totalQueries = (int) $conn->fetchOne("
+                    SELECT COUNT(DISTINCT query_id)
+                    FROM metric_configs
+                    WHERE channeled_account_id = :asset_id
+                      AND query_id IS NOT NULL
+                ", ['asset_id' => $assetId]);
+
+                // Classified queries for this asset
+                $classifiedQueries = (int) $conn->fetchOne("
+                    SELECT COUNT(DISTINCT query_id)
+                    FROM account_query_classifications
+                    WHERE channeled_account_id = :asset_id
+                ", ['asset_id' => $assetId]);
+
+                // Traffic volume coverage (clicks/impressions of classified queries vs total)
+                $trafficStats = $conn->fetchAssociative("
+                    SELECT 
+                        COALESCE(SUM(mc.occurrences), 0) AS total_occurrences,
+                        COALESCE(SUM(CASE WHEN aqc.query_id IS NOT NULL THEN mc.occurrences ELSE 0 END), 0) AS classified_occurrences
+                    FROM (
+                        SELECT query_id, COUNT(id) AS occurrences
+                        FROM metric_configs
+                        WHERE channeled_account_id = :asset_id AND query_id IS NOT NULL
+                        GROUP BY query_id
+                    ) mc
+                    LEFT JOIN account_query_classifications aqc 
+                        ON aqc.query_id = mc.query_id AND aqc.channeled_account_id = :asset_id
+                ", ['asset_id' => $assetId]);
+            } else {
+                // Tenant-wide totals across all GSC assets
+                $totalQueries = (int) $conn->fetchOne("
+                    SELECT COUNT(DISTINCT query_id)
+                    FROM metric_configs
+                    WHERE query_id IS NOT NULL
+                ");
+
+                $classifiedQueries = (int) $conn->fetchOne("
+                    SELECT COUNT(DISTINCT query_id)
+                    FROM query_classifications
+                ");
+
+                $trafficStats = $conn->fetchAssociative("
+                    SELECT 
+                        COALESCE(SUM(mc.occurrences), 0) AS total_occurrences,
+                        COALESCE(SUM(CASE WHEN qc.query_id IS NOT NULL THEN mc.occurrences ELSE 0 END), 0) AS classified_occurrences
+                    FROM (
+                        SELECT query_id, COUNT(id) AS occurrences
+                        FROM metric_configs
+                        WHERE query_id IS NOT NULL
+                        GROUP BY query_id
+                    ) mc
+                    LEFT JOIN query_classifications qc 
+                        ON qc.query_id = mc.query_id
+                ");
+            }
+
+            $totalOccurrences = (int) ($trafficStats['total_occurrences'] ?? 0);
+            $classifiedOccurrences = (int) ($trafficStats['classified_occurrences'] ?? 0);
+            $trafficCoveragePercentage = $totalOccurrences > 0 ? round(($classifiedOccurrences / $totalOccurrences) * 100, 2) : 100.0;
+            $queryCoveragePercentage = $totalQueries > 0 ? round(($classifiedQueries / $totalQueries) * 100, 2) : 100.0;
+            $hasKey = !empty(Helpers::getEnvValue('TYPESAFE_API_KEY'));
+
+            return new JsonResponse([
+                'status' => 'success',
+                'data' => [
+                    'account_id' => $assetId ? (int) $assetId : null,
+                    'total_queries' => $totalQueries,
+                    'classified_queries' => $classifiedQueries,
+                    'unclassified_queries' => max(0, $totalQueries - $classifiedQueries),
+                    'query_coverage_percentage' => $queryCoveragePercentage,
+                    'traffic_coverage_percentage' => $trafficCoveragePercentage,
+                    'is_fully_classified' => $classifiedQueries >= $totalQueries,
+                    'has_active_key' => $hasKey,
+                ]
+            ]);
+        } catch (\Throwable $e) {
+            return new JsonResponse([
+                'error' => 'Failed to calculate classification coverage',
                 'message' => $e->getMessage()
             ], 500);
         }

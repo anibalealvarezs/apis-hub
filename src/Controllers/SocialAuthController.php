@@ -20,18 +20,20 @@ class SocialAuthController
             return new Response(json_encode(['error' => 'Unauthorized']), 401, ['Content-Type' => 'application/json']);
         }
 
-        $data = json_decode($request->getContent(), true);
+        $data = json_decode($request->getContent(), true) ?: [];
         $token = $data['access_token'] ?? null;
         $userId = $data['user_id'] ?? null;
         $refreshToken = $data['refresh_token'] ?? null;
         $scopes = $data['scopes'] ?? [];
+        $accounts = $data['accounts'] ?? null;
 
         $this->saveCredentials(
             provider: $provider,
             token: (string)$token, 
             userId: $userId, 
             refreshToken: $refreshToken, 
-            scopes: $scopes
+            scopes: $scopes,
+            extra: $accounts ? ['accounts' => $accounts] : $data
         );
 
         return new Response(json_encode(['success' => true]), 200, ['Content-Type' => 'application/json']);
@@ -40,19 +42,20 @@ class SocialAuthController
     /**
      * Persist tokens to provider-specific storage via drivers
      */
-    private function saveCredentials(string $provider, string $token, ?string $userId = null, ?string $refreshToken = null, array $scopes = []): void
+    private function saveCredentials(string $provider, string $token, ?string $userId = null, ?string $refreshToken = null, array $scopes = [], array $extra = []): void
     {
         $registry = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getRegistry();
         
         foreach ($registry as $channel => $config) {
             $driverClass = $config['driver'];
             if (class_exists($driverClass) && $driverClass::getCommonConfigKey() === $provider) {
-                $driverClass::storeCredentials([
+                $payload = array_merge($extra, [
                     'access_token' => $token,
                     'refresh_token' => $refreshToken,
                     'user_id' => $userId,
                     'scopes' => $scopes
                 ]);
+                $driverClass::storeCredentials($payload);
                 return;
             }
         }

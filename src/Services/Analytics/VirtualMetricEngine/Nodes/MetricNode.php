@@ -35,7 +35,7 @@ class MetricNode implements AstNodeInterface
 
     public function evaluate(EvaluationContext $context): float|int|array
     {
-        return $context->getMetricTimeSeries($this->getHashKey());
+        return $context->getMetricDataByNode($this->getHashKey(), $this->metricAlias);
     }
 
     public function getMetricNodes(): array

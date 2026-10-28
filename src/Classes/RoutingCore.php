@@ -169,12 +169,27 @@
                 return $adminKey !== null && $providedKey === $adminKey;
             }
 
-            // Public/Report routes accept both admin and regular keys
+            // Public/Report routes accept admin, master app key, and valid user-scoped keys
             $validKeys = [];
             if ($appKey) $validKeys = array_merge($validKeys, array_map('trim', explode(',', $appKey)));
             if ($adminKey) $validKeys[] = trim($adminKey);
 
-            return !empty($validKeys) && in_array($providedKey, $validKeys, true);
+            if (!empty($validKeys) && in_array($providedKey, $validKeys, true)) {
+                return true;
+            }
+
+            // Check user-scoped API keys (stored in config/user_keys.json)
+            $userKeyEntry = Helpers::findUserApiKey($providedKey);
+            if ($userKeyEntry !== null) {
+                // Attach user scope attributes to request for downstream controller/filtering access
+                $request->attributes->set('USER_API_KEY_CONTEXT', $userKeyEntry);
+                $request->attributes->set('USER_ID', $userKeyEntry['user_id'] ?? null);
+                $request->attributes->set('ALLOWED_ASSET_GROUPS', $userKeyEntry['allowed_asset_groups'] ?? []);
+                $request->attributes->set('ALLOWED_ASSETS', $userKeyEntry['allowed_assets'] ?? []);
+                return true;
+            }
+
+            return false;
         }
 
         /**

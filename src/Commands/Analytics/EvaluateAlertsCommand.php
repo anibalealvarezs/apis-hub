@@ -31,6 +31,7 @@ class EvaluateAlertsCommand extends Command
     {
         $this
             ->addOption('config', 'c', InputOption::VALUE_OPTIONAL, 'Path to alerts.json config file', 'config/alerts.json')
+            ->addOption('alert-id', 'a', InputOption::VALUE_OPTIONAL, 'Specific alert ID to evaluate')
             ->addOption('force', 'f', InputOption::VALUE_NONE, 'Force evaluation regardless of next_evaluation_at schedule')
             ->addOption('dry-run', 'd', InputOption::VALUE_NONE, 'Evaluate thresholds without sending HTTP callbacks to Facade');
     }
@@ -38,6 +39,7 @@ class EvaluateAlertsCommand extends Command
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $configPath = $input->getOption('config');
+        $alertIdFilter = $input->getOption('alert-id');
         $force = (bool) $input->getOption('force');
         $dryRun = (bool) $input->getOption('dry-run');
 
@@ -60,22 +62,45 @@ class EvaluateAlertsCommand extends Command
             return Command::SUCCESS;
         }
 
+        if ($alertIdFilter !== null) {
+            $alerts = array_values(array_filter($alerts, fn ($a) => (string)($a['id'] ?? '') === (string)$alertIdFilter));
+            if (empty($alerts)) {
+                $output->writeln("<comment>Alert with ID '{$alertIdFilter}' not found in {$configPath}.</comment>");
+                return Command::SUCCESS;
+            }
+        }
+
         $logger = Helpers::setLogger('alerts.log');
         $logger->info("--- Starting Alert Evaluation Run ---", ['count' => count($alerts), 'force' => $force, 'dryRun' => $dryRun]);
 
         $facadeUrl = $_ENV['ALERT_FACADE_URL'] ?? null;
         if (!$facadeUrl && !empty($_ENV['MONITOR_FACADE_URL'])) {
-            $facadeUrl = rtrim(dirname($_ENV['MONITOR_FACADE_URL']), '/') . '/api/alerts/triggered';
+            $parsedUrl = parse_url($_ENV['MONITOR_FACADE_URL']);
+            $scheme = $parsedUrl['scheme'] ?? 'https';
+            $host = $parsedUrl['host'] ?? 'localhost';
+            $port = isset($parsedUrl['port']) ? ':' . $parsedUrl['port'] : '';
+            $facadeUrl = "{$scheme}://{$host}{$port}/api/alerts/triggered";
+        }
+        if ($facadeUrl && str_ends_with($facadeUrl, '/api/heartbeat/api/alerts/triggered')) {
+            $facadeUrl = str_replace('/api/heartbeat/api/alerts/triggered', '/api/alerts/triggered', $facadeUrl);
         }
         $monitorToken = $_ENV['MONITOR_TOKEN'] ?? null;
 
         $nowIso = date('c');
         $nowTs = time();
 
-        foreach ($alerts as $alert) {
+        $configUpdated = false;
+
+        foreach ($alerts as $idx => $alert) {
             $alertId = $alert['id'] ?? null;
             $alertName = $alert['name'] ?? 'Alert #' . $alertId;
+            $isActive = $alert['is_active'] ?? true;
             $nextEval = $alert['next_evaluation_at'] ?? null;
+
+            if (!$isActive && !$force && $alertIdFilter === null) {
+                $output->writeln("  [Skip] Alert '{$alertName}' (ID {$alertId}) is disabled");
+                continue;
+            }
 
             if (!$force && $nextEval) {
                 $nextTs = strtotime($nextEval);
@@ -96,6 +121,8 @@ class EvaluateAlertsCommand extends Command
             $lines = $alert['calculation_lines'] ?? [
                 ['id' => null, 'label' => 'Default Line', 'asset_filter' => ['asset_platform_id' => 'all']]
             ];
+
+            $lastReturnedNextEval = null;
 
             foreach ($lines as $line) {
                 $lineId = $line['id'] ?? null;
@@ -170,7 +197,10 @@ class EvaluateAlertsCommand extends Command
                     ];
 
                     if (!$dryRun && $facadeUrl && $monitorToken) {
-                        $this->postResultToFacade($facadeUrl, $monitorToken, $payload);
+                        $res = $this->postResultToFacade($facadeUrl, $monitorToken, $payload);
+                        if (!empty($res['next_evaluation_at'])) {
+                            $lastReturnedNextEval = $res['next_evaluation_at'];
+                        }
                     } elseif ($dryRun) {
                         $output->writeln("     [Dry Run] Skipping HTTP callback");
                     }
@@ -191,14 +221,71 @@ class EvaluateAlertsCommand extends Command
                             'warning_message' => $e->getMessage(),
                             'triggered_at' => $nowIso,
                         ];
-                        $this->postResultToFacade($facadeUrl, $monitorToken, $errorPayload);
+                        $res = $this->postResultToFacade($facadeUrl, $monitorToken, $errorPayload);
+                        if (!empty($res['next_evaluation_at'])) {
+                            $lastReturnedNextEval = $res['next_evaluation_at'];
+                        }
                     }
                 }
             }
+
+            // Advance next_evaluation_at timestamp for evaluated alert
+            $nextTimestamp = $lastReturnedNextEval ?: $this->computeFallbackNextEvaluationAt($alert);
+            $alerts[$idx]['next_evaluation_at'] = $nextTimestamp;
+            $alerts[$idx]['last_evaluated_at'] = $nowIso;
+            $configUpdated = true;
+        }
+
+        if ($configUpdated && file_exists($configPath) && is_writable($configPath)) {
+            file_put_contents($configPath, json_encode($alerts, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
         }
 
         $logger->info("--- Alert Evaluation Run Complete ---");
         return Command::SUCCESS;
+    }
+
+    /**
+     * Compute fallback next evaluation timestamp when not returned by Facade.
+     */
+    protected function computeFallbackNextEvaluationAt(array $alert): ?string
+    {
+        $scheduleType = $alert['schedule_type'] ?? 'daily';
+        $config = $alert['schedule_config'] ?? [];
+        $timeStr = $config['time'] ?? '08:00';
+        $timeParts = explode(':', $timeStr);
+        $hour = (int) ($timeParts[0] ?? 8);
+        $minute = (int) ($timeParts[1] ?? 0);
+
+        $now = new \DateTime();
+        switch ($scheduleType) {
+            case 'daily':
+                $next = (clone $now)->setTime($hour, $minute, 0);
+                if ($next <= $now) {
+                    $next->modify('+1 day');
+                }
+                return $next->format('c');
+
+            case 'weekly':
+                $dayOfWeek = (int) ($config['day_of_week'] ?? 1); // 1 = Mon, 7 = Sun
+                $dayName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][$dayOfWeek % 7];
+                $next = (clone $now)->modify("next {$dayName}")->setTime($hour, $minute, 0);
+                return $next->format('c');
+
+            case 'biweekly':
+                $dayOfWeek = (int) ($config['day_of_week'] ?? 1);
+                $dayName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][$dayOfWeek % 7];
+                $next = (clone $now)->modify("next {$dayName}")->setTime($hour, $minute, 0);
+                $next->modify('+1 week');
+                return $next->format('c');
+
+            case 'monthly':
+                $next = (clone $now)->modify('+1 month')->setTime($hour, $minute, 0);
+                return $next->format('c');
+
+            case 'once':
+            default:
+                return null;
+        }
     }
 
     /**
@@ -248,7 +335,7 @@ class EvaluateAlertsCommand extends Command
     /**
      * Post evaluation result payload to Facade webhook endpoint.
      */
-    protected function postResultToFacade(string $url, string $token, array $payload): void
+    protected function postResultToFacade(string $url, string $token, array $payload): ?array
     {
         $ch = curl_init($url);
         $json = json_encode($payload);
@@ -271,5 +358,7 @@ class EvaluateAlertsCommand extends Command
         if ($code < 200 || $code >= 300) {
             throw new \Exception("Facade webhook returned status {$code}: {$response}");
         }
+
+        return is_string($response) ? json_decode($response, true) : null;
     }
 }

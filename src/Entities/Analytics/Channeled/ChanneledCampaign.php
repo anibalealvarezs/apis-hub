@@ -20,10 +20,14 @@
     #[ORM\Index(name: 'idx_channeled_campaigns_channeled_account_id_idx', columns: ['channeled_account_id'])]
     #[ORM\Index(name: 'idx_channeled_campaigns_campaign_idx', columns: ['campaign_id'])]
     #[ORM\Index(name: 'idx_channeled_campaigns_channeled_account_id_campaign_id_idx', columns: ['channeled_account_id', 'campaign_id'])]
+    #[ORM\Index(name: 'idx_channeled_campaigns_channel_type_idx', columns: ['channel', 'type'])]
     #[ORM\UniqueConstraint(name: 'channeled_campaigns_platform_id_account_id_uidx', columns: ['platform_id', 'channeled_account_id'])]
     #[ORM\HasLifecycleCallbacks]
     class ChanneledCampaign extends ChanneledEntity
     {
+        #[ORM\Column(type: 'string', length: 32, nullable: true)]
+        protected ?string $type = null;
+
         #[ORM\Column(type: 'string', nullable: true, enumType: CampaignObjective::class)]
         protected ?CampaignObjective $objective = null;
 
@@ -58,6 +62,27 @@
             $this->channeledAdGroups = new ArrayCollection();
             $this->metricConfigs = new ArrayCollection();
             $this->channeledAds = new ArrayCollection();
+        }
+
+        /**
+         * Gets the campaign type (e.g. regular, automation).
+         * @return string|null
+         */
+        public function getType(): ?string
+        {
+            return $this->type;
+        }
+
+        /**
+         * Sets the campaign type.
+         * @param string|null $type
+         * @return self
+         */
+        public function setType(?string $type): self
+        {
+            $this->type = $type;
+
+            return $this;
         }
 
         /**
