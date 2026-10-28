@@ -22,6 +22,7 @@
             'average_session_duration', 'total_users', 'total_revenue',
             'sends', 'opens', 'bounces', 'unsubscribes', 'orders',
             'opens_standard', 'opens_proxy', 'clicks_unique', 'bounces_hard', 'bounces_soft',
+            'purchases', 'purchase_value', 'cost_per_purchase', 'leads', 'cost_per_lead',
         ];
 
         /**
@@ -67,10 +68,15 @@
                 'spend'         => ['spend', 'spend_daily'],
                 'clicks'        => ['clicks', 'clicks_daily'],
                 'impressions'   => ['impressions', 'impressions_daily'],
-                'reach'         => ['reach', 'reach_daily'],
-                'frequency'     => ['frequency', 'frequency_daily'],
-                'conversions'   => ['results', 'results_daily'],
-                'roas_purchase' => ['purchase_roas', 'purchase_roas_daily'],
+                'reach'             => ['reach', 'reach_daily'],
+                'frequency'         => ['frequency', 'frequency_daily'],
+                'conversions'       => ['results', 'results_daily'],
+                'roas_purchase'     => ['purchase_roas', 'purchase_roas_daily'],
+                'purchases'         => ['purchases', 'purchases_daily'],
+                'purchase_value'    => ['purchase_value', 'purchase_value_daily'],
+                'cost_per_purchase' => ['cost_per_purchase'],
+                'leads'             => ['leads', 'leads_daily'],
+                'cost_per_lead'     => ['cost_per_lead'],
             ],
         ];
 
@@ -171,7 +177,8 @@
             $sqlExpression = match ($resolutionMetric) {
                 'spend', 'clicks', 'impressions', 'reach', 'conversions', 'actions', 'sessions', 'new_users', 'event_count', 'total_users', 'total_revenue',
                 'sends', 'opens', 'bounces', 'unsubscribes', 'orders',
-                'opens_standard', 'opens_proxy', 'clicks_unique', 'bounces_hard', 'bounces_soft' =>
+                'opens_standard', 'opens_proxy', 'clicks_unique', 'bounces_hard', 'bounces_soft',
+                'purchases', 'purchase_value', 'leads' =>
                 $this->buildSumExpression($resolvedNames['raw_names'], $nameCol, $periodCol),
                 'frequency', 'roas_purchase', 'bounce_rate', 'average_session_duration' =>
                 $this->buildAverageExpression($resolvedNames['raw_names'], $nameCol, $periodCol),
@@ -180,6 +187,8 @@
                 'cpm' => $this->buildCpmExpression($channel, $nameCol, $periodCol),
                 'cost_per_conversion' => $this->buildCostPerConversionExpression($channel, $nameCol, $periodCol),
                 'conversion_rate' => $this->buildConversionRateExpression($channel, $nameCol, $periodCol),
+                'cost_per_purchase' => $this->buildCostPerPurchaseExpression($channel, $nameCol, $periodCol),
+                'cost_per_lead' => $this->buildCostPerLeadExpression($channel, $nameCol, $periodCol),
                 default => null,
             };
 
@@ -400,6 +409,28 @@
             }
 
             return "$conversionSql / NULLIF($impressionsSql, 0)";
+        }
+
+        private function buildCostPerPurchaseExpression(?string $channel, string $nameCol, string $periodCol): ?string
+        {
+            $spendSql = $this->buildSumExpression($this->resolveRawMetricNames('spend', $channel)['raw_names'], $nameCol, $periodCol);
+            $purchasesSql = $this->buildSumExpression($this->resolveRawMetricNames('purchases', $channel)['raw_names'], $nameCol, $periodCol);
+            if ($spendSql === null || $purchasesSql === null) {
+                return null;
+            }
+
+            return "$spendSql / NULLIF($purchasesSql, 0)";
+        }
+
+        private function buildCostPerLeadExpression(?string $channel, string $nameCol, string $periodCol): ?string
+        {
+            $spendSql = $this->buildSumExpression($this->resolveRawMetricNames('spend', $channel)['raw_names'], $nameCol, $periodCol);
+            $leadsSql = $this->buildSumExpression($this->resolveRawMetricNames('leads', $channel)['raw_names'], $nameCol, $periodCol);
+            if ($spendSql === null || $leadsSql === null) {
+                return null;
+            }
+
+            return "$spendSql / NULLIF($leadsSql, 0)";
         }
 
         /**

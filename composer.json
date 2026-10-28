@@ -25,7 +25,7 @@
   "require": {
     "ext-json": "*",
     "anibalealvarezs/api-client-skeleton": "^1.0.0",
-    "anibalealvarezs/api-driver-core": "^1.1.1",
+    "anibalealvarezs/api-driver-core": "^1.1.3",
     "anibalealvarezs/facebook-graph-api": "^1.2.0",
     "anibalealvarezs/google-api": "^1.1.0",
     "doctrine/orm": "^2.12.3 || ^3.0",
