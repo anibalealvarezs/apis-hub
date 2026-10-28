@@ -676,13 +676,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/meta-hub-driver.git",
-                "reference": "2a00db18effb1ab369ba4f00c5432f8169bd4c0e"
+                "reference": "4c56ab5155b18793a655f7b477ff42e4b0332cad"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/meta-hub-driver/anibalealvarezs-meta-hub-driver-2a00db18effb1ab369ba4f00c5432f8169bd4c0e-zip-fb26f4.zip",
-                "reference": "2a00db18effb1ab369ba4f00c5432f8169bd4c0e",
-                "shasum": "c28ea9c2c48d3640d2f161731e8fe39a0dc89cd8"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/meta-hub-driver/anibalealvarezs-meta-hub-driver-4c56ab5155b18793a655f7b477ff42e4b0332cad-zip-09c5b5.zip",
+                "reference": "4c56ab5155b18793a655f7b477ff42e4b0332cad",
+                "shasum": "ad1ddbb75e07df650d2025cd5becfda6cce71dc9"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "^1.0.0",
@@ -715,7 +715,7 @@
                 }
             ],
             "description": "APIs-Hub driver for Meta (Facebook & Instagram) integration.",
-            "time": "2026-10-28T21:12:06+00:00"
+            "time": "2026-10-28T21:45:41+00:00"
         },
         {
             "name": "anibalealvarezs/oauth-v1",
