@@ -10,6 +10,7 @@ echo "Starting Nuclear Resync Process..."
 # Parse channel and asset arguments if provided
 CHANNEL_ARG=""
 ASSET_ARG=""
+WIPE_ARG=""
 
 for arg in "$@"; do
     case $arg in
@@ -18,6 +19,9 @@ for arg in "$@"; do
             ;;
         --asset=*)
             ASSET_ARG="$arg"
+            ;;
+        --wipe-metrics)
+            WIPE_ARG="$arg"
             ;;
         *)
             if [ -z "$CHANNEL_ARG" ]; then
@@ -42,7 +46,7 @@ fi
 
 # 2. Run the database truncation and re-scheduling via the master container (this regenerates docker-compose.yml)
 echo "Running database truncation and scheduling..."
-docker compose exec -T master php bin/cli.php app:nuclear-resync $CHANNEL_ARG $ASSET_ARG
+docker compose exec -T master php bin/cli.php app:nuclear-resync $CHANNEL_ARG $ASSET_ARG $WIPE_ARG
 
 # 3. Re-evaluate workers from the freshly built docker-compose.yml
 NEW_WORKERS=$(docker compose config --services | grep "worker-tier-" | tr '\r\n' ' ' || true)
