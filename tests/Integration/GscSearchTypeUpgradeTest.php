@@ -18,10 +18,12 @@ use Symfony\Component\Console\Output\BufferedOutput;
 class GscUpgradeSqliteConnection extends Connection
 {
     public array $updateStatements = [];
+    public bool $failFinalWrite = false;
     public function executeStatement(string $sql, array $params = [], array $types = []): int|string
     {
         if (str_starts_with($sql, 'LOCK TABLE ')) return 0;
         if (str_starts_with($sql, 'UPDATE ')) $this->updateStatements[] = $sql;
+        if ($this->failFinalWrite && str_starts_with($sql, 'UPDATE metrics AS m')) throw new \RuntimeException('Injected final write failure');
         return parent::executeStatement($sql, $params, $types);
     }
 }
@@ -54,7 +56,7 @@ class GscSearchTypeUpgradeTest extends TestCase
             'CREATE TABLE dimension_values (id INTEGER PRIMARY KEY, dimension_key_id INTEGER, value TEXT, UNIQUE(dimension_key_id, value))',
             'CREATE TABLE dimension_set_items (dimension_set_id INTEGER, dimension_value_id INTEGER, PRIMARY KEY(dimension_set_id, dimension_value_id))',
             'CREATE TABLE metrics (id INTEGER PRIMARY KEY, metric_config_id INTEGER, dimensions_hash TEXT, metric_date TEXT, value REAL, UNIQUE(metric_config_id, dimensions_hash, metric_date))',
-            'CREATE TABLE channeled_metrics (id INTEGER PRIMARY KEY, metric_id INTEGER, dimension_set_id INTEGER)',
+            'CREATE TABLE channeled_metrics (id INTEGER PRIMARY KEY, metric_id INTEGER, dimension_set_id INTEGER, platform_id TEXT DEFAULT \'site\', channel INTEGER DEFAULT 1, platform_created_at TEXT DEFAULT \'2026-10-01\', UNIQUE(platform_id, channel, metric_id, platform_created_at))',
         ] as $statement) $this->conn->executeStatement($statement);
         $this->conn->insert('channels', ['id' => 1, 'name' => 'google_search_console']);
         $this->em = $this->createMock(EntityManagerInterface::class);
@@ -98,21 +100,23 @@ class GscSearchTypeUpgradeTest extends TestCase
         $this->assertSame($before, $this->conn->fetchAllAssociative('SELECT * FROM metric_configs ORDER BY id'));
     }
 
-    public function testSignatureCollisionRollsBackTheWholeMigrationWithoutSummingValues(): void
+    public function testTypedCollisionMergesWithoutSummingValuesAndRetainsChannelLinks(): void
     {
         $this->seed(1, 1);
         $this->seed(2, 1, 'web');
         $rows = $this->conn->fetchAllAssociative(MetricConfigSignature::selectSql());
         $this->conn->executeStatement('UPDATE metric_configs SET config_signature = ? WHERE id = 2', [MetricConfigSignature::fromRow($rows[1])]);
-        try {
-            (new Upgrade_v1_18_2_to_v1_18_3())->up($this->em, new BufferedOutput());
-            $this->fail('Expected collision');
-        } catch (\RuntimeException $error) {
-            $this->assertStringContainsString('collides', $error->getMessage());
-        }
-        $this->assertSame('old_1', $this->conn->fetchOne('SELECT config_signature FROM metric_configs WHERE id = 1'));
-        $this->assertSame(2, (int)$this->conn->fetchOne('SELECT COUNT(*) FROM metrics'));
-        $this->assertSame(14.0, (float)$this->conn->fetchOne('SELECT SUM(value) FROM metrics'));
+        $this->conn->executeStatement('UPDATE metrics SET value = 9 WHERE id = 2');
+        $this->conn->insert('channeled_metrics', ['id' => 3, 'metric_id' => 1, 'dimension_set_id' => 1, 'platform_id' => 'additional-source']);
+        (new Upgrade_v1_18_2_to_v1_18_3())->up($this->em, new BufferedOutput());
+        $this->assertSame(1, (int)$this->conn->fetchOne('SELECT COUNT(*) FROM metric_configs'));
+        $this->assertSame(1, (int)$this->conn->fetchOne('SELECT COUNT(*) FROM metrics'));
+        $this->assertSame(9.0, (float)$this->conn->fetchOne('SELECT SUM(value) FROM metrics'));
+        $this->assertSame(1, (int)$this->conn->fetchOne('SELECT metric_config_id FROM metrics'));
+        $this->assertSame(2, (int)$this->conn->fetchOne('SELECT COUNT(*) FROM channeled_metrics'));
+        $this->assertSame(2, (int)$this->conn->fetchOne('SELECT metric_id FROM channeled_metrics WHERE id = 3'));
+        $row = $this->conn->fetchAllAssociative(MetricConfigSignature::selectSql())[0];
+        $this->assertSame(MetricConfigSignature::fromRow($row), $row['config_signature']);
     }
 
     public function testLargeBackfillStagesBatchesAndUpdatesEachMetricTableOnce(): void
@@ -121,7 +125,7 @@ class GscSearchTypeUpgradeTest extends TestCase
         for ($id = 2; $id <= 501; $id++) {
             $this->conn->executeStatement('INSERT INTO metric_configs (id, channel, name, period, dimension_set_id, config_signature) SELECT ?, channel, ?, period, dimension_set_id, ? FROM metric_configs WHERE id = 1', [$id, 'metric_'.$id, 'old_'.$id]);
             $this->conn->executeStatement('INSERT INTO metrics SELECT ?, ?, dimensions_hash, metric_date, value FROM metrics WHERE id = 1', [$id, $id]);
-            $this->conn->executeStatement('INSERT INTO channeled_metrics SELECT ?, ?, dimension_set_id FROM channeled_metrics WHERE id = 1', [$id, $id]);
+            $this->conn->executeStatement('INSERT INTO channeled_metrics (id, metric_id, dimension_set_id) SELECT ?, ?, dimension_set_id FROM channeled_metrics WHERE id = 1', [$id, $id]);
         }
         $output = new BufferedOutput();
         (new Upgrade_v1_18_2_to_v1_18_3())->up($this->em, $output);
@@ -129,5 +133,39 @@ class GscSearchTypeUpgradeTest extends TestCase
         $this->assertSame(501, (int)$this->conn->fetchOne('SELECT COUNT(*) FROM metric_configs WHERE config_signature NOT LIKE ?', ['old_%']));
         $this->assertSame(3507.0, (float)$this->conn->fetchOne('SELECT SUM(value) FROM metrics'));
         $this->assertStringContainsString('staged 501 configurations', $output->fetch());
+    }
+
+    public function testLegacyCollisionsKeepNonOverlappingDatesAndRollbackOnWriteFailure(): void
+    {
+        $this->seed(1, 1);
+        $this->seed(2, 1);
+        $this->conn->executeStatement('UPDATE metrics SET metric_date = ? WHERE id = 2', ['2026-10-02']);
+        $this->conn->failFinalWrite = true;
+        try {
+            (new Upgrade_v1_18_2_to_v1_18_3())->up($this->em, new BufferedOutput());
+            $this->fail('Expected injected failure');
+        } catch (\RuntimeException $error) {
+            $this->assertSame('Injected final write failure', $error->getMessage());
+        }
+        $this->assertSame(2, (int)$this->conn->fetchOne('SELECT COUNT(*) FROM metric_configs'));
+        $this->assertSame('old_1', $this->conn->fetchOne('SELECT config_signature FROM metric_configs WHERE id = 1'));
+        $this->conn->failFinalWrite = false;
+        (new Upgrade_v1_18_2_to_v1_18_3())->up($this->em, new BufferedOutput());
+        $this->assertSame(1, (int)$this->conn->fetchOne('SELECT COUNT(*) FROM metric_configs'));
+        $this->assertSame(2, (int)$this->conn->fetchOne('SELECT COUNT(*) FROM metrics'));
+        $this->assertSame(14.0, (float)$this->conn->fetchOne('SELECT SUM(value) FROM metrics'));
+    }
+
+    public function testThreeLegacyDuplicatesKeepTheNewestObservationOnTheOldestConfig(): void
+    {
+        foreach ([1, 2, 3] as $id) {
+            $this->seed($id, 1);
+            $this->conn->executeStatement('UPDATE metrics SET value = ? WHERE id = ?', [$id, $id]);
+        }
+        (new Upgrade_v1_18_2_to_v1_18_3())->up($this->em, new BufferedOutput());
+        $this->assertSame(1, (int)$this->conn->fetchOne('SELECT COUNT(*) FROM metric_configs'));
+        $this->assertSame(1, (int)$this->conn->fetchOne('SELECT metric_config_id FROM metrics'));
+        $this->assertSame(3.0, (float)$this->conn->fetchOne('SELECT value FROM metrics'));
+        $this->assertSame(1, (int)$this->conn->fetchOne('SELECT COUNT(*) FROM channeled_metrics'));
     }
 }

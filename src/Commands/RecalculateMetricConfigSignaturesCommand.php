@@ -182,21 +182,7 @@ class RecalculateMetricConfigSignaturesCommand extends Command
             if (!$dryRun) {
                 // Execute deduplication merges
                 foreach ($merges as $oldId => $targetId) {
-                    // a) Delete colliding metrics from the TARGET row (Historical) that already exist in the DUPLICATE row (New)
-                    // This ensures we keep the freshest synced data from the newly duplicated configs.
-                    $conn->executeStatement('
-                        DELETE FROM metrics m1
-                        USING metrics m2
-                        WHERE m1.metric_config_id = ? 
-                          AND m2.metric_config_id = ?
-                          AND m1.metric_date = m2.metric_date 
-                          AND m1.dimensions_hash = m2.dimensions_hash
-                    ', [$targetId, $oldId]);
-
-                    // b) Migrate remaining non-colliding historical metrics to Target
-                    $conn->executeStatement('
-                        UPDATE metrics SET metric_config_id = ? WHERE metric_config_id = ?
-                    ', [$targetId, $oldId]);
+                    \Services\Analytics\MetricConfigDeduplicator::mergeMetrics($conn, $oldId, $targetId);
                 }
 
                 // Delete duplicate configs

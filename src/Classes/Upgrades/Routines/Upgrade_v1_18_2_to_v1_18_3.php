@@ -7,6 +7,7 @@ use Classes\DimensionManager;
 use Doctrine\ORM\EntityManagerInterface;
 use Interfaces\UpgradeRoutineInterface;
 use Services\Analytics\MetricConfigSignature;
+use Services\Analytics\MetricConfigDeduplicator;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /** Upgrade with sync workers stopped: dimension identities change together. */
@@ -69,12 +70,34 @@ class Upgrade_v1_18_2_to_v1_18_3 implements UpgradeRoutineInterface
                 }
                 if ($rows) $output->writeln("GSC Web backfill: staged {$updated} configurations (last ID {$afterId}).");
             } while (count($rows) === 500);
+            // Session-local index: repeated collision lookups must not scan the
+            // full staging table. Dropped automatically with this temporary table.
+            $conn->executeStatement('CREATE INDEX gsc_type_upgrade_signature_idx ON gsc_type_upgrade_map (config_signature)');
             $conn->executeStatement('ANALYZE gsc_type_upgrade_map');
-            // Check every signature together before changing persisted identities.
-            $conflict = $conn->fetchOne('SELECT map.config_id FROM gsc_type_upgrade_map map JOIN metric_configs mc ON mc.config_signature = map.config_signature WHERE mc.id <> map.config_id LIMIT 1');
-            $duplicate = $conn->fetchOne('SELECT MIN(config_id) FROM gsc_type_upgrade_map GROUP BY config_signature HAVING COUNT(*) > 1 LIMIT 1');
-            if ($conflict !== false || $duplicate !== false) {
-                throw new \RuntimeException('A GSC configuration collides with another typed identity; reconcile duplicates before retrying the upgrade.');
+            // Include already typed targets so the same established deduplication
+            // policy handles both legacy/legacy and legacy/typed collisions.
+            $conn->executeStatement('INSERT INTO gsc_type_upgrade_map
+                SELECT DISTINCT mc.id, map.config_signature, map.dimension_set_id, map.dimensions_hash
+                FROM metric_configs mc JOIN gsc_type_upgrade_map map ON mc.config_signature = map.config_signature
+                WHERE mc.channel = ? AND NOT EXISTS (SELECT 1 FROM gsc_type_upgrade_map present WHERE present.config_id = mc.id)', [(int)$channel]);
+            $groups = $conn->fetchAllAssociative('SELECT config_signature, MIN(config_id) AS target_id FROM gsc_type_upgrade_map GROUP BY config_signature HAVING COUNT(*) > 1');
+            $merged = 0;
+            $output->writeln('GSC Web backfill: reconciling '.count($groups).' duplicate identity groups.');
+            foreach ($groups as $group) {
+                $members = $conn->fetchAllAssociative('SELECT * FROM gsc_type_upgrade_map WHERE config_signature = ? ORDER BY config_id', [$group['config_signature']]);
+                $ids = array_map('intval', array_column($members, 'config_id'));
+                // Both sides must have their final dimension hash before comparing
+                // observations; equal dates alone are insufficient for deduplication.
+                $conn->executeStatement('UPDATE metrics SET dimensions_hash = ? WHERE metric_config_id IN (?)', [$members[0]['dimensions_hash'], $ids], [\Doctrine\DBAL\ParameterType::STRING, \Doctrine\DBAL\ArrayParameterType::INTEGER]);
+                $targetId = (int)$group['target_id'];
+                foreach ($ids as $sourceId) {
+                    if ($sourceId === $targetId) continue;
+                    MetricConfigDeduplicator::mergeMetrics($conn, $sourceId, $targetId);
+                    $conn->executeStatement('DELETE FROM metric_configs WHERE id = ?', [$sourceId]);
+                    $conn->executeStatement('DELETE FROM gsc_type_upgrade_map WHERE config_id = ?', [$sourceId]);
+                    $merged++;
+                }
+                if ($merged % 100 === 0) $output->writeln("GSC Web backfill: merged {$merged} duplicate configurations.");
             }
             $output->writeln('<info>GSC Web backfill: updating configuration signatures...</info>');
             $conn->executeStatement('UPDATE metric_configs AS mc SET dimension_set_id = map.dimension_set_id, config_signature = map.config_signature FROM gsc_type_upgrade_map map WHERE mc.id = map.config_id');
@@ -84,7 +107,7 @@ class Upgrade_v1_18_2_to_v1_18_3 implements UpgradeRoutineInterface
             $conn->executeStatement('UPDATE channeled_metrics AS cm SET dimension_set_id = map.dimension_set_id FROM metrics m JOIN gsc_type_upgrade_map map ON m.metric_config_id = map.config_id WHERE cm.metric_id = m.id');
             $conn->executeStatement('DROP TABLE gsc_type_upgrade_map');
             $conn->commit();
-            $output->writeln("<info>Added search_type=web to {$updated} GSC configurations; signatures and metric hashes updated.</info>");
+            $output->writeln("<info>Added search_type=web to {$updated} GSC configurations; merged {$merged} duplicates without summing observations; signatures and metric hashes updated.</info>");
         } catch (\Throwable $error) {
             $conn->rollBack();
             throw $error;

@@ -15,7 +15,7 @@ GSC measures organic acquisition and complements paid Google Ads and downstream 
 - [x] Driver passes explicit type, annotates rows, retains it in converted dimensions and signatures; missing type on legacy input defaults to Web.
 - [x] Supported type list is validated; cancellation and failures cannot be marked as successful complete coverage.
 - [x] Driver profiles default existing queries to Web, permit explicit type filters/grouping, and do not mix appearance datasets.
-- [x] Tenant forward upgrade adds Web only to untyped GSC dimension sets, updates config signatures and metric hashes atomically, and preserves typed/other-channel data. Duplicate conflicts fail safely rather than sum observations.
+- [x] Tenant forward upgrade adds Web only to untyped GSC dimension sets, updates config signatures and metric hashes atomically, and preserves typed/other-channel data. Duplicate identities are reconciled using the shared recalculation policy without summing observations; unexpected failures roll back atomically.
 - [x] Historical additional-type coverage requires a non-destructive GSC replay of the available cache range; deployment instructions are in the driver's surface manifest. No global nuclear resync/data wipe.
 - [x] Tests cover type isolation, feed compatibility, missing metrics, default conversion, signatures, cancellation, and upgrade idempotence/rollback.
 
