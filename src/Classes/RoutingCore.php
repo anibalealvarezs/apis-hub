@@ -23,13 +23,15 @@
          * @var RouteCollection
          */
         protected RouteCollection $routes;
+        private ?\Services\Http\RequestBudgetLimiter $requestBudgetLimiter;
 
         /**
          * RoutingCore constructor.
          */
-        public function __construct()
+        public function __construct(?\Services\Http\RequestBudgetLimiter $requestBudgetLimiter = null)
         {
             $this->routes = new RouteCollection();
+            $this->requestBudgetLimiter = $requestBudgetLimiter;
         }
 
         /**
@@ -85,14 +87,49 @@
                     ]), Response::HTTP_UNAUTHORIZED, ['Content-Type' => 'application/json']);
                 }
 
-                unset($attributes['controller'], $attributes['_route'], $attributes['html'], $attributes['public'], $attributes['admin']);
-                $attributes['body'] = $request->getContent() ?: null;
-                $attributes['params'] = $request->query->all() ?: null;
-                $attributes['request'] = $request;
-                $attributes['isDemo'] = Helpers::isDemo();
-                $attributes['channelsConfig'] = Helpers::getChannelsConfig();
+                $budgetLease = null;
+                $policy = $isHtml ? null : \Services\Http\RequestBudgetPolicy::forRequest($request);
+                if ($policy !== null) {
+                    try {
+                        $this->requestBudgetLimiter ??= new \Services\Http\RequestBudgetLimiter(
+                            Helpers::getRedisClient(), getenv('API_RATE_LIMIT_NAMESPACE') ?: 'api_resource_guard'
+                        );
+                        $actor = (string)($request->attributes->get('USER_ID') ?? '');
+                        if ($this->isAuthorized($request, true) && preg_match('/^[a-f0-9]{64}$/D', $request->headers->get('X-Request-Actor', ''))) {
+                            $actor = $request->headers->get('X-Request-Actor');
+                        }
+                        if ($actor === '') $actor = hash('sha256', $request->headers->get('X-API-Key')
+                            ?: $request->headers->get('X-Admin-API-Key') ?: $request->headers->get('Authorization')
+                            ?: $request->query->get('key') ?: $request->query->get('token') ?: (string)$request->getClientIp());
+                        $decision = $this->requestBudgetLimiter->acquire($policy, $actor);
+                        if (!$decision['allowed']) {
+                            return new Response(json_encode(['status' => 'error', 'error' => 'Too Many Requests',
+                                'error_code' => 'request_budget_exhausted', 'reason' => $decision['reason'],
+                                'retry_after' => $decision['retry_after'], 'message' => 'Request capacity reached. Please retry later.']),
+                                429, ['Content-Type' => 'application/json', 'Retry-After' => (string)$decision['retry_after']]);
+                        }
+                        $budgetLease = $decision['lease'];
+                    } catch (\Throwable $error) {
+                        error_log('Request resource guard unavailable: '.get_class($error));
+                        return new Response(json_encode(['status' => 'error', 'error_code' => 'request_guard_unavailable',
+                            'message' => 'Request capacity checks are temporarily unavailable.', 'retry_after' => 2]),
+                            503, ['Content-Type' => 'application/json', 'Retry-After' => '2']);
+                    }
+                }
 
-                $response = call_user_func_array($controller, $attributes);
+                try {
+                    unset($attributes['controller'], $attributes['_route'], $attributes['html'], $attributes['public'], $attributes['admin']);
+                    $attributes['body'] = $request->getContent() ?: null;
+                    $attributes['params'] = $request->query->all() ?: null;
+                    $attributes['request'] = $request;
+                    $attributes['isDemo'] = Helpers::isDemo();
+                    $attributes['channelsConfig'] = Helpers::getChannelsConfig();
+
+                    $response = call_user_func_array($controller, $attributes);
+                } finally {
+                    try { $this->requestBudgetLimiter?->release($budgetLease); }
+                    catch (\Throwable $error) { error_log('Request lease release failed: '.get_class($error)); }
+                }
 
                 if (!$isHtml && !$response->headers->has('Content-Type')) {
                     $response->headers->set('Content-Type', 'application/json');
@@ -200,7 +237,7 @@
         {
             $path = $request->getPathInfo();
             // Don't rate limit health checks, local dev, or monitoring dashboard
-            if ($path === '/api/heartbeat') return false;
+            if (in_array(rtrim($path, '/'), ['/api/heartbeat', '/api/v1/ping', '/up'], true)) return false;
             if (Helpers::isDemo()) return false;
 
             // 1. IP Whitelisting Bypass
