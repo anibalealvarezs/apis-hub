@@ -65,6 +65,7 @@ final class EntityAttributeResolver
             $target = $this->em->getClassMetadata($association->targetEntity);
             foreach ($target->getFieldNames() as $field) {
                 $mapping = $target->getFieldMapping($field);
+                if (in_array($target->getColumnName($field), ['version', 'platform_created_at', 'start_date', 'end_date'], true)) continue;
                 if (in_array($mapping->type, ['json', 'json_array', 'blob', 'binary', 'object'], true)) continue;
                 $path = 'attributes.'.$relation.'.'.$field;
                 $options = [];
