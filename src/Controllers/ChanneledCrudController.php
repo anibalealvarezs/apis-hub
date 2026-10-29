@@ -98,6 +98,7 @@ class ChanneledCrudController extends BaseController
             'count' => $this->count(entity: $entity, channel: $channelConstant, body: $body, params: $params),
             'list' => $this->list(entity: $entity, channel: $channelConstant, body: $body, params: $params, rawData: $rawData, hideFields: $hideFields),
             'aggregate' => $this->aggregate(entity: $entity, channel: $channelConstant, body: $body, params: $params),
+            'attributes' => $this->attributes($channelConstant, $body),
             'range' => $this->range(entity: $entity, channel: $channelConstant, body: $body, params: $params),
             default => $this->createResponse(
                 data: null,
@@ -106,6 +107,18 @@ class ChanneledCrudController extends BaseController
                 httpStatus: Response::HTTP_NOT_FOUND
             ),
         };
+    }
+
+    protected function attributes(Channel $channel, ?string $body): Response
+    {
+        try {
+            $request = json_decode($body ?? '{}', true, 512, JSON_THROW_ON_ERROR);
+            if (!is_array($request)) throw new \InvalidArgumentException('Expected an attribute request object');
+            $catalog = (new \Services\Aggregation\EntityAttributeCatalog($this->em))->get($channel->value, $request);
+            return $this->createResponse($catalog, 'success');
+        } catch (\InvalidArgumentException|\JsonException $error) {
+            return $this->createResponse(null, 'error', $error->getMessage(), Response::HTTP_BAD_REQUEST);
+        }
     }
 
     /**

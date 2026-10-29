@@ -3,6 +3,14 @@
 use Controllers\ChanneledCrudController;
 
 return [
+    '/{channel}/{entity}/attributes' => [
+        'httpMethod' => 'POST',
+        'callable' => function (string $channel, string $entity, ?string $body = null, ?array $params = null, ...$args) {
+            return (new ChanneledCrudController())(entity: $entity, channel: $channel, method: 'attributes', body: $body, params: $params);
+        },
+        'admin' => false,
+        'requirements' => ['channel' => '^(?!api$|api/).+'],
+    ],
     '/{channel}/{entity}/count' => [
         'httpMethod' => 'GET',
         'callable' => function (string $channel, string $entity, ?string $body = null, ?array $params = null, ...$args) {

@@ -220,6 +220,20 @@
                 $paramName = 'filter_'.preg_replace('/[^a-z0-9]/i', '_', $key);
                 $condition = $filterResolver->resolve($value);
 
+                if (str_starts_with($baseKey, 'attributes.')) {
+                    $condition = $filterResolver->resolve($value, true);
+                    $attribute = (new \Services\Aggregation\EntityAttributeResolver(\Helpers\Helpers::getManager()))->resolve($baseKey);
+                    foreach ($attribute['joins'] as $join) {
+                        $safeLeftJoin($join['table'], $join['alias'], $join['condition']);
+                    }
+                    $predicate = (new \Services\Aggregation\EntityAttributeFilter())->compile(
+                        $attribute['expression'], $condition, $paramName, $attribute['type']
+                    );
+                    $whereClauses[] = $predicate['sql'];
+                    $sqlParams = array_merge($sqlParams, $predicate['params']);
+                    continue;
+                }
+
                 // Exclude some internal filters that shouldn't generate SQL WHERE clauses directly
                 if (in_array($baseKey, ['snapshot_delta', 'latest_snapshot', 'period'], true)) {
                     continue;

@@ -52,7 +52,16 @@
             $filtersArr = $this->normalizeFilters($filters);
             $groupPattern = $this->resolveGroupPattern($groupBy);
             $filterOperators = $this->collectFilterOperators($filtersArr);
-            $unsupportedFilterOperators = array_values(array_diff($filterOperators, ['eq', 'neq', 'is_null', 'is_not_null', 'like', 'not_like', 'in', 'not_in']));
+            $unsupportedFilterOperators = [];
+            foreach ($filtersArr as $key => $value) {
+                $operators = $this->collectFilterOperators([(string)$key => $value]);
+                $supported = ['eq', 'neq', 'is_null', 'is_not_null', 'like', 'not_like', 'in', 'not_in'];
+                if (str_starts_with((string)$key, 'attributes.')) {
+                    $supported = array_merge($supported, ['gt', 'gte', 'lt', 'lte', 'between', '>', '>=', '<', '<=']);
+                }
+                $unsupportedFilterOperators = array_merge($unsupportedFilterOperators, array_diff($operators, $supported));
+            }
+            $unsupportedFilterOperators = array_values(array_unique($unsupportedFilterOperators));
             $reducerAnalysis = $this->analyzeReducers($aggregations, $isMetric || $isChanneledMetric);
 
             $requestedPeriod = null;
@@ -556,6 +565,15 @@
         ): array
         {
             $candidates = [];
+
+            // Specialized strategies predate relational attribute predicates.
+            // Keep snapshot semantics in the legacy pipeline; use the universal
+            // compiler for other metric requests so no strategy drops a filter.
+            foreach (array_keys($filters) as $key) {
+                if (str_starts_with((string)$key, 'attributes.')) {
+                    return ($snapshotDelta || !empty($filters['latest_snapshot'])) ? [] : ['universal_sql'];
+                }
+            }
 
             if ($isMetric || $isChanneledMetric) {
                 if ($this->matchesSocialOrganicPageSummary($groupPattern, $filters, $aggregations, $startDate, $endDate)) {

@@ -10,6 +10,7 @@
 - Use `D:\laragon\www\_shared\AGENTS.md` and `D:\laragon\www\_shared\MEMORY.md` for cross-repository protocols and workspace-wide learnings.
 - Keep secrets, credentials, tokens, and private endpoints out of this file.
 ## Current notes
+- Entity attribute aggregation filters (2026-10-29): `attributes.<MetricConfig owning to-one relationship>.<mapped scalar property>` is resolved by `EntityAttributeResolver` using Doctrine metadata, with nested singular paths and no channel/attribute whitelist. `EntityAttributeFilter` shares typed predicates across universal and legacy execution. Attribute requests bypass specialized strategies that do not apply these predicates; snapshots retain legacy snapshot semantics. `POST /{channel}/metric/attributes` discovers direct scalar fields/enums and account/channel-scoped facet values (200-value cap). Current synced attributes, stored numeric units, scalar-only contract; see `docs/entity-attribute-filters.md`.
 - MCP server dependency management now uses `pnpm` with `mcp-server/.npmrc` enforcing `minimum-release-age=1440` and `block-exotic-subdeps=true`; Docker builds activate pnpm via Corepack before installing MCP dependencies.
 - Orchestrator owns caching, normalization, persistence, and aggregation.
 - Prefer Doctrine-managed schema changes for index work; avoid direct manual `CREATE INDEX` unless there is explicit emergency authorization.

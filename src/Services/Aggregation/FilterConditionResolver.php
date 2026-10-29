@@ -9,7 +9,7 @@
         /**
          * @return array{operator: string, value: mixed}
          */
-        public function resolve(mixed $rawValue): array
+        public function resolve(mixed $rawValue, bool $strict = false): array
         {
             if (is_object($rawValue) || (is_array($rawValue) && isset($rawValue['operator']))) {
                 $op = is_object($rawValue) ? ($rawValue->operator ?? 'eq') : ($rawValue['operator'] ?? 'eq');
@@ -18,6 +18,11 @@
                 $operator = strtolower(trim((string)$op));
 
                 return match ($operator) {
+                    'gt', '>' => ['operator' => 'gt', 'value' => $val],
+                    'gte', '>=' => ['operator' => 'gte', 'value' => $val],
+                    'lt', '<' => ['operator' => 'lt', 'value' => $val],
+                    'lte', '<=' => ['operator' => 'lte', 'value' => $val],
+                    'between' => ['operator' => 'between', 'value' => $val],
                     'neq', 'not_equal', '!=', 'ne' => ['operator' => 'neq', 'value' => $val],
                     'is_null', 'null' => ['operator' => 'is_null', 'value' => null],
                     'is_not_null', 'not_null' => ['operator' => 'is_not_null', 'value' => null],
@@ -25,7 +30,10 @@
                     'in' => ['operator' => 'in', 'value' => is_array($val) ? array_values($val) : [$val]],
                     'not_like', 'not like', '!like' => ['operator' => 'not_like', 'value' => $val],
                     'like' => ['operator' => 'like', 'value' => $val],
-                    default => ['operator' => 'eq', 'value' => $val],
+                    'eq', '=', 'equal' => ['operator' => 'eq', 'value' => $val],
+                    default => $strict
+                        ? throw new \InvalidArgumentException('Unsupported entity attribute filter operator: '.$operator)
+                        : ['operator' => 'eq', 'value' => $val],
                 };
             }
 

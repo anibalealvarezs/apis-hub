@@ -38,6 +38,7 @@
                 return;
             }
 
+            $attributeJoins = [];
             foreach ($filters as $key => $value) {
                 if ($key === 'debug_sql' || $key === '_' || $key === 'latest_snapshot' || $key === 'snapshot_delta' || $key === 'snapshot_fallback_mode') {
                     continue;
@@ -47,6 +48,23 @@
                 $isDimension = str_starts_with($key, 'dimensions.') || str_starts_with($baseKey, 'dimensions.');
                 $rawDimKey = $isDimension ? substr($key, 11) : $key;
                 $dimKey = preg_replace('/__\d+$/', '', $rawDimKey);
+
+                if (str_starts_with($baseKey, 'attributes.')) {
+                    $attribute = (new \Services\Aggregation\EntityAttributeResolver(\Helpers\Helpers::getManager()))->resolve($baseKey);
+                    foreach ($attribute['joins'] as $join) {
+                        if (!isset($attributeJoins[$join['alias']])) {
+                            $safeLeftJoin($join['source'], $join['table'], $join['alias'], $join['condition']);
+                            $attributeJoins[$join['alias']] = true;
+                        }
+                    }
+                    $predicate = (new \Services\Aggregation\EntityAttributeFilter())->compile(
+                        $attribute['expression'], (new \Services\Aggregation\FilterConditionResolver())->resolve($value, true),
+                        'f_'.preg_replace('/[^a-z0-9]/i', '_', $key), $attribute['type']
+                    );
+                    $qb->andWhere($predicate['sql']);
+                    foreach ($predicate['params'] as $parameter => $boundValue) $qb->setParameter($parameter, $boundValue);
+                    continue;
+                }
 
                 if ($isDimension && in_array($dimKey, ['intent', 'language', 'brand_relation', 'business_relevance'], true)) {
                     $isAccountSemantic = in_array($dimKey, ['brand_relation', 'business_relevance'], true);
