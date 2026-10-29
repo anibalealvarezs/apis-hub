@@ -17,9 +17,11 @@ use Symfony\Component\Console\Output\BufferedOutput;
 // table lock is the only statement skipped; no configured tenant DB is accessed.
 class GscUpgradeSqliteConnection extends Connection
 {
+    public array $updateStatements = [];
     public function executeStatement(string $sql, array $params = [], array $types = []): int|string
     {
         if (str_starts_with($sql, 'LOCK TABLE ')) return 0;
+        if (str_starts_with($sql, 'UPDATE ')) $this->updateStatements[] = $sql;
         return parent::executeStatement($sql, $params, $types);
     }
 }
@@ -111,5 +113,21 @@ class GscSearchTypeUpgradeTest extends TestCase
         $this->assertSame('old_1', $this->conn->fetchOne('SELECT config_signature FROM metric_configs WHERE id = 1'));
         $this->assertSame(2, (int)$this->conn->fetchOne('SELECT COUNT(*) FROM metrics'));
         $this->assertSame(14.0, (float)$this->conn->fetchOne('SELECT SUM(value) FROM metrics'));
+    }
+
+    public function testLargeBackfillStagesBatchesAndUpdatesEachMetricTableOnce(): void
+    {
+        $this->seed(1, 1);
+        for ($id = 2; $id <= 501; $id++) {
+            $this->conn->executeStatement('INSERT INTO metric_configs (id, channel, name, period, dimension_set_id, config_signature) SELECT ?, channel, ?, period, dimension_set_id, ? FROM metric_configs WHERE id = 1', [$id, 'metric_'.$id, 'old_'.$id]);
+            $this->conn->executeStatement('INSERT INTO metrics SELECT ?, ?, dimensions_hash, metric_date, value FROM metrics WHERE id = 1', [$id, $id]);
+            $this->conn->executeStatement('INSERT INTO channeled_metrics SELECT ?, ?, dimension_set_id FROM channeled_metrics WHERE id = 1', [$id, $id]);
+        }
+        $output = new BufferedOutput();
+        (new Upgrade_v1_18_2_to_v1_18_3())->up($this->em, $output);
+        $this->assertCount(3, $this->conn->updateStatements);
+        $this->assertSame(501, (int)$this->conn->fetchOne('SELECT COUNT(*) FROM metric_configs WHERE config_signature NOT LIKE ?', ['old_%']));
+        $this->assertSame(3507.0, (float)$this->conn->fetchOne('SELECT SUM(value) FROM metrics'));
+        $this->assertStringContainsString('staged 501 configurations', $output->fetch());
     }
 }
