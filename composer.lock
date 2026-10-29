@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "bb6b600d5b609419719de6b6cae842d0",
+    "content-hash": "379a7506854b0d84092d061842885138",
     "packages": [
         {
             "name": "anibalealvarezs/amazon-api",
@@ -385,17 +385,17 @@
         },
         {
             "name": "anibalealvarezs/google-hub-driver",
-            "version": "v1.2.0",
+            "version": "v1.3.0",
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/google-hub-driver.git",
-                "reference": "34f46fd9477e27fd92e71a25025cd076c43a2051"
+                "reference": "aadd1958f2d438ee59a67a1a726b8ed039ceb8b2"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/google-hub-driver/anibalealvarezs-google-hub-driver-34f46fd9477e27fd92e71a25025cd076c43a2051-zip-8e5374.zip",
-                "reference": "34f46fd9477e27fd92e71a25025cd076c43a2051",
-                "shasum": "73e168d54b15a7300ab47dbb807d41990ee9abf6"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/google-hub-driver/anibalealvarezs-google-hub-driver-aadd1958f2d438ee59a67a1a726b8ed039ceb8b2-zip-828eac.zip",
+                "reference": "aadd1958f2d438ee59a67a1a726b8ed039ceb8b2",
+                "shasum": "c19de1066bd775f6d5d8c4b4e0dc2591e34ac5ce"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "^1.0.0",
@@ -428,7 +428,7 @@
                 }
             ],
             "description": "APIs-Hub driver for Google (Search Console & Analytics) integration.",
-            "time": "2026-10-24T15:22:10+00:00"
+            "time": "2026-10-29T20:56:05+00:00"
         },
         {
             "name": "anibalealvarezs/klaviyo-api",
