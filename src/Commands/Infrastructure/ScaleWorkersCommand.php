@@ -33,8 +33,8 @@
         {
             $jobRepo = $this->entityManager->getRepository(Job::class);
 
-            // 1. Get Active Jobs (Scheduled + Processing)
-            $scheduledJobs = $jobRepo->findBy(['status' => JobStatus::scheduled->value]);
+            // Delayed jobs remain claimable work (dependencies/rate limits).
+            $scheduledJobs = $jobRepo->findBy(['status' => [JobStatus::scheduled->value, JobStatus::delayed->value]]);
             $processingJobs = $jobRepo->findBy(['status' => JobStatus::processing->value]);
             
             $activeJobs = array_merge($scheduledJobs, $processingJobs);

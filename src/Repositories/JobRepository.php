@@ -755,7 +755,12 @@ class JobRepository extends BaseRepository
             ->getQuery()
             ->execute();
 
-        return (int)$updatedRows > 0;
+        $success = (int)$updatedRows > 0;
+        if ($success) {
+            $this->invalidateTelemetryCache($id);
+        }
+
+        return $success;
     }
 
     /**
