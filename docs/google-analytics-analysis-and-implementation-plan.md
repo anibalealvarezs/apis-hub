@@ -3,6 +3,10 @@
 Date: 2026-10-30. Scope: correctness repairs to the existing GA4 driver and consumers.
 Inputs: Facade analytics availability audit and progressive remediation plan.
 
+Coverage beyond the v1.18.4 correctness increment is specified in the
+[scoped analytics expansion plan](google-analytics-expansion-plan.md), including the
+nine-dimension budget, measurement/attribution scopes, additivity and catalog gates.
+
 GA4 measures acquisition, engagement and revenue for properties; it is not an ad-cost
 source. Current daily account, traffic, acquisition, event and ad-touchpoint reports
 are overlapping datasets. User counts are preaggregated distincts, not atomic users.

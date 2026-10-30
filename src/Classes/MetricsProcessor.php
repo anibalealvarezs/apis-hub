@@ -203,7 +203,6 @@ class MetricsProcessor
     public static function processChanneledEvents(ArrayCollection $metrics, EntityManager $manager, ?array $channeledAccountMap = null, ?array $eventMap = null): array
     {
         $channel = $metrics->first()?->channel;
-        $driverClass = $channel ? DriverFactory::getRegistry()[(string)$channel]['driver'] ?? null : null;
         $channelObj = Channel::tryFromName((string)$channel);
         $channelId = $channelObj ? $channelObj->getId() : (int)$channel;
 
@@ -236,24 +235,25 @@ class MetricsProcessor
 
         $platformIds = array_unique(array_column($uniqueChanneledEvents, 'platform_id'));
         $placeholders = implode(',', array_fill(0, count($platformIds), '?'));
-        $sql = "SELECT id, platform_id, event_id FROM channeled_events WHERE platform_id IN ($placeholders) AND channel = ?";
+        $sql = "SELECT id, platform_id, channeled_account_id, event_id FROM channeled_events WHERE platform_id IN ($placeholders) AND channel = ?";
         
         $params = $platformIds;
         $params[] = $channelId;
 
         $results = $manager->getConnection()->executeQuery($sql, $params)->fetchAllAssociative();
 
-        $map = ['global' => []];
+        $map = ['global' => [], 'by_account' => [], 'global_by_account' => []];
         $mapReverse = [];
         foreach ($results as $row) {
-            $map[$row['platform_id']] = (int)$row['id'];
+            $map['by_account'][(int)$row['channeled_account_id']][$row['platform_id']] = (int)$row['id'];
             $map['global'][$row['platform_id']] = (int)($row['event_id'] ?? 0);
+            $map['global_by_account'][(int)$row['channeled_account_id']][$row['platform_id']] = (int)($row['event_id'] ?? 0);
             $mapReverse[$row['id']] = $row['platform_id'];
         }
 
         $toInsert = [];
         foreach ($uniqueChanneledEvents as $key => $ce) {
-            if (!isset($map[$ce['platform_id']])) {
+            if (!isset($map['by_account'][$ce['channeled_account_id']][$ce['platform_id']])) {
                 $toInsert[] = $ce;
             }
         }
@@ -273,19 +273,20 @@ class MetricsProcessor
             $sql = Helpers::buildInsertIgnoreSql(
                 'channeled_events',
                 $cols,
-                ['platform_id', 'channel', 'channeled_account_id'],
+                ['platform_id', 'channeled_account_id'],
                 count($toInsert)
             );
             $manager->getConnection()->executeStatement($sql, $insertParams);
 
             $results = $manager->getConnection()->executeQuery(
-                "SELECT id, platform_id, event_id FROM channeled_events WHERE platform_id IN ($placeholders) AND channel = ?",
+                "SELECT id, platform_id, channeled_account_id, event_id FROM channeled_events WHERE platform_id IN ($placeholders) AND channel = ?",
                 $params
             )->fetchAllAssociative();
 
             foreach ($results as $row) {
-                $map[$row['platform_id']] = (int)$row['id'];
+                $map['by_account'][(int)$row['channeled_account_id']][$row['platform_id']] = (int)$row['id'];
                 $map['global'][$row['platform_id']] = (int)($row['event_id'] ?? 0);
+                $map['global_by_account'][(int)$row['channeled_account_id']][$row['platform_id']] = (int)($row['event_id'] ?? 0);
                 $mapReverse[$row['id']] = $row['platform_id'];
             }
         }
@@ -1187,8 +1188,10 @@ class MetricsProcessor
                 'country_id' => self::resolveCountryId($metric, $countryMap),
                 'device_id' => self::resolveDeviceId($metric, $deviceMap),
                 'dimension_set_id' => self::resolveDimensionSetId($metric, $dimensionSetMap),
-                'event_id' => self::resolveEventId($metric, $eventMap) ?? ($channeledEventMap['global'][self::extractMetricLookupKey($metric, 'channeledEvent')] ?? null),
-                'channeled_event_id' => self::resolveChanneledEventId($metric, $channeledEventMap),
+                'event_id' => self::resolveEventId($metric, $eventMap) ?? (isset($channeledEventMap['map']['global_by_account'])
+                    ? ($channeledEventMap['map']['global_by_account'][self::resolveChanneledAccountId($metric, $channeledAccountMap)][self::extractMetricLookupKey($metric, 'channeledEvent')] ?? null)
+                    : ($channeledEventMap['global'][self::extractMetricLookupKey($metric, 'channeledEvent')] ?? null)),
+                'channeled_event_id' => self::resolveChanneledEventId($metric, $channeledEventMap, $channeledAccountMap),
                 'key' => $metricConfigKey,
             ];
         }
@@ -2008,7 +2011,7 @@ class MetricsProcessor
         return $pId ? ($map['map'][$pId] ?? null) : null;
     }
 
-    private static function resolveChanneledEventId(object $metric, ?array $map): ?int
+    private static function resolveChanneledEventId(object $metric, ?array $map, ?array $channeledAccountMap = null): ?int
     {
         $resolvedEntityId = self::resolveEntityIdFromMetricValue($metric, 'channeledEvent');
         if ($resolvedEntityId) {
@@ -2018,6 +2021,11 @@ class MetricsProcessor
             return null;
         }
         $pId = self::extractMetricLookupKey($metric, 'channeledEvent');
+
+        if (isset($map['map']['by_account'])) {
+            $accountId = self::resolveChanneledAccountId($metric, $channeledAccountMap);
+            return $pId && $accountId ? ($map['map']['by_account'][$accountId][$pId] ?? null) : null;
+        }
 
         return $pId ? ($map['map'][$pId] ?? null) : null;
     }

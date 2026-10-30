@@ -83,11 +83,11 @@ class EventProcessor
         $caPlatformIds = array_unique(array_filter(array_column($eventsData, 'channeledAccountId')));
         $caMap = [];
         if (!empty($caPlatformIds)) {
-            $sql = 'SELECT platform_id, id FROM channeled_accounts WHERE platform_id IN ('
+            $sql = 'SELECT platform_id, channel, id FROM channeled_accounts WHERE platform_id IN ('
                 . implode(', ', array_fill(0, count($caPlatformIds), '?')) . ')';
             $fetched = $conn->executeQuery($sql, array_values($caPlatformIds))->fetchAllAssociative();
             foreach ($fetched as $row) {
-                $caMap[$row['platform_id']] = $row['id'];
+                $caMap[(int)$row['channel']][$row['platform_id']] = $row['id'];
             }
         }
 
@@ -100,32 +100,32 @@ class EventProcessor
             if (!is_object($e) || empty($e->name) || empty($e->platformId)) continue;
             
             $globalEventId = $eventMap[$e->name] ?? null;
-            $caId = $caMap[$e->channeledAccountId] ?? null;
 
-            if ($globalEventId && $caId) {
-                $rawChannel = $e->channel ?? 0;
-                $channelId = 0;
-                if (is_numeric($rawChannel) && (int)$rawChannel > 0) {
-                    $channelId = (int)$rawChannel;
-                } elseif (is_string($rawChannel) && !empty($rawChannel)) {
-                    if (!isset($channelMap[$rawChannel])) {
-                        $ch = $channelRepo->findOneBy(['name' => $rawChannel]);
-                        $channelMap[$rawChannel] = $ch ? $ch->getId() : 0;
-                    }
-                    $channelId = $channelMap[$rawChannel];
+            $rawChannel = $e->channel ?? 0;
+            $channelId = 0;
+            if (is_numeric($rawChannel) && (int)$rawChannel > 0) {
+                $channelId = (int)$rawChannel;
+            } elseif (is_string($rawChannel) && !empty($rawChannel)) {
+                if (!isset($channelMap[$rawChannel])) {
+                    $ch = $channelRepo->findOneBy(['name' => $rawChannel]);
+                    $channelMap[$rawChannel] = $ch ? $ch->getId() : 0;
                 }
-
-                $key = $e->platformId . ':' . $caId;
-                $validChanneledEvents[$key] = [
-                    'platform_id' => $e->platformId,
-                    'event_id' => $globalEventId,
-                    'channeled_account_id' => $caId,
-                    'channel' => $channelId,
-                    'data' => !empty($e->data) ? json_encode($e->data) : null,
-                    'created_at' => $now ?? date('Y-m-d H:i:s'),
-                    'updated_at' => $now ?? date('Y-m-d H:i:s')
-                ];
+                $channelId = $channelMap[$rawChannel];
             }
+
+            $caId = $caMap[$channelId][$e->channeledAccountId] ?? null;
+            if (!$globalEventId || !$caId || !$channelId) continue;
+
+            $key = $e->platformId . ':' . $caId;
+            $validChanneledEvents[$key] = [
+                'platform_id' => $e->platformId,
+                'event_id' => $globalEventId,
+                'channeled_account_id' => $caId,
+                'channel' => $channelId,
+                'data' => !empty($e->data) ? json_encode($e->data) : null,
+                'created_at' => $now ?? date('Y-m-d H:i:s'),
+                'updated_at' => $now ?? date('Y-m-d H:i:s')
+            ];
         }
 
         if (!empty($validChanneledEvents)) {
