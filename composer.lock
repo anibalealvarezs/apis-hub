@@ -318,13 +318,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/google-api.git",
-                "reference": "df88cde6e0b7ad431c3a8f5e8aba91c74a980c25"
+                "reference": "8eb31a210649fa73f7196b62a850d45671be06a2"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/google-api/anibalealvarezs-google-api-df88cde6e0b7ad431c3a8f5e8aba91c74a980c25-zip-ddae9a.zip",
-                "reference": "df88cde6e0b7ad431c3a8f5e8aba91c74a980c25",
-                "shasum": "35a718d44e096ea85fa35117b28240cb9e3d9da2"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/google-api/anibalealvarezs-google-api-8eb31a210649fa73f7196b62a850d45671be06a2-zip-f30598.zip",
+                "reference": "8eb31a210649fa73f7196b62a850d45671be06a2",
+                "shasum": "b2b1c5a0226bfd4d78a42f69945e3f18041f5cbd"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "^1.0.0",
@@ -381,7 +381,7 @@
             "support": {
                 "issues": "https://github.com/anibalealvarezs/google-api/issues"
             },
-            "time": "2026-10-30T20:21:08+00:00"
+            "time": "2026-10-30T22:34:01+00:00"
         },
         {
             "name": "anibalealvarezs/google-hub-driver",
@@ -389,13 +389,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/google-hub-driver.git",
-                "reference": "98d05e9daf4411dae16a3f4ab205424aec3a75fd"
+                "reference": "a037fb1d84688d87fbb9ebf9bcb165f5c32e7da0"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/google-hub-driver/anibalealvarezs-google-hub-driver-98d05e9daf4411dae16a3f4ab205424aec3a75fd-zip-adfba7.zip",
-                "reference": "98d05e9daf4411dae16a3f4ab205424aec3a75fd",
-                "shasum": "5da2578a0b2c7675b8f3e0c8f7936524381145fe"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/google-hub-driver/anibalealvarezs-google-hub-driver-a037fb1d84688d87fbb9ebf9bcb165f5c32e7da0-zip-4f2493.zip",
+                "reference": "a037fb1d84688d87fbb9ebf9bcb165f5c32e7da0",
+                "shasum": "4c05137df1c7e518f4b597fef8a9772c9e1285b0"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "^1.0.0",
@@ -428,7 +428,7 @@
                 }
             ],
             "description": "APIs-Hub driver for Google (Search Console & Analytics) integration.",
-            "time": "2026-10-30T20:28:38+00:00"
+            "time": "2026-10-30T22:44:26+00:00"
         },
         {
             "name": "anibalealvarezs/klaviyo-api",
@@ -1733,16 +1733,16 @@
         },
         {
             "name": "doctrine/orm",
-            "version": "3.7.5",
+            "version": "3.7.6",
             "source": {
                 "type": "git",
                 "url": "https://github.com/doctrine/orm.git",
-                "reference": "00c2fd70da291cca1ec75f4dae5344fe3df588fa"
+                "reference": "4487f850401c0e1f27891cce5897fa90b3055c2a"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/doctrine/orm/zipball/00c2fd70da291cca1ec75f4dae5344fe3df588fa",
-                "reference": "00c2fd70da291cca1ec75f4dae5344fe3df588fa",
+                "url": "https://api.github.com/repos/doctrine/orm/zipball/4487f850401c0e1f27891cce5897fa90b3055c2a",
+                "reference": "4487f850401c0e1f27891cce5897fa90b3055c2a",
                 "shasum": ""
             },
             "require": {
@@ -1817,9 +1817,9 @@
             ],
             "support": {
                 "issues": "https://github.com/doctrine/orm/issues",
-                "source": "https://github.com/doctrine/orm/tree/3.7.5"
+                "source": "https://github.com/doctrine/orm/tree/3.7.6"
             },
-            "time": "2026-10-09T05:58:13+00:00"
+            "time": "2026-10-30T12:19:09+00:00"
         },
         {
             "name": "doctrine/persistence",
