@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "379a7506854b0d84092d061842885138",
+    "content-hash": "909b2e10d087d564354aa1a0814a675c",
     "packages": [
         {
             "name": "anibalealvarezs/amazon-api",
@@ -201,17 +201,17 @@
         },
         {
             "name": "anibalealvarezs/api-driver-core",
-            "version": "v1.1.3",
+            "version": "v1.1.4",
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/api-driver-core.git",
-                "reference": "48a45057076e9536e63677ab9a177572c32ce370"
+                "reference": "52e9c93784a89acfad10cc7d866b0d24de9b1786"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/api-driver-core/anibalealvarezs-api-driver-core-48a45057076e9536e63677ab9a177572c32ce370-zip-47a728.zip",
-                "reference": "48a45057076e9536e63677ab9a177572c32ce370",
-                "shasum": "90a0ecddeb02def1ab2a8a1160083ddb769685c7"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/api-driver-core/anibalealvarezs-api-driver-core-52e9c93784a89acfad10cc7d866b0d24de9b1786-zip-f158ae.zip",
+                "reference": "52e9c93784a89acfad10cc7d866b0d24de9b1786",
+                "shasum": "3190a4953a1a7ce82c2a983c8cb7499eda84cc85"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "^1.0.0",
@@ -245,7 +245,7 @@
                 }
             ],
             "description": "Core interfaces and orchestration logic for APIs Hub drivers.",
-            "time": "2026-10-28T22:52:58+00:00"
+            "time": "2026-10-30T20:21:04+00:00"
         },
         {
             "name": "anibalealvarezs/facebook-graph-api",
@@ -314,17 +314,17 @@
         },
         {
             "name": "anibalealvarezs/google-api",
-            "version": "v1.1.0",
+            "version": "v1.1.1",
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/google-api.git",
-                "reference": "2ec046995255bf74365317a077539dd1d8b2aa8c"
+                "reference": "df88cde6e0b7ad431c3a8f5e8aba91c74a980c25"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/google-api/anibalealvarezs-google-api-2ec046995255bf74365317a077539dd1d8b2aa8c-zip-c37f3e.zip",
-                "reference": "2ec046995255bf74365317a077539dd1d8b2aa8c",
-                "shasum": "515e6f0f19169da0dc115e6ac425ebed2f3a12f8"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/google-api/anibalealvarezs-google-api-df88cde6e0b7ad431c3a8f5e8aba91c74a980c25-zip-ddae9a.zip",
+                "reference": "df88cde6e0b7ad431c3a8f5e8aba91c74a980c25",
+                "shasum": "35a718d44e096ea85fa35117b28240cb9e3d9da2"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "^1.0.0",
@@ -381,26 +381,26 @@
             "support": {
                 "issues": "https://github.com/anibalealvarezs/google-api/issues"
             },
-            "time": "2026-10-18T16:07:42+00:00"
+            "time": "2026-10-30T20:21:08+00:00"
         },
         {
             "name": "anibalealvarezs/google-hub-driver",
-            "version": "v1.3.0",
+            "version": "v1.3.1",
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/google-hub-driver.git",
-                "reference": "fb84e8358b780778551a4d2503ebe701b93496b7"
+                "reference": "98d05e9daf4411dae16a3f4ab205424aec3a75fd"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/google-hub-driver/anibalealvarezs-google-hub-driver-fb84e8358b780778551a4d2503ebe701b93496b7-zip-5ff15c.zip",
-                "reference": "fb84e8358b780778551a4d2503ebe701b93496b7",
-                "shasum": "1abab80c48b37435e320274f71bb5d0dae89b5a0"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/google-hub-driver/anibalealvarezs-google-hub-driver-98d05e9daf4411dae16a3f4ab205424aec3a75fd-zip-adfba7.zip",
+                "reference": "98d05e9daf4411dae16a3f4ab205424aec3a75fd",
+                "shasum": "5da2578a0b2c7675b8f3e0c8f7936524381145fe"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "^1.0.0",
-                "anibalealvarezs/api-driver-core": "^1.1.1",
-                "anibalealvarezs/google-api": "^1.1.0",
+                "anibalealvarezs/api-driver-core": "^1.1.4",
+                "anibalealvarezs/google-api": "^1.1.1",
                 "doctrine/orm": "^2.12.3 || ^3.0",
                 "fakerphp/faker": "^1.20",
                 "nesbot/carbon": "^2.0 || ^3.0",
@@ -428,7 +428,7 @@
                 }
             ],
             "description": "APIs-Hub driver for Google (Search Console & Analytics) integration.",
-            "time": "2026-10-29T22:11:47+00:00"
+            "time": "2026-10-30T20:28:38+00:00"
         },
         {
             "name": "anibalealvarezs/klaviyo-api",
@@ -626,21 +626,21 @@
         },
         {
             "name": "anibalealvarezs/mailchimp-hub-driver",
-            "version": "v1.1.0",
+            "version": "v1.1.1",
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/mailchimp-hub-driver.git",
-                "reference": "08335c01fdf28b7fd9ff642187ce364431610434"
+                "reference": "be150fea0d36f38b258fd0658c262045b72fc4fd"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/mailchimp-hub-driver/anibalealvarezs-mailchimp-hub-driver-08335c01fdf28b7fd9ff642187ce364431610434-zip-f38b91.zip",
-                "reference": "08335c01fdf28b7fd9ff642187ce364431610434",
-                "shasum": "549771486fcc70c634dda30932067e00cfad89de"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/mailchimp-hub-driver/anibalealvarezs-mailchimp-hub-driver-be150fea0d36f38b258fd0658c262045b72fc4fd-zip-bb87c7.zip",
+                "reference": "be150fea0d36f38b258fd0658c262045b72fc4fd",
+                "shasum": "8bd89c8822e0b93bc7befa4817ca34e07617dce1"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "^1.0.0",
-                "anibalealvarezs/api-driver-core": "^1.1.2",
+                "anibalealvarezs/api-driver-core": "^1.1.4",
                 "anibalealvarezs/mailchimp-api": "1.0.0",
                 "doctrine/orm": "^2.12.3 || ^3.0",
                 "nesbot/carbon": "^2.0 || ^3.0",
@@ -668,25 +668,25 @@
                 }
             ],
             "description": "APIs-Hub driver for Mailchimp marketing & eCommerce integration.",
-            "time": "2026-10-18T01:51:22+00:00"
+            "time": "2026-10-30T20:31:07+00:00"
         },
         {
             "name": "anibalealvarezs/meta-hub-driver",
-            "version": "v1.2.0",
+            "version": "v1.2.1",
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/meta-hub-driver.git",
-                "reference": "37ee3ebc339cb3f420a2eac2bd6c30f755befdac"
+                "reference": "89d89f53b630ae9679f6aa23a5f4a66d737ac004"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/meta-hub-driver/anibalealvarezs-meta-hub-driver-37ee3ebc339cb3f420a2eac2bd6c30f755befdac-zip-169123.zip",
-                "reference": "37ee3ebc339cb3f420a2eac2bd6c30f755befdac",
-                "shasum": "84973880dfab0978df6f4b27a6b7b61844a4ad0e"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/meta-hub-driver/anibalealvarezs-meta-hub-driver-89d89f53b630ae9679f6aa23a5f4a66d737ac004-zip-b2cf73.zip",
+                "reference": "89d89f53b630ae9679f6aa23a5f4a66d737ac004",
+                "shasum": "215a1278d8c54d2b949e7debda263aacfff81ddb"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "^1.0.0",
-                "anibalealvarezs/api-driver-core": "^1.1.3",
+                "anibalealvarezs/api-driver-core": "^1.1.4",
                 "anibalealvarezs/facebook-graph-api": "^1.2.0",
                 "doctrine/orm": "^2.12.3 || ^3.0",
                 "fakerphp/faker": "^1.20",
@@ -715,7 +715,7 @@
                 }
             ],
             "description": "APIs-Hub driver for Meta (Facebook & Instagram) integration.",
-            "time": "2026-10-30T14:38:05+00:00"
+            "time": "2026-10-30T20:30:02+00:00"
         },
         {
             "name": "anibalealvarezs/oauth-v1",
