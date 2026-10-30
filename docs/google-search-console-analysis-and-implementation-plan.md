@@ -1,5 +1,15 @@
 # GSC search type expansion
 
+## Consumer analytics index (2026-10-29 follow-up)
+
+Facade's `GscAnalyticsCatalog` and `docs/gsc-analytics-catalog.md` now distinguish
+source capabilities from the implemented cache surface. Google News supports
+device and appearance reporting; Discover supports appearance reporting. Current
+feed ingestion remains date/page/country. Adding device grain needs reconciliation
+of already cached coarse feed observations to avoid counting both grains. Appearance
+must retain the established dual-cache scope separation; never mix appearance rows
+with standard totals. No driver grain change is included in this Facade UI update.
+
 GSC measures organic acquisition and complements paid Google Ads and downstream GA4 traffic. Existing assets remain sites/accounts and page/query/geo/device entities; no new entity hierarchy is required.
 
 ## Source findings
