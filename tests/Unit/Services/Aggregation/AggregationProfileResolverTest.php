@@ -39,6 +39,7 @@
             $this->assertSame('demo_profile', $profiles[0]['key']);
             $this->assertSame('demo_channel', $profiles[0]['channel']);
             $this->assertSame(['eq', 'neq'], $profiles[0]['filter_contract']['channel']);
+            $this->assertSame(['version' => 1, 'blocked_metrics' => ['cost']], $profiles[0]['query_contract']);
         }
 
         public function testReturnsEmptyWhenDriverDoesNotPublishProfileContract(): void
@@ -65,6 +66,7 @@
         {
             return [[
                         'key'                => 'demo_profile',
+                        'query_contract'     => ['version' => 1, 'blocked_metrics' => ['cost']],
                         'group_patterns'     => [['daily']],
                         'filter_contract'    => [
                             'channel' => ['=', '!='],

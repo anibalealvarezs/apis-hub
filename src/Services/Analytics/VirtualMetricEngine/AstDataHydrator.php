@@ -110,6 +110,7 @@ class AstDataHydrator
 
             // Fetch rows
             $rows = $result->getRows();
+            self::assertInputsAvailable($result->getMeta());
             if ($this->logger) {
                 $this->logger->info("Fetched rows for channel {$channel}", ['rowCount' => count($rows), 'sample' => $rows[0] ?? null]);
             }
@@ -185,5 +186,13 @@ class AstDataHydrator
         }
 
         return $metricData;
+    }
+
+    /** Contract-declared missing inputs must not be coerced into zero by KPI arithmetic. */
+    public static function assertInputsAvailable(array $meta): void
+    {
+        if (!empty($meta['unavailable_metrics'])) {
+            throw new \InvalidArgumentException('A KPI input is unavailable because complete matching metric weights are missing.');
+        }
     }
 }

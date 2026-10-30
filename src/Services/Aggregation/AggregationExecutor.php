@@ -78,6 +78,19 @@
          */
         public function execute(BaseRepository $repository, AggregationPlan $plan): AggregationExecutionResult
         {
+            if ($plan->getContextValue('query_contract', []) !== []) {
+                $rows = (new \Services\Aggregation\Strategies\UniversalSqlStrategy())->execute(
+                    $repository->getEntityManager()->getConnection(), $plan,
+                    (bool)$plan->getContextValue('is_postgres', false)
+                );
+                if ($rows === null) throw new \InvalidArgumentException('The selected query cannot preserve the driver metric contract.');
+                return new AggregationExecutionResult($rows, $repository->getLastAggregateMeta() + [
+                    'execution_path' => 'optimized', 'optimized_strategy' => 'universal_sql',
+                    'query_contract_version' => $plan->getContextValue('query_contract')['version'],
+                    'metric_quality' => $plan->getContextValue('query_contract')['quality'],
+                    'unavailable_metrics' => (new DriverQueryContract())->unavailableMetrics($plan->getContextValue('query_contract'), $rows),
+                ]);
+            }
             $optimizedAttempted = $plan->canUseOptimized();
             $candidateStrategies = $plan->getCandidateOptimizedStrategies();
             $plannerDiagnostics = $this->buildPlannerDiagnostics($plan);

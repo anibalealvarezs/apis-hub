@@ -136,6 +136,18 @@
 
             $channel = $this->resolveRequestedChannelKey($filtersArr, $repository);
 
+            $queryContract = ['contract' => [], 'filters' => $filtersArr];
+            if (($isMetric || $isChanneledMetric) && $channel !== null) {
+                $queryContract = (new DriverQueryContract())->prepare(
+                    $this->aggregationProfileResolver->resolve($channel), $aggregations, $filtersArr, $groupBy
+                );
+                if ($queryContract['contract'] !== []) {
+                    $filtersArr = $queryContract['filters'];
+                    $filters = (object)$filtersArr;
+                    $context['query_contract'] = $queryContract['contract'];
+                }
+            }
+
             $profileValidation = $this->evaluateProfileCapability(
                 filters: $filtersArr,
                 groupPattern: $groupPattern,

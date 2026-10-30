@@ -55,7 +55,9 @@
             $metricSqlResolver = $this->metricSqlResolver ?? new CanonicalMetricSqlResolver();
             $filterResolver = new FilterConditionResolver();
             $channelKey = $this->resolveChannelKey($filtersArr, $plan);
+            $queryContract = $plan->getContextValue('query_contract', []);
             $resolvedMetrics = [];
+            $currencyGuards = [];
 
             $selectFields = [];
             $groupByFields = [];
@@ -93,9 +95,36 @@
                 }
             };
 
+            $dimensionValue = function (string $key) use ($queryContract, $safeLeftJoin, &$sqlParams, $isPostgres): string {
+                $base = 'dv_dim_'.preg_replace('/[^a-z0-9]/i', '_', $key).'.value';
+                $definition = array_change_key_case($queryContract['derived_dimensions'] ?? [], CASE_LOWER)[strtolower($key)] ?? null;
+                if ($definition === null) return $base;
+                $parts = [];
+                foreach ($definition['parts'] as $part) {
+                    if (!preg_match('/^[a-zA-Z0-9_]+$/', $part)) throw new \InvalidArgumentException('Invalid driver dimension part.');
+                    $alias = 'derived_'.$part;
+                    $sqlParams['key_'.$alias] = strtolower($part);
+                    $safeLeftJoin('dimension_set_items', 'dsi_'.$alias, "mc.dimension_set_id = dsi_$alias.dimension_set_id AND dsi_$alias.dimension_value_id IN (SELECT v.id FROM dimension_values v JOIN dimension_keys k ON k.id = v.dimension_key_id WHERE LOWER(k.name) = :key_$alias)");
+                    $safeLeftJoin('dimension_values', 'dv_'.$alias, "dsi_$alias.dimension_value_id = dv_$alias.id");
+                    $parts[] = 'dv_'.$alias.'.value';
+                }
+                $separator = "'".str_replace("'", "''", $definition['separator'])."'";
+                $joined = $isPostgres ? implode(' || '.$separator.' || ', $parts) : 'CONCAT('.implode(', '.$separator.', ', $parts).')';
+                return "COALESCE($base, $joined)";
+            };
+
             // Handle GroupBy
             foreach ($groupBy as $field) {
                 $quotedField = preg_match('/^[a-zA-Z0-9_]+$/', $field) ? $field : $quoteChar.$field.$quoteChar;
+                if ($queryContract !== [] && !in_array($field, ['daily', 'metric_date'], true)) {
+                    $dateExpression = (new \Services\Aggregation\TemporalDatePartSqlResolver())->resolve($field, 'm.metric_date', $isPostgres);
+                    if ($dateExpression !== null) {
+                        $selectFields[] = "$dateExpression AS $quotedField";
+                        $groupByFields[] = $dateExpression;
+                        $orderMap[$field] = $dateExpression;
+                        continue;
+                    }
+                }
                 $isDimension = str_starts_with($field, 'dimensions.');
                 $dimKey = $isDimension ? substr($field, 11) : $field;
 
@@ -150,9 +179,10 @@
                         $fallbackExpr = "dv_$fbAlias.value, 'unknown'";
                     }
 
-                    $selectFields[] = "COALESCE(dv_$dimAlias.value, $fallbackExpr) AS $quotedField";
-                    $groupByFields[] = "COALESCE(dv_$dimAlias.value, $fallbackExpr)";
-                    $orderMap[$field] = "COALESCE(dv_$dimAlias.value, $fallbackExpr)";
+                    $valueExpression = $dimensionValue($dimKey);
+                    $selectFields[] = "COALESCE($valueExpression, $fallbackExpr) AS $quotedField";
+                    $groupByFields[] = "COALESCE($valueExpression, $fallbackExpr)";
+                    $orderMap[$field] = "COALESCE($valueExpression, $fallbackExpr)";
                     continue;
                 }
 
@@ -345,7 +375,11 @@
                 )");
                     $safeLeftJoin('dimension_values', "dv_$dimAlias", "dsi_$dimAlias.dimension_value_id = dv_$dimAlias.id");
 
-                    $whereClauses[] = $this->buildFilterClause("dv_$dimAlias.value", $condition, $paramName, $isPostgres);
+                    // Filter joins use a different alias from grouping joins.
+                    $valueExpression = $dimensionValue($dimKey);
+                    $groupAlias = 'dv_dim_'.preg_replace('/[^a-z0-9]/i', '_', $dimKey).'.value';
+                    $valueExpression = str_replace($groupAlias, "dv_$dimAlias.value", $valueExpression);
+                    $whereClauses[] = $this->buildFilterClause($valueExpression, $condition, $paramName, $isPostgres);
                     if ($condition['value'] !== null) {
                         if (in_array($condition['operator'], ['in', 'not_in'], true) && is_array($condition['value'])) {
                             foreach ($condition['value'] as $i => $v) {
@@ -361,6 +395,18 @@
 
             foreach ($aggregations as $alias => $expr) {
                 $normalizedExpr = strtolower(trim((string)$expr));
+                $rule = $queryContract['resolved_rules'][$alias] ?? null;
+                if ($rule !== null) {
+                    if ($rule['reducer'] === 'companion_weighted_average') {
+                        $metricSql = (new \Services\Aggregation\CompanionMetricWeightedFormula())->build($rule, $isPostgres);
+                    } elseif ($rule['reducer'] === 'sum') {
+                        $names = implode(', ', array_map(static fn ($name) => "'".str_replace("'", "''", strtolower($name))."'", $rule['source_names']));
+                        $metricSql = "SUM(CASE WHEN LOWER(mc.name) IN ($names) AND LOWER(mc.period) = 'daily' THEN m.value ELSE 0 END)";
+                    } else {
+                        throw new \InvalidArgumentException('Unsupported driver reducer.');
+                    }
+                    $resolvedMetric = ['sql_expression' => $metricSql, 'source' => 'driver_query_contract', 'raw_names' => $rule['source_names']];
+                } else {
                 $resolvedMetric = $metricSqlResolver->resolveMarketingMetric(
                     requestedMetric: $normalizedExpr,
                     channel: $channelKey,
@@ -368,6 +414,7 @@
                     periodCol: $periodCol,
                 );
                 $metricSql = is_string($resolvedMetric['sql_expression']) ? $resolvedMetric['sql_expression'] : null;
+                }
 
                 if ($metricSql === null) {
                     // Try organic metric as fallback
@@ -410,6 +457,11 @@
                 }
 
                 $safeAlias = preg_replace('/[^a-z0-9_]/i', '_', (string)$alias) ?: (string)$alias;
+                if (isset($rule['currency_metadata_path'])) {
+                    $guardAlias = '_contract_currency_'.count($currencyGuards);
+                    $currencyGuards[] = $guardAlias;
+                    $selectFields[] = (new \Services\Aggregation\MetricCurrencyGuardFormula())->build($rule, $isPostgres).' AS '.$quoteChar.$guardAlias.$quoteChar;
+                }
                 $quotedAlias = $quoteChar.$safeAlias.$quoteChar;
                 $selectFields[] = $metricSql.' AS '.$quotedAlias;
                 $orderMap[strtolower($safeAlias)] = $quotedAlias;
@@ -467,6 +519,13 @@
             error_log("[UniversalSqlDebug] Executing SQL: " . preg_replace('/\s+/', ' ', $sql) . " | Params: " . json_encode($sqlParams));
 
             $rows = $connection->fetchAllAssociative($sql, $sqlParams);
+            foreach ($rows as &$row) {
+                foreach ($currencyGuards as $guard) {
+                    if (!empty($row[$guard])) throw new \InvalidArgumentException('Revenue from multiple accounts requires matching known currencies. Select one account or refresh reporting currency metadata.');
+                    unset($row[$guard]);
+                }
+            }
+            unset($row);
 
             error_log("[UniversalSqlDebug] Rows returned: " . count($rows) . " | Sample: " . json_encode(array_slice($rows, 0, 2)));
 

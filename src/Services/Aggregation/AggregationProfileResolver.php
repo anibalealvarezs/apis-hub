@@ -49,10 +49,17 @@ final class AggregationProfileResolver
             return [];
         }
 
-        return AggregationProfileNormalizer::normalizeProfiles(
+        $rawProfiles = array_values(array_filter($driverClass::getAggregationProfiles(), 'is_array'));
+        $normalized = AggregationProfileNormalizer::normalizeProfiles(
             defaultChannel: $channel,
-            profiles: $driverClass::getAggregationProfiles()
+            profiles: $rawProfiles
         );
+        // Preserve policy during staged core upgrades; old normalizers discard new optional keys.
+        foreach ($normalized as $index => &$profile) {
+            if (isset($rawProfiles[$index]['query_contract'])) $profile['query_contract'] = $rawProfiles[$index]['query_contract'];
+        }
+        unset($profile);
+        return $normalized;
     }
 
     /**

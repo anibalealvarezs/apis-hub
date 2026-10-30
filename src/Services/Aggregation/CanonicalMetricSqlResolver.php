@@ -492,6 +492,10 @@
                     continue;
                 }
 
+                if ($rawNames === []) {
+                    throw new \InvalidArgumentException("Metric '{$canonicalMetric}' is not supported by the selected channel.");
+                }
+
                 $list = is_array($rawNames) ? $rawNames : [$rawNames];
                 $normalized = [];
                 foreach ($list as $name) {

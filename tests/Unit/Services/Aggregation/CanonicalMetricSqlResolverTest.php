@@ -10,6 +10,13 @@ use Tests\Unit\BaseUnitTestCase;
 
 final class CanonicalMetricSqlResolverTest extends BaseUnitTestCase
 {
+    public function testExplicitUnsupportedDictionaryEntryCannotFallBackToGenericCost(): void
+    {
+        $resolver = new CanonicalMetricSqlResolver(driverDictionaryResolver: fn () => ['spend' => [], 'revenue' => ['totalRevenue']]);
+        $this->expectException(\InvalidArgumentException::class);
+        $resolver->resolveMarketingMetric('spend', 'fixture', 'LOWER(mc.name)', 'LOWER(mc.period)');
+    }
+
     public function testResolvesLegacyAliasIntoCanonicalMarketingExpression(): void
     {
         $resolver = new CanonicalMetricSqlResolver();
