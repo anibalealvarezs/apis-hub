@@ -7,6 +7,22 @@ use Throwable;
 
 class HealthService
 {
+    public static function getMcpEndpoint(?bool $container = null, ?array $environment = null): array
+    {
+        $container ??= file_exists('/.dockerenv');
+        $environment ??= ['MCP_HOST' => getenv('MCP_HOST'), 'MCP_PORT' => getenv('MCP_PORT'), 'MCP_INTERNAL_PORT' => getenv('MCP_INTERNAL_PORT')];
+        return [
+            'host' => ($environment['MCP_HOST'] ?? null) ?: ($container ? 'mcp' : '127.0.0.1'),
+            'port' => (int)(($container ? ($environment['MCP_INTERNAL_PORT'] ?? null) : ($environment['MCP_PORT'] ?? null)) ?: 3000),
+        ];
+    }
+
+    public static function heartbeatUrl(string $url): string
+    {
+        $url = rtrim($url, '/');
+        return str_ends_with($url, '/api/heartbeat') ? $url : $url.'/api/heartbeat';
+    }
+
     /**
      * Performs a deep health check of the system.
      */

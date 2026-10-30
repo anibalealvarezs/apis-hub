@@ -130,15 +130,17 @@
             $output->write("🧠 <comment>MCP Interface (Port 3000):</comment> ");
             $mcpStatus = true;
             try {
-                $mcpPort = (int)(getenv('MCP_PORT') ?: 3000);
+                $endpoint = HealthService::getMcpEndpoint();
+                $mcpPort = $endpoint['port'];
+                $mcpHost = $endpoint['host'];
                 $errno = 0;
                 $errstr = '';
-                $connection = @stream_socket_client("tcp://127.0.0.1:$mcpPort", $errno, $errstr, 2);
+                $connection = @stream_socket_client("tcp://{$mcpHost}:{$mcpPort}", $errno, $errstr, 2);
                 if (is_resource($connection)) {
                     $output->writeln("<info>ONLINE (SSE Mode)</info>");
                     fclose($connection);
                 } else {
-                    $output->writeln("<error>OFFLINE (Port $mcpPort inaccessible)</error>");
+                    $output->writeln("<error>OFFLINE ({$mcpHost}:{$mcpPort} inaccessible)</error>");
                     $mcpStatus = false;
                     $allPassed = false;
                 }
@@ -166,7 +168,7 @@
 
                     $payload = json_encode($statusReport);
 
-                    $ch = curl_init($facadeUrl.'/api/heartbeat');
+                    $ch = curl_init(HealthService::heartbeatUrl($facadeUrl));
                     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
                     curl_setopt($ch, CURLOPT_POST, true);
                     curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
@@ -179,12 +181,14 @@
                     $response = curl_exec($ch);
                     $info = curl_getinfo($ch);
                     if ($response === false || $info['http_code'] !== 200) {
+                        $allPassed = false;
                         $output->write("<error>FAILED (".curl_errno($ch)."): ".curl_error($ch)." HTTP ".$info['http_code']."</error>\n");
                     } else {
                         $output->write("<info>PASSED</info>\n");
                     }
                     curl_close($ch);
                 } catch (Throwable $e) {
+                    $allPassed = false;
                     $output->write("<error>ERROR (".$e->getMessage().")</error>\n");
                 }
             }

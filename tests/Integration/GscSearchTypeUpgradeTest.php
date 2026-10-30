@@ -21,7 +21,7 @@ class GscUpgradeSqliteConnection extends Connection
     public bool $failFinalWrite = false;
     public function executeStatement(string $sql, array $params = [], array $types = []): int|string
     {
-        if (str_starts_with($sql, 'LOCK TABLE ')) return 0;
+        if (str_starts_with($sql, 'LOCK TABLE ') && $this->getDatabasePlatform() instanceof \Doctrine\DBAL\Platforms\SQLitePlatform) return 0;
         if (str_starts_with($sql, 'UPDATE ')) $this->updateStatements[] = $sql;
         if ($this->failFinalWrite && str_starts_with($sql, 'UPDATE metrics AS m')) throw new \RuntimeException('Injected final write failure');
         return parent::executeStatement($sql, $params, $types);
@@ -30,12 +30,19 @@ class GscUpgradeSqliteConnection extends Connection
 
 class GscSearchTypeUpgradeTest extends TestCase
 {
-    private Connection $conn;
-    private EntityManagerInterface $em;
+    protected Connection $conn;
+    protected EntityManagerInterface $em;
+
+    protected function connectFixture(): Connection
+    {
+        return DriverManager::getConnection(['driver' => 'pdo_sqlite', 'memory' => true, 'wrapperClass' => GscUpgradeSqliteConnection::class]);
+    }
+
+    protected function fixtureSql(string $sql): string { return $sql; }
 
     protected function setUp(): void
     {
-        $this->conn = DriverManager::getConnection(['driver' => 'pdo_sqlite', 'memory' => true, 'wrapperClass' => GscUpgradeSqliteConnection::class]);
+        $this->conn = $this->connectFixture();
         $sql = MetricConfigSignature::selectSql();
         $tables = ['mc' => 'metric_configs'];
         preg_match_all('/LEFT JOIN (\w+) (\w+)/', $sql, $joins, PREG_SET_ORDER);
@@ -46,9 +53,10 @@ class GscSearchTypeUpgradeTest extends TestCase
         foreach ($tables as $alias => $table) {
             $definitions = ['id INTEGER PRIMARY KEY'];
             foreach (array_keys($columns[$alias] ?? []) as $column) {
-                if ($column !== 'id') $definitions[] = '"'.$column.'" TEXT'.($column === 'hash' || $column === 'config_signature' ? ' UNIQUE' : '');
+                $type = $alias === 'mc' && ($column === 'channel' || str_ends_with($column, '_id')) ? 'INTEGER' : 'TEXT';
+                if ($column !== 'id') $definitions[] = '"'.$column.'" '.$type.($column === 'hash' || $column === 'config_signature' ? ' UNIQUE' : '');
             }
-            $this->conn->executeStatement('CREATE TABLE '.$table.' ('.implode(', ', $definitions).')');
+            $this->conn->executeStatement($this->fixtureSql('CREATE TABLE '.$table.' ('.implode(', ', $definitions).')'));
         }
         foreach ([
             'CREATE TABLE channels (id INTEGER PRIMARY KEY, name TEXT)',
@@ -57,7 +65,7 @@ class GscSearchTypeUpgradeTest extends TestCase
             'CREATE TABLE dimension_set_items (dimension_set_id INTEGER, dimension_value_id INTEGER, PRIMARY KEY(dimension_set_id, dimension_value_id))',
             'CREATE TABLE metrics (id INTEGER PRIMARY KEY, metric_config_id INTEGER, dimensions_hash TEXT, metric_date TEXT, value REAL, UNIQUE(metric_config_id, dimensions_hash, metric_date))',
             'CREATE TABLE channeled_metrics (id INTEGER PRIMARY KEY, metric_id INTEGER, dimension_set_id INTEGER, platform_id TEXT DEFAULT \'site\', channel INTEGER DEFAULT 1, platform_created_at TEXT DEFAULT \'2026-10-01\', UNIQUE(platform_id, channel, metric_id, platform_created_at))',
-        ] as $statement) $this->conn->executeStatement($statement);
+        ] as $statement) $this->conn->executeStatement($this->fixtureSql($statement));
         $this->conn->insert('channels', ['id' => 1, 'name' => 'google_search_console']);
         $this->em = $this->createMock(EntityManagerInterface::class);
         $this->em->method('getConnection')->willReturn($this->conn);
@@ -71,7 +79,7 @@ class GscSearchTypeUpgradeTest extends TestCase
         });
     }
 
-    private function seed(int $id, int $channel, ?string $type = null): void
+    protected function seed(int $id, int $channel, ?string $type = null): void
     {
         $dimensions = [['dimensionKey' => 'page', 'dimensionValue' => 'https://example.com/']];
         if ($type !== null) $dimensions[] = ['dimensionKey' => 'search_type', 'dimensionValue' => $type];

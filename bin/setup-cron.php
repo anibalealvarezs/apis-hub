@@ -224,6 +224,8 @@ if (Helpers::isDebug()) {
     $projectName = $config['project'] ?? 'apis-hub';
     echo "✔ Cron configuration generated for project: {$projectName}\n";
     foreach ($cronLines as $line) {
-        echo "  Applied: {$line}\n";
+        $displayLine = preg_match('/^([A-Z_][A-Z0-9_]*)=/', $line, $matches)
+            ? $matches[1].'=[configured]' : $line;
+        echo "  Applied: {$displayLine}\n";
     }
 }
