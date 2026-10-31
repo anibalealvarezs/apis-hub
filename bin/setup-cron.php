@@ -211,6 +211,7 @@ $cronLines[] = "* * * * * cd /app && /usr/local/bin/php bin/cli.php app:scale-wo
 
 // Watchdog and fallback processing for master
 if ($isMaster) {
+    $cronLines[] = "* * * * * cd /app && /usr/local/bin/php bin/cli.php app:process-scoped-reports --limit=3 > /dev/null 2>&1";
     $cronLines[] = "*/5 * * * * cd /app && /usr/local/bin/php bin/cli.php app:process-jobs > /dev/null 2>&1";
     $cronLines[] = "*/15 * * * * cd /app && /usr/local/bin/php bin/cli.php app:evaluate-alerts > /dev/null 2>&1";
 }

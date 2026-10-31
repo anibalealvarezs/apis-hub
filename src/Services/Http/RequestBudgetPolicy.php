@@ -14,7 +14,7 @@ final class RequestBudgetPolicy
         if (in_array($path, ['/api/heartbeat', '/api/v1/ping', '/up'], true)) return null;
         $management = str_starts_with($path, '/api/management/') || str_contains($path, '/auth/') || str_contains($path, '/token');
         $orchestration = $path === '/api/compute-kpi';
-        $expensive = !$management && str_ends_with($path, '/aggregate');
+        $expensive = !$management && (str_ends_with($path, '/aggregate') || str_starts_with($path, '/api/analytics/'));
         $int = static fn (string $key, int $default) => max(1, (int)(getenv($key) ?: $default));
         return [
             'group' => $management ? 'management' : ($orchestration ? 'orchestration' : 'data'),

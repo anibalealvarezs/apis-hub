@@ -19,6 +19,19 @@ final class DriverQueryContractTest extends TestCase
         ]]];
     }
 
+    public function testNewGrainsRequireTheirRevisionAndRejectUncachedJointFilters(): void
+    {
+        $profiles = $this->profiles();
+        $profiles[0]['query_contract']['scope_default_filters']['traffic'] = ['dimensions.recipe_revision' => '1'];
+        $profiles[0]['query_contract']['dimension_filter_fields']['traffic'] = ['dimensions.scope', 'dimensions.recipe_revision', 'dimensions.device'];
+        $policy = new DriverQueryContract;
+        $prepared = $policy->prepare($profiles, ['sessions' => 'sessions'], ['dimensions.device' => 'mobile'], []);
+        self::assertSame('1', $prepared['filters']['dimensions.recipe_revision']);
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('reporting grain');
+        $policy->prepare($profiles, ['sessions' => 'sessions'], ['dimensions.itemId' => 'unknown-in-this-grain'], []);
+    }
+
     public function testDefaultsSelectOneScopeAndNormalizeRawAndCanonicalCase(): void
     {
         foreach (['bounce_rate', 'bounceRate', 'BOUNCERATE'] as $name) {

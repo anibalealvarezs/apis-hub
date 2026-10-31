@@ -85,6 +85,7 @@
 
         // Register your own commands
         $commands = [
+            new \Commands\Analytics\ProcessScopedReportsCommand($entityManager),
             new InvalidateSyncCacheCommand(),
             new CreateEntityCommand(),
             new DeleteEntityCommand(),

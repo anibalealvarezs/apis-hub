@@ -117,7 +117,9 @@
             foreach ($groupBy as $field) {
                 $quotedField = preg_match('/^[a-zA-Z0-9_]+$/', $field) ? $field : $quoteChar.$field.$quoteChar;
                 if ($queryContract !== [] && !in_array($field, ['daily', 'metric_date'], true)) {
-                    $dateExpression = (new \Services\Aggregation\TemporalDatePartSqlResolver())->resolve($field, 'm.metric_date', $isPostgres);
+                    $dateExpression = str_starts_with($field, 'trailing_')
+                        ? (new \Services\Aggregation\BoundedTemporalBuckets())->expression($field, 'm.metric_date', $startDate, $endDate)
+                        : (new \Services\Aggregation\TemporalDatePartSqlResolver())->resolve($field, 'm.metric_date', $isPostgres);
                     if ($dateExpression !== null) {
                         $selectFields[] = "$dateExpression AS $quotedField";
                         $groupByFields[] = $dateExpression;

@@ -1,3 +1,7 @@
+> Subsequent expansion: [scoped report implementation and rollout](ga4-scoped-reports-rollout.md)
+> now adds whole-window users and weighted trailing buckets. Historical statements
+> below describe the earlier correctness increment.
+
 # GA4 correctness rollout
 
 Implementation date: 2026-10-30. No production upgrade or source replay has run.

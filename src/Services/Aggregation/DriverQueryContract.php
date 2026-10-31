@@ -41,6 +41,13 @@ final class DriverQueryContract
         if (!in_array($condition['operator'], ['eq', 'is_null'], true) || !is_string($scope) || !isset($contract['scopes'][$scope])) {
             throw new InvalidArgumentException('Select one supported reporting scope.');
         }
+        $filters += $contract['scope_default_filters'][$scope] ?? [];
+        if (isset($contract['dimension_filter_fields'][$scope])) {
+            foreach (array_keys($filters) as $field) {
+                $base = preg_replace('/__[^.]+$/', '', $field);
+                if (str_starts_with($base, 'dimensions.') && !in_array($base, $contract['dimension_filter_fields'][$scope], true)) throw new InvalidArgumentException('This filter is not available in the selected reporting grain. Request a separate compatible report.');
+            }
+        }
         $aliases = array_change_key_case($contract['aliases'] ?? [], CASE_LOWER);
         $allowed = array_combine(array_map('strtolower', $contract['scopes'][$scope]), $contract['scopes'][$scope]);
         $blocked = array_map('strtolower', $contract['blocked_metrics'] ?? []);
@@ -59,8 +66,9 @@ final class DriverQueryContract
             if (isset($rule['quality'])) $quality[$alias] = $rule['quality'];
         }
         foreach ($groupBy as $field) {
-            if (str_starts_with($field, 'trailing_')) throw new InvalidArgumentException('Rolling windows are unavailable for this metric contract. Select a calendar granularity.');
-            if (isset($contract['groupable_fields'][$scope]) && !in_array($field, ['daily', 'metric_date', 'weekly', 'monthly', 'quarterly', 'semiannual', 'yearly', 'annually'], true) && !in_array($field, $contract['groupable_fields'][$scope], true)) {
+            $trailing = str_starts_with($field, 'trailing_') && ($contract['temporal_policy'] ?? null) === 'bounded_calendar_and_trailing';
+            if (str_starts_with($field, 'trailing_') && !$trailing) throw new InvalidArgumentException('Rolling windows are unavailable for this metric contract. Select a calendar granularity.');
+            if (!$trailing && isset($contract['groupable_fields'][$scope]) && !in_array($field, ['daily', 'metric_date', 'weekly', 'monthly', 'quarterly', 'semiannual', 'yearly', 'annually'], true) && !in_array($field, $contract['groupable_fields'][$scope], true)) {
                 throw new InvalidArgumentException('The selected breakdown is unavailable in this reporting scope.');
             }
         }
