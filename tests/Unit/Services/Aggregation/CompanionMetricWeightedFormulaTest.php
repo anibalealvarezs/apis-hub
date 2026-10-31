@@ -39,6 +39,9 @@ final class CompanionMetricWeightedFormulaTest extends TestCase
         self::assertNull($db->fetchOne($sql), 'Negative companions must remain unavailable.');
         $db->executeStatement("UPDATE metrics SET value=0 WHERE metric_config_id=2 AND metric_date='2026-10-01'");
         self::assertEqualsWithDelta(.9, (float)$db->fetchOne($sql), .000001);
+        $db->executeStatement('UPDATE metrics SET value=0 WHERE metric_config_id=2');
+        self::assertNull($db->fetchOne($sql), 'Zero total sessions is undefined even when every companion exists.');
+        $db->executeStatement("UPDATE metrics SET value=90 WHERE metric_config_id=2 AND metric_date='2026-10-02'");
         $db->insert('metrics', ['metric_config_id' => 1, 'metric_date' => '2026-10-03', 'value' => .5]);
         self::assertNull($db->fetchOne($sql), 'Incomplete weights must not silently produce a partial average.');
         $db->close();
