@@ -63,6 +63,7 @@
             $groupByFields = [];
             $joins = [];
             $whereClauses = [];
+            $companionConfigBounds = [];
             $sqlParams = [];
             $orderMap = [];
 
@@ -252,6 +253,14 @@
                 $paramName = 'filter_'.preg_replace('/[^a-z0-9]/i', '_', $key);
                 $condition = $filterResolver->resolve($value);
 
+                if ($baseKey === 'channel') {
+                    $predicate = (new \Services\Aggregation\ChannelSqlFilter)->compile($condition, $paramName);
+                    $whereClauses[] = $predicate['sql'];
+                    $sqlParams = array_merge($sqlParams, $predicate['params']);
+                    $companionConfigBounds[] = str_replace('mc.', 'wc.', $predicate['sql']);
+                    continue;
+                }
+
                 if (str_starts_with($baseKey, 'attributes.')) {
                     $condition = $filterResolver->resolve($value, true);
                     $attribute = (new \Services\Aggregation\EntityAttributeResolver(\Helpers\Helpers::getManager()))->resolve($baseKey);
@@ -396,10 +405,16 @@
             }
 
             $companionJoins = [];
+            $companionSources = [];
             if ($queryContract !== []) {
                 $sourceNames = [];
                 foreach ($queryContract['resolved_rules'] as $rule) {
                     $sourceNames = array_merge($sourceNames, $rule['source_names']);
+                    if (($rule['reducer'] ?? '') === 'companion_weighted_average') {
+                        $weights = $rule['weight_names']; sort($weights);
+                        $weightKey = json_encode($weights);
+                        $companionSources[$weightKey] = array_unique(array_merge($companionSources[$weightKey] ?? [], $rule['source_names']));
+                    }
                 }
                 $names = implode(', ', array_map(static fn ($name) => "'".str_replace("'", "''", strtolower($name))."'", array_unique($sourceNames)));
                 $whereClauses[] = "LOWER(mc.name) IN ($names)";
@@ -417,7 +432,7 @@
                         $formula = new \Services\Aggregation\CompanionMetricWeightedFormula();
                         if (!isset($companionJoins[$key])) {
                             $weightAlias = 'companion_'.count($companionJoins);
-                            $bounds = [];
+                            $bounds = $companionConfigBounds;
                             if ($startDate !== null) $bounds[] = 'wm.metric_date >= :startDate';
                             if ($endDate !== null) $bounds[] = 'wm.metric_date <= :endDate';
                             // Push direct identity predicates into the weight scan. Dimension
@@ -427,7 +442,12 @@
                                     $bounds[] = str_replace('mc.', 'wc.', $clause);
                                 }
                             }
-                            $joins[] = $formula->join($rule, $weightAlias, $isPostgres, $bounds);
+                            $scopeBound = (new \Services\Aggregation\CompanionScopeFilter)->compile($queryContract, $filtersArr);
+                            if ($scopeBound !== null) {
+                                $bounds[] = $scopeBound['sql'];
+                                $sqlParams = array_merge($sqlParams, $scopeBound['params']);
+                            }
+                            $joins[] = $formula->join($rule, $weightAlias, $isPostgres, $bounds, $companionSources[$key]);
                             $companionJoins[$key] = $weightAlias;
                         }
                         $metricSql = $formula->buildFromJoin($rule, $companionJoins[$key]);
@@ -550,7 +570,10 @@
 
             error_log("[UniversalSqlDebug] Executing SQL: " . preg_replace('/\s+/', ' ', $sql) . " | Params: " . json_encode($sqlParams));
 
+            $sqlStarted = microtime(true);
             $rows = $connection->fetchAllAssociative($sql, $sqlParams);
+            $sqlMilliseconds = round((microtime(true) - $sqlStarted) * 1000, 2);
+            error_log('[UniversalSqlDebug] Completed SQL: duration_ms='.$sqlMilliseconds.' rows='.count($rows));
             foreach ($rows as &$row) {
                 foreach ($currencyGuards as $guard) {
                     if (!empty($row[$guard])) throw new \InvalidArgumentException('Revenue from multiple accounts requires matching known currencies. Select one account or refresh reporting currency metadata.');

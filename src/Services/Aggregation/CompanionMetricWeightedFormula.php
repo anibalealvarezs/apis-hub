@@ -10,13 +10,17 @@ final class CompanionMetricWeightedFormula
     public const GRAIN_COLUMNS = ['channel', 'account_id', 'channeled_account_id', 'campaign_id', 'channeled_campaign_id', 'channeled_ad_group_id', 'channeled_ad_id', 'creative_id', 'event_id', 'channeled_event_id', 'page_id', 'post_id', 'product_id', 'customer_id', 'order_id', 'query_id', 'country_id', 'device_id', 'dimension_set_id', 'location_id', 'state_id', 'city_id'];
 
     /** One grouped scan per companion metric set, rather than subqueries per source row. */
-    public function join(array $rule, string $alias, bool $isPostgres, array $bounds = []): string
+    public function join(array $rule, string $alias, bool $isPostgres, array $bounds = [], array $sourceNames = []): string
     {
         if (!preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/', $alias)) throw new \InvalidArgumentException('Invalid companion alias.');
         $names = implode(', ', array_map(static fn ($name) => "'".str_replace("'", "''", strtolower($name))."'", $rule['weight_names']));
         $grain = implode(', ', array_map(static fn ($column) => "wc.$column", self::GRAIN_COLUMNS));
         $where = ["LOWER(wc.name) IN ($names)", "LOWER(wc.period) = 'daily'", ...$bounds];
         $conditions = ["$alias.metric_date = m.metric_date"];
+        if ($sourceNames) {
+            $sourceList = implode(', ', array_map(static fn ($name) => "'".str_replace("'", "''", strtolower($name))."'", $sourceNames));
+            $conditions[] = "LOWER(mc.name) IN ($sourceList)";
+        }
         foreach (self::GRAIN_COLUMNS as $column) {
             // Equijoins permit PostgreSQL hash/merge plans. The nullness comparison
             // distinguishes a real zero from NULL without reserving an ID sentinel.
