@@ -38,7 +38,9 @@ final class ContractPerformanceRegressionTest extends BaseUnitTestCase
             self::assertStringContainsString('mc.channel IN (SELECT id FROM channels', $sql);
             self::assertStringContainsString('wc.channel IN (SELECT id FROM channels', $sql);
             self::assertStringContainsString('wc.dimension_set_id IN (SELECT wi.dimension_set_id', $sql);
-            self::assertStringContainsString("LOWER(mc.name) IN ('averagesessionduration') AND COALESCE", $sql);
+            self::assertStringStartsWith('WITH contract_observations AS MATERIALIZED', $sql);
+            self::assertStringNotContainsString('LEFT JOIN (SELECT wc.channel', $sql);
+            self::assertStringContainsString('OVER contract_grain', $sql);
             self::assertSame('traffic_matrix', $params['companion_scope_value']);
             self::assertSame('google_analytics', $params['filter_channel_0']);
             return $db->fetchAllAssociative($sql, $params);

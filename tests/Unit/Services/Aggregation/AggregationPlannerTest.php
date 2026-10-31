@@ -54,6 +54,25 @@
             $this->assertTrue($plan->getStages()['grouping']['has_temporal_grouping']);
         }
 
+        public function testReportedGscQueriesRequestRetainsOptimizedRouting(): void
+        {
+            $repository = $this->createMock(BaseRepository::class);
+            $repository->method('getClassName')->willReturn('Entities\\Analytics\\Channeled\\ChanneledMetric');
+            $planner = new AggregationPlanner(
+                aggregationProfilesResolver: fn () => \Anibalealvarezs\GoogleHubDriver\Drivers\SearchConsoleDriver::getAggregationProfiles(),
+                channelKeyResolver: fn () => 'google_search_console',
+            );
+            $plan = $planner->plan(repository: $repository,
+                aggregations: ['clicks'=>'clicks','impressions'=>'impressions','ctr'=>'ctr','position'=>'position'],
+                groupBy: ['query','dimensions.intent'],
+                filters: (object)['channel'=>'google_search_console','channeledAccount'=>'3','dimensions.searchAppearance'=>'standard','dimensions.search_type'=>'web'],
+                startDate:'2026-09-30', endDate:'2026-10-30');
+            self::assertTrue($plan->canUseOptimized());
+            self::assertNull($plan->getFallbackReason());
+            self::assertContains('weighted_metric', $plan->getCandidateOptimizedStrategies());
+            self::assertSame([], $plan->getContextValue('query_contract', []));
+        }
+
         public function testMarksUnsupportedEntityTypesForLegacyFallback(): void
         {
             $repository = $this->createMock(BaseRepository::class);

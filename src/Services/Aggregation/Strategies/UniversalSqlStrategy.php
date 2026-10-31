@@ -421,6 +421,22 @@
                 $whereClauses[] = "LOWER(mc.period) = 'daily'";
             }
 
+            $windowSource = [];
+            if ($isPostgres && $companionSources !== []) {
+                $bounds = $companionConfigBounds;
+                if ($startDate !== null) $bounds[] = 'wm.metric_date >= :startDate';
+                if ($endDate !== null) $bounds[] = 'wm.metric_date <= :endDate';
+                foreach ($whereClauses as $clause) {
+                    if (preg_match('/^mc\.(channel|channeled_account_id|account_id) (?:=|IN\s*\()/i', $clause)) $bounds[] = str_replace('mc.', 'wc.', $clause);
+                }
+                $scopeBound = (new \Services\Aggregation\CompanionScopeFilter)->compile($queryContract, $filtersArr);
+                if ($scopeBound !== null) {
+                    $bounds[] = $scopeBound['sql'];
+                    $sqlParams = array_merge($sqlParams, $scopeBound['params']);
+                }
+                $windowSource = (new \Services\Aggregation\CompanionMetricWindow)->compile($queryContract['resolved_rules'], $bounds);
+            }
+
             foreach ($aggregations as $alias => $expr) {
                 $normalizedExpr = strtolower(trim((string)$expr));
                 $rule = $queryContract['resolved_rules'][$alias] ?? null;
@@ -430,6 +446,10 @@
                         sort($weightNames);
                         $key = json_encode($weightNames);
                         $formula = new \Services\Aggregation\CompanionMetricWeightedFormula();
+                        if ($windowSource !== []) {
+                            $pair = $windowSource['companions'][$key];
+                            $metricSql = $formula->buildFromColumns($rule, $pair['count'], $pair['value']);
+                        } else {
                         if (!isset($companionJoins[$key])) {
                             $weightAlias = 'companion_'.count($companionJoins);
                             $bounds = $companionConfigBounds;
@@ -451,6 +471,7 @@
                             $companionJoins[$key] = $weightAlias;
                         }
                         $metricSql = $formula->buildFromJoin($rule, $companionJoins[$key]);
+                        }
                     } elseif ($rule['reducer'] === 'sum') {
                         $names = implode(', ', array_map(static fn ($name) => "'".str_replace("'", "''", strtolower($name))."'", $rule['source_names']));
                         $metricSql = "SUM(CASE WHEN LOWER(mc.name) IN ($names) AND LOWER(mc.period) = 'daily' THEN m.value ELSE 0 END)";
@@ -559,9 +580,11 @@
             $whereSql = $whereClauses !== [] ? "WHERE " . implode("\n              AND ", $whereClauses) : "";
             $groupSql = $groupByFields !== [] ? "GROUP BY\n                    " . implode(",\n            ", $groupByFields) : "";
 
-            $sql = "SELECT
+            $metricTable = $windowSource['table'] ?? 'metrics m';
+            $sqlPrefix = $windowSource['prefix'] ?? '';
+            $sql = $sqlPrefix."SELECT
                 ".implode(",\n                ", $selectFields)."
-                FROM metrics m
+                FROM $metricTable
                 JOIN metric_configs mc ON m.metric_config_id = mc.id
                 ".implode("\n        ", $joins)."
                 $whereSql

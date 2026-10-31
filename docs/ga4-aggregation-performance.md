@@ -1,107 +1,55 @@
-# GA4 Explorer aggregation performance correction
+# Aggregation regression: code-only correction
 
-## Evidence (2026-10-31)
+## Commit comparison
 
-Captured long-window Explorer SQL uses the contract UniversalSql executor; it is not
-falling back to the legacy reducer. Traffic requests add the same-grain sessions
-companion scan; acquisition queries do not. The captured SQL omitted channel from
-both scans even though it was supplied in the request. Existing composite config
-indexes mostly lead with channel, and none of the supplied indexes covers LOWER(name)
-and LOWER(period) as expressions. The companion scan was date/account-bounded but
-included every scope, then joined its result to additive as well as weighted rows.
-Logs contain completed results but no query start/duration or PostgreSQL EXPLAIN;
-they do not establish which database operator accounts for the timeout.
+- Parent of 216e94f7: contract weighted reducers used correlated companion formulas.
+- 216e94f7: replaced them with a derived companion dataset grouped by date plus all
+  persisted grain columns, joined back to source facts. It also changed diagnostics
+  for contract queries. This is the join shape responsible for the investigated
+  GA4 work; indexing/planner statistics were not a substitute for fixing it.
+- 58386697: added contract-only trailing buckets, revision/filter validation and a
+  separately scheduled source-report worker. Its temporal change does not apply to
+  the supplied summary or non-contract GSC request.
+- WeightedMetricStrategy and AggregationExecutor are byte-identical to the parent
+  of 216e94f7. The reported GSC query+intent/Web/standard request is covered by a
+  planner fixture using installed driver profiles and remains on optimized routing.
+  That routing check does not establish GSC production latency or rule out shared
+  API/database contention from slow GA4 requests.
 
-## Code changes
+## Measured failed experiment
 
-- Compile channel-name/ID membership to a database predicate, including the companion
-  scan. Channel names are resolved using the channels name index; no ambient ORM
-  lookup or driver-specific numeric ID is required. Bound parameters preserve names,
-  numeric IDs, exclusions and mixed membership without injecting literals.
-- Push the driver's declared equality scope into the companion scan as a dimension
-  set semi-join. Other-channel/other-scope sessions cannot inflate the intermediate
-  scan. No scope names are hardcoded in the generic executor.
-- Probe companion results only for the union of weighted source metric names sharing
-  that companion. Additive metrics stay on their existing sum path. Full null-safe
-  grain matching and missing/duplicate/negative-weight guards remain unchanged.
-- Log `Completed SQL: duration_ms=... rows=...` after the database fetch.
+The lateral indexed-lookup benchmark took 44.7 and 39.1 seconds, with 15,306 weight
+lookups and over nine million buffer hits. It is rejected, removed from code, and
+was never enabled in the executor. Restarting the application could not change the
+standalone benchmark's SQL. Do not interpret activity predicate flags as proof of
+old loaded code: pg_stat_activity may truncate SQL before those predicates.
 
-No cached metrics or signatures are changed. No historical resync or schema migration
-is required for this code correction. This does not assert that all existing indexes
-are optimal: PostgreSQL execution plans and real timings are still required before
-recommending additional expression/covering indexes or declaring the 504 fixed.
+## Replacement
 
-## Read-only database acceptance
+PostgreSQL contract queries with weighted reducers now build a materialized fact CTE.
+A named window partitions by the full persisted grain and date, counts companion
+observations and retains their value. Both rates reuse the same window. Outer SQL
+keeps existing filters, groupings, additive sums and currency guards. Source-only
+metric pruning happens outside the window so unselected weights remain available.
+There is no wide companion self-join and no per-observation lateral lookup. Null,
+zero, negative, duplicate and missing weights retain the established behavior.
 
-The accompanying SQL file reproduces the corrected captured Traffic Pages query,
-with property and dates supplied as psql variables. Copy the file to the tenant if
-it is not present in its deployed checkout. From the tenant directory:
+Non-contract and other-channel strategy selection is unchanged. Non-PostgreSQL
+execution retains the existing compatible path. No statistics command, DDL,
+migration, index, resync or data repair is required or run by this patch. The pending
+manual statistics-maintenance command and registration have been removed.
 
-```bash
-docker compose exec -T db sh -lc \
-'psql -U "${POSTGRES_USER:-postgres}" -d "${POSTGRES_DB:-postgres}" -v ON_ERROR_STOP=1 -v account_id=46 -v date_start=2025-01-01 -v date_end=2026-10-29 -v analyze=false' \
-< docs/sql/ga4-traffic-performance-audit.sql
-```
+## Validation
 
-Default mode plans without executing. During a quiet period, `-v analyze=true` runs
-EXPLAIN ANALYZE/BUFFERS inside a read-only transaction with a 45-second timeout. Do
-not run concurrent diagnostic copies while Explorer requests are already stuck.
-Compare selected config/metric row counts, sort spills, buffers and join shape;
-then rerun the four original Explorer payloads after deploying/restarting the tenant.
-Inspect the new duration log for both summary periods and each table. If requests
-still time out, capture their execution plans before choosing another optimization.
+The local 45,000-observation fixture executes both weighted rates and additive
+sessions using one physical fact scan. SQL-plan assertions check materialization
+and absence of correlated lookups. Numerical regression compares window execution
+with existing formulas, including missing/duplicate/negative/zero companions and
+campaign/date isolation. The reported GSC planner shape has its own regression.
+These SQLite/unit results are not a PostgreSQL production latency claim.
 
-Offline regression uses the long-window shape with multiple channels/scopes, mixed
-additive/weighted metrics, duplicate/missing companions and parameterized channel
-membership. It proves isolation and arithmetic, not production PostgreSQL latency.
-The broad aggregation unit suite also has two existing SocialOrganic sentinel tests
-expecting a metadata callback that the unchanged early-return path does not emit;
-those unrelated tests were left intact.
-
-
-## Execution architecture and cross-channel scope
-
-The omitted channel predicate was a shared UniversalSql compiler defect: channel was
-recognized as a standard field (so it bypassed dynamic dimension filtering), but no
-filter branch emitted its predicate. The correction applies to every channel using
-UniversalSql, not just GA4. Companion pruning applies to contracts declaring a scope
-and companion-weighted reducers. Other specialized strategies are separate code paths;
-passing UniversalSql regressions is not proof that every channel/query is fast.
-
-Architecture direction confirmed by the operator: retire legacy aggregation execution
-as capability coverage becomes complete. Legacy references describe current temporary
-compatibility paths, not a preferred long-term executor. Currently contract queries
-execute UniversalSql directly and fail explicitly when unsupported; non-contract
-queries can still select specialized SQL strategies or fall back to legacy. Migrate
-snapshot/latest/delta behavior and other remaining capabilities with semantic parity
-and execution-plan tests before removing that fallback. UniversalSql is the shared
-optimized target, but its name alone does not establish a good PostgreSQL plan.
-
-
-## Follow-up plan evidence: indexed candidate, not activated
-
-The supplied activity snapshot has no lock blockers. Several entries are PostgreSQL
-parallel workers (`MessageQueueSend`), not necessarily separate client requests. The
-estimated corrected-query plan places the full grouped companion scan on the inner
-side of a Nested Loop Left Join while estimating one source row. Repeated work is a
-credible explanation, but actual loops/time require EXPLAIN ANALYZE; estimated costs
-are not durations. Source config scanning also still uses a parallel sequential scan.
-
-Both activity predicate flags were false. This is inconclusive: pg_stat_activity may
-truncate the SQL text before the WHERE/join predicates. Do not diagnose stale loaded
-code from these flags alone. The static audit script proves its own query shape, not
-the exact SQL currently executing in the application.
-
-`CompanionMetricWeightedFormula::indexedLookup/indexedJoin` now provide a candidate
-single lateral lookup with date/full-grain matching and explicit nullable equality
-arms for indexed dimension/account IDs. Existing count/value validation is retained.
-These methods are deliberately NOT wired into UniversalSql until PostgreSQL acceptance.
-SQLite fixtures verify missing/duplicate detection and null-versus-zero isolation;
-they do not establish the lateral join's production performance.
-
-`docs/sql/ga4-traffic-indexed-companion-audit.sql` benchmarks that candidate with the
-same summary expressions, dates, property and page grouping as the captured report.
-Use the original audit command with this filename and `-v analyze=true`, once during
-a quiet period. It is read-only and cancels at 45 seconds. Capture actual loop counts,
-buffers and execution time before enabling this execution shape. A timed-out test is
-not acceptance. No executor routing or PostgreSQL planner setting is changed here.
+The read-only `docs/sql/ga4-traffic-performance-audit.sql` now reflects the current
+windowed compiler, replacing the old self-join template. Its default EXPLAIN mode
+only plans; optional analyze=true executes inside a read-only transaction with a
+45-second timeout. It changes no schema or metrics. No further manual database
+alterations are part of this fix.

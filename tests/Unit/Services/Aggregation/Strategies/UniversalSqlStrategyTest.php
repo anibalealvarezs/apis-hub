@@ -16,12 +16,14 @@ final class UniversalSqlStrategyTest extends BaseUnitTestCase
     {
         $connection = $this->createMock(Connection::class);
         $connection->expects(self::once())->method('fetchAllAssociative')->willReturnCallback(function ($sql, $params) {
-            self::assertSame(1, substr_count($sql, 'COUNT(*) AS observation_count'));
+            self::assertSame(1, substr_count($sql, 'OVER contract_grain AS _contract_weight_count_'));
+            self::assertStringNotContainsString('LEFT JOIN (SELECT wc.channel', $sql);
             self::assertStringNotContainsString('SELECT CASE WHEN COUNT(*) = 1', $sql);
             self::assertStringContainsString('wm.metric_date >= :startDate', $sql);
             self::assertStringContainsString('wc.channeled_account_id IN', $sql);
             self::assertStringContainsString("LOWER(mc.name) IN ('averagesessionduration', 'bouncerate')", $sql);
-            self::assertStringContainsString('COALESCE(companion_0.dimension_set_id, 0) = COALESCE(mc.dimension_set_id, 0)', $sql);
+            self::assertStringContainsString('PARTITION BY wc.channel, wc.account_id', $sql);
+            self::assertStringContainsString('wc.dimension_set_id', $sql);
             self::assertSame('2026-08-01', $params['startDate']);
             return [];
         });

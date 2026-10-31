@@ -33,39 +33,14 @@ final class CompanionMetricWeightedFormula
 
     public function buildFromJoin(array $rule, string $alias): string
     {
+        return $this->buildFromColumns($rule, "$alias.observation_count", "$alias.weight_value");
+    }
+
+    public function buildFromColumns(array $rule, string $count, string $weight): string
+    {
         $sources = implode(', ', array_map(static fn ($name) => "'".str_replace("'", "''", strtolower($name))."'", $rule['source_names']));
         $source = "LOWER(mc.name) IN ($sources) AND LOWER(mc.period) = 'daily'";
-        $weight = "$alias.weight_value";
-        return "CASE WHEN SUM(CASE WHEN $source AND ($alias.observation_count IS NULL OR $alias.observation_count <> 1 OR $weight IS NULL OR $weight < 0) THEN 1 ELSE 0 END) > 0 THEN NULL ELSE SUM(CASE WHEN $source THEN m.value * $weight ELSE 0 END) / NULLIF(SUM(CASE WHEN $source THEN $weight ELSE 0 END), 0) END";
-    }
-
-    /** Candidate for PostgreSQL plan acceptance; deliberately not selected by the executor yet. */
-    public function indexedLookup(array $rule, array $sourceNames = []): string
-    {
-        $quote = static fn ($name) => "'".str_replace("'", "''", strtolower($name))."'";
-        $conditions = [
-            'wm.metric_date = m.metric_date',
-            'wc.channel = mc.channel',
-            'LOWER(wc.name) IN ('.implode(', ', array_map($quote, $rule['weight_names'])).')',
-            'LOWER(wc.period) = LOWER(mc.period)',
-        ];
-        foreach (self::GRAIN_COLUMNS as $column) {
-            if ($column === 'channel') continue; // Persisted channel FK is non-nullable.
-            if (in_array($column, ['dimension_set_id', 'channeled_account_id'], true)) {
-                // Keep explicit indexable equality arms for the existing FK indexes.
-                $conditions[] = "(wc.$column = mc.$column OR (wc.$column IS NULL AND mc.$column IS NULL))";
-            } else {
-                $conditions[] = "wc.$column IS NOT DISTINCT FROM mc.$column";
-            }
-        }
-        if ($sourceNames) $conditions[] = 'LOWER(mc.name) IN ('.implode(', ', array_map($quote, $sourceNames)).')';
-        return 'SELECT COUNT(*) AS observation_count, MAX(wm.value) AS weight_value FROM metric_configs wc JOIN metrics wm ON wm.metric_config_id = wc.id WHERE '.implode(' AND ', $conditions);
-    }
-
-    public function indexedJoin(array $rule, string $alias, array $sourceNames = []): string
-    {
-        if (!preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/', $alias)) throw new \InvalidArgumentException('Invalid companion alias.');
-        return 'LEFT JOIN LATERAL ('.$this->indexedLookup($rule, $sourceNames).") $alias ON TRUE";
+        return "CASE WHEN SUM(CASE WHEN $source AND ($count IS NULL OR $count <> 1 OR $weight IS NULL OR $weight < 0) THEN 1 ELSE 0 END) > 0 THEN NULL ELSE SUM(CASE WHEN $source THEN m.value * $weight ELSE 0 END) / NULLIF(SUM(CASE WHEN $source THEN $weight ELSE 0 END), 0) END";
     }
 
     public function build(array $rule, bool $isPostgres): string

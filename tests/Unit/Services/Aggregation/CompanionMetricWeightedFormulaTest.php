@@ -11,7 +11,7 @@ use Services\Aggregation\CompanionMetricWeightedFormula;
 final class CompanionMetricWeightedFormulaTest extends TestCase
 {
     /** @dataProvider executionForms */
-    public function testUnequalWeightsMissingCompanionsAndGrainIsolation(bool $joined): void
+    public function testUnequalWeightsMissingCompanionsAndGrainIsolation(bool|string $joined): void
     {
         $db = DriverManager::getConnection(['driver' => 'pdo_sqlite', 'memory' => true]);
         $columns = ['channel', 'account_id', 'channeled_account_id', 'campaign_id', 'channeled_campaign_id', 'channeled_ad_group_id', 'channeled_ad_id', 'creative_id', 'event_id', 'channeled_event_id', 'page_id', 'post_id', 'product_id', 'customer_id', 'order_id', 'query_id', 'country_id', 'device_id', 'dimension_set_id', 'location_id', 'state_id', 'city_id'];
@@ -26,7 +26,14 @@ final class CompanionMetricWeightedFormulaTest extends TestCase
         $rule = ['source_names' => ['bounceRate'], 'weight_names' => ['sessions']];
         $formula = $joined ? $builder->buildFromJoin($rule, 'cw') : $builder->build($rule, true);
         $join = $joined ? $builder->join($rule, 'cw', true) : '';
-        $sql = 'SELECT '.$formula.' AS value FROM metrics m JOIN metric_configs mc ON mc.id=m.metric_config_id '.$join.' WHERE mc.channeled_campaign_id=9';
+        $prefix = ''; $table = 'metrics m';
+        if ($joined === 'window') {
+            $compiled = (new \Services\Aggregation\CompanionMetricWindow)->compile(['rate' => $rule + ['reducer' => 'companion_weighted_average']], []);
+            $pair = reset($compiled['companions']);
+            $formula = $builder->buildFromColumns($rule, $pair['count'], $pair['value']);
+            $prefix = $compiled['prefix']; $table = $compiled['table']; $join = '';
+        }
+        $sql = $prefix.'SELECT '.$formula.' AS value FROM '.$table.' JOIN metric_configs mc ON mc.id=m.metric_config_id '.$join.' WHERE mc.channeled_campaign_id=9';
         if ($joined) {
             $queryPlan = json_encode($db->fetchAllAssociative('EXPLAIN QUERY PLAN '.$sql));
             self::assertStringNotContainsString('CORRELATED', $queryPlan);
@@ -47,5 +54,5 @@ final class CompanionMetricWeightedFormulaTest extends TestCase
         $db->close();
     }
 
-    public static function executionForms(): array { return [[false], [true]]; }
+    public static function executionForms(): array { return [[false], [true], ['window']]; }
 }
