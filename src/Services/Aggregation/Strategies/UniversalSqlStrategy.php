@@ -393,12 +393,42 @@
                 }
             }
 
+            $companionJoins = [];
+            if ($queryContract !== []) {
+                $sourceNames = [];
+                foreach ($queryContract['resolved_rules'] as $rule) {
+                    $sourceNames = array_merge($sourceNames, $rule['source_names']);
+                }
+                $names = implode(', ', array_map(static fn ($name) => "'".str_replace("'", "''", strtolower($name))."'", array_unique($sourceNames)));
+                $whereClauses[] = "LOWER(mc.name) IN ($names)";
+                $whereClauses[] = "LOWER(mc.period) = 'daily'";
+            }
+
             foreach ($aggregations as $alias => $expr) {
                 $normalizedExpr = strtolower(trim((string)$expr));
                 $rule = $queryContract['resolved_rules'][$alias] ?? null;
                 if ($rule !== null) {
                     if ($rule['reducer'] === 'companion_weighted_average') {
-                        $metricSql = (new \Services\Aggregation\CompanionMetricWeightedFormula())->build($rule, $isPostgres);
+                        $weightNames = $rule['weight_names'];
+                        sort($weightNames);
+                        $key = json_encode($weightNames);
+                        $formula = new \Services\Aggregation\CompanionMetricWeightedFormula();
+                        if (!isset($companionJoins[$key])) {
+                            $weightAlias = 'companion_'.count($companionJoins);
+                            $bounds = [];
+                            if ($startDate !== null) $bounds[] = 'wm.metric_date >= :startDate';
+                            if ($endDate !== null) $bounds[] = 'wm.metric_date <= :endDate';
+                            // Push direct identity predicates into the weight scan. Dimension
+                            // and attribute predicates still apply to the matched source grain.
+                            foreach ($whereClauses as $clause) {
+                                if (preg_match('/^mc\.(channel|channeled_account_id|account_id) (?:=|IN\s*\()/i', $clause)) {
+                                    $bounds[] = str_replace('mc.', 'wc.', $clause);
+                                }
+                            }
+                            $joins[] = $formula->join($rule, $weightAlias, $isPostgres, $bounds);
+                            $companionJoins[$key] = $weightAlias;
+                        }
+                        $metricSql = $formula->buildFromJoin($rule, $companionJoins[$key]);
                     } elseif ($rule['reducer'] === 'sum') {
                         $names = implode(', ', array_map(static fn ($name) => "'".str_replace("'", "''", strtolower($name))."'", $rule['source_names']));
                         $metricSql = "SUM(CASE WHEN LOWER(mc.name) IN ($names) AND LOWER(mc.period) = 'daily' THEN m.value ELSE 0 END)";

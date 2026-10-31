@@ -12,6 +12,32 @@ use Tests\Unit\BaseUnitTestCase;
 
 final class UniversalSqlStrategyTest extends BaseUnitTestCase
 {
+    public function testWeightedContractSharesABoundedCompanionScanAndPrunesUnrequestedMetrics(): void
+    {
+        $connection = $this->createMock(Connection::class);
+        $connection->expects(self::once())->method('fetchAllAssociative')->willReturnCallback(function ($sql, $params) {
+            self::assertSame(1, substr_count($sql, 'COUNT(*) AS observation_count'));
+            self::assertStringNotContainsString('SELECT CASE WHEN COUNT(*) = 1', $sql);
+            self::assertStringContainsString('wm.metric_date >= :startDate', $sql);
+            self::assertStringContainsString('wc.channeled_account_id IN', $sql);
+            self::assertStringContainsString("LOWER(mc.name) IN ('averagesessionduration', 'bouncerate')", $sql);
+            self::assertStringContainsString('COALESCE(companion_0.dimension_set_id, 0) = COALESCE(mc.dimension_set_id, 0)', $sql);
+            self::assertSame('2026-08-01', $params['startDate']);
+            return [];
+        });
+        $rules = [];
+        foreach (['duration' => 'averageSessionDuration', 'bounce' => 'bounceRate'] as $alias => $metric) {
+            $rules[$alias] = ['reducer' => 'companion_weighted_average', 'source_names' => [$metric], 'weight_names' => ['sessions']];
+        }
+        $plan = new AggregationPlan(
+            aggregations: ['duration' => 'averageSessionDuration', 'bounce' => 'bounceRate'], groupBy: ['daily'],
+            filters: (object)['channeledAccount' => ['operator' => 'in', 'value' => [1, 2, 3, 4, 5, 6]]],
+            startDate: '2026-08-01', endDate: '2026-10-29',
+            context: ['query_contract' => ['resolved_rules' => $rules]],
+        );
+        (new UniversalSqlStrategy())->execute($connection, $plan, true);
+    }
+
     public function testFacebookOrganicPageLevelQueriesExcludePostRows(): void
     {
         $capturedSql = null;

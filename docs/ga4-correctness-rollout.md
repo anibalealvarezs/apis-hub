@@ -101,3 +101,25 @@ Source-threshold metadata is retained for diagnosis but is not yet summarized in
 per-report UI badges. Exact-window user reporting and provider-driven expansion of
 additional metrics remain separate follow-ups requiring a budgeted window-cache
 design and controlled provider verification. No claim of complete live parity is made.
+
+
+## Weighted-query performance follow-up
+
+Weighted rate/duration aggregation now uses one grouped companion scan per weight
+metric set, bounded by the requested dates and direct account/channel predicates.
+It joins on the complete cached grain, counts duplicate observations and retains
+NULL for missing/invalid weights. Multiple weighted metrics sharing sessions reuse
+that scan. Source metric names and daily period are filtered before aggregation.
+This replaces repeated correlated subqueries on the contract-aware SQL path; it
+does not loosen rate semantics or use account/date-only weights.
+
+Planner diagnostics identify the validated contract execution capability and the
+actual universal_sql candidate, rather than claiming a legacy profile fallback.
+Queries without a driver contract retain the existing planning behavior.
+
+Offline regression covers weighted results, missing/duplicate/negative weights,
+zero weights, grain isolation, shared SQL scans and planner diagnostics. SQLite
+EXPLAIN confirms the joined formulation has no correlated subquery. Before rollout
+acceptance, compare PostgreSQL EXPLAIN (ANALYZE, BUFFERS) and latency for the same
+six-property, August–October duration request and check result equality. No live
+production benchmark or deployment is implied by the offline checks.

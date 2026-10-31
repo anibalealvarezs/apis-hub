@@ -171,11 +171,21 @@
                 groupBy: $groupBy,
             );
 
-            if ($fallbackReason === null && !$profileValidation['supported']) {
+            if ($queryContract['contract'] !== []) {
+                // The executor uses the validated contract SQL path directly. Legacy
+                // profile/reducer diagnostics must not report a fallback it never takes.
+                $fallbackReason = null;
+                $canUseOptimized = true;
+                $candidateOptimizedStrategies = ['universal_sql'];
+                $stages['optimized']['candidate_strategies'] = $candidateOptimizedStrategies;
+                $stages['profiles']['execution_capability'] = 'driver_query_contract';
+            }
+
+            if ($queryContract['contract'] === [] && $fallbackReason === null && !$profileValidation['supported']) {
                 error_log("[AggregateDebug] fallback=missing_profile_capability channel={$channel} groupPattern={$groupPattern} reason=".($profileValidation['failure_reason'] ?? 'unknown'));
             }
 
-            if ($fallbackReason === null && $profileValidation['checked'] === true && $profileValidation['supported'] === false) {
+            if ($queryContract['contract'] === [] && $fallbackReason === null && $profileValidation['checked'] === true && $profileValidation['supported'] === false) {
                 $fallbackReason = 'missing_profile_capability';
             }
 

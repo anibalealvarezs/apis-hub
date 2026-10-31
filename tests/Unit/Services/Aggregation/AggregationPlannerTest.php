@@ -10,6 +10,27 @@
 
     final class AggregationPlannerTest extends BaseUnitTestCase
     {
+        public function testValidatedContractReportsTheActualSqlPathWithoutLegacyProfileFallback(): void
+        {
+            $repository = $this->createMock(BaseRepository::class);
+            $repository->method('getClassName')->willReturn('Entities\\Analytics\\Metric');
+            $planner = new AggregationPlanner(aggregationProfilesResolver: fn () => [[
+                'key' => 'contract_fixture', 'group_patterns' => [], 'metrics' => [],
+                'query_contract' => [
+                    'version' => 1, 'scope_filter' => 'dimensions.scope',
+                    'default_filters' => ['dimensions.scope' => 'traffic_matrix'],
+                    'scopes' => ['traffic_matrix' => ['averageSessionDuration']],
+                    'rules' => ['averageSessionDuration' => ['reducer' => 'companion_weighted_average', 'weight_names' => ['sessions']]],
+                ],
+            ]]);
+            $plan = $planner->plan($repository, ['duration' => 'averageSessionDuration'], ['daily'], (object)['channel' => 'fixture']);
+            self::assertNull($plan->getFallbackReason());
+            self::assertTrue($plan->canUseOptimized());
+            self::assertSame(['universal_sql'], $plan->getCandidateOptimizedStrategies());
+            self::assertSame('driver_query_contract', $plan->getStages()['profiles']['execution_capability']);
+            self::assertSame('traffic_matrix', $plan->getFilters()->{'dimensions.scope'});
+        }
+
         public function testPlansOptimizedFirstForChanneledMetrics(): void
         {
             $repository = $this->createMock(BaseRepository::class);
