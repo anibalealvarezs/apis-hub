@@ -76,3 +76,32 @@ queries can still select specialized SQL strategies or fall back to legacy. Migr
 snapshot/latest/delta behavior and other remaining capabilities with semantic parity
 and execution-plan tests before removing that fallback. UniversalSql is the shared
 optimized target, but its name alone does not establish a good PostgreSQL plan.
+
+
+## Follow-up plan evidence: indexed candidate, not activated
+
+The supplied activity snapshot has no lock blockers. Several entries are PostgreSQL
+parallel workers (`MessageQueueSend`), not necessarily separate client requests. The
+estimated corrected-query plan places the full grouped companion scan on the inner
+side of a Nested Loop Left Join while estimating one source row. Repeated work is a
+credible explanation, but actual loops/time require EXPLAIN ANALYZE; estimated costs
+are not durations. Source config scanning also still uses a parallel sequential scan.
+
+Both activity predicate flags were false. This is inconclusive: pg_stat_activity may
+truncate the SQL text before the WHERE/join predicates. Do not diagnose stale loaded
+code from these flags alone. The static audit script proves its own query shape, not
+the exact SQL currently executing in the application.
+
+`CompanionMetricWeightedFormula::indexedLookup/indexedJoin` now provide a candidate
+single lateral lookup with date/full-grain matching and explicit nullable equality
+arms for indexed dimension/account IDs. Existing count/value validation is retained.
+These methods are deliberately NOT wired into UniversalSql until PostgreSQL acceptance.
+SQLite fixtures verify missing/duplicate detection and null-versus-zero isolation;
+they do not establish the lateral join's production performance.
+
+`docs/sql/ga4-traffic-indexed-companion-audit.sql` benchmarks that candidate with the
+same summary expressions, dates, property and page grouping as the captured report.
+Use the original audit command with this filename and `-v analyze=true`, once during
+a quiet period. It is read-only and cancels at 45 seconds. Capture actual loop counts,
+buffers and execution time before enabling this execution shape. A timed-out test is
+not acceptance. No executor routing or PostgreSQL planner setting is changed here.
