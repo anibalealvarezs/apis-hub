@@ -6,7 +6,6 @@ use Services\CacheService;
 use Symfony\Component\HttpFoundation\Response;
 
 return [
-    ...require __DIR__.'/analytics.php',
     '/cache/interrupt' => [
         'httpMethod' => 'POST',
         'callable' => function (?string $body = null, ?array $params = null) {
