@@ -105,7 +105,8 @@
                     if (!preg_match('/^[a-zA-Z0-9_]+$/', $part)) throw new \InvalidArgumentException('Invalid driver dimension part.');
                     $alias = 'derived_'.$part;
                     $sqlParams['key_'.$alias] = strtolower($part);
-                    $safeLeftJoin('dimension_set_items', 'dsi_'.$alias, "mc.dimension_set_id = dsi_$alias.dimension_set_id AND dsi_$alias.dimension_value_id IN (SELECT v.id FROM dimension_values v JOIN dimension_keys k ON k.id = v.dimension_key_id WHERE LOWER(k.name) = :key_$alias)");
+                    $sqlParams['key_norm_'.$alias] = strtolower(str_replace('_', '', $part));
+                    $safeLeftJoin('dimension_set_items', 'dsi_'.$alias, "mc.dimension_set_id = dsi_$alias.dimension_set_id AND dsi_$alias.dimension_value_id IN (SELECT v.id FROM dimension_values v JOIN dimension_keys k ON k.id = v.dimension_key_id WHERE LOWER(k.name) = :key_$alias OR LOWER(REPLACE(k.name, '_', '')) = :key_norm_$alias)");
                     $safeLeftJoin('dimension_values', 'dv_'.$alias, "dsi_$alias.dimension_value_id = dv_$alias.id");
                     $parts[] = 'dv_'.$alias.'.value';
                 }
@@ -160,11 +161,12 @@
                     // Dimension join logic
                     $dimAlias = 'dim_'.preg_replace('/[^a-z0-9]/i', '_', $dimKey);
                     $sqlParams["key_$dimAlias"] = strtolower($dimKey);
+                    $sqlParams["key_norm_$dimAlias"] = strtolower(str_replace('_', '', $dimKey));
 
                     $safeLeftJoin('dimension_set_items', "dsi_$dimAlias", "mc.dimension_set_id = dsi_$dimAlias.dimension_set_id AND dsi_$dimAlias.dimension_value_id IN (
                     SELECT sub_dv.id FROM dimension_values sub_dv 
                     JOIN dimension_keys sub_dk ON sub_dv.dimension_key_id = sub_dk.id 
-                    WHERE LOWER(sub_dk.name) = :key_$dimAlias
+                    WHERE LOWER(sub_dk.name) = :key_$dimAlias OR LOWER(REPLACE(sub_dk.name, '_', '')) = :key_norm_$dimAlias
                 )");
                     $safeLeftJoin('dimension_values', "dv_$dimAlias", "dsi_$dimAlias.dimension_value_id = dv_$dimAlias.id");
 
@@ -176,7 +178,7 @@
                         $safeLeftJoin('dimension_set_items', "dsi_$fbAlias", "mc.dimension_set_id = dsi_$fbAlias.dimension_set_id AND dsi_$fbAlias.dimension_value_id IN (
                         SELECT sub_dv.id FROM dimension_values sub_dv 
                         JOIN dimension_keys sub_dk ON sub_dv.dimension_key_id = sub_dk.id 
-                        WHERE LOWER(sub_dk.name) = :key_$fbAlias
+                        WHERE LOWER(sub_dk.name) = :key_$fbAlias OR LOWER(REPLACE(sub_dk.name, '_', '')) = 'landingpage'
                     )");
                         $safeLeftJoin('dimension_values', "dv_$fbAlias", "dsi_$fbAlias.dimension_value_id = dv_$fbAlias.id");
                         $fallbackExpr = "dv_$fbAlias.value, 'unknown'";
@@ -378,11 +380,12 @@
 
                     $dimAlias = 'dim_filter_'.preg_replace('/[^a-z0-9]/i', '_', $dimKey);
                     $sqlParams["key_$dimAlias"] = strtolower($dimKey);
+                    $sqlParams["key_norm_$dimAlias"] = strtolower(str_replace('_', '', $dimKey));
 
                     $safeLeftJoin('dimension_set_items', "dsi_$dimAlias", "mc.dimension_set_id = dsi_$dimAlias.dimension_set_id AND dsi_$dimAlias.dimension_value_id IN (
                     SELECT sub_dv.id FROM dimension_values sub_dv 
                     JOIN dimension_keys sub_dk ON sub_dv.dimension_key_id = sub_dk.id 
-                    WHERE LOWER(sub_dk.name) = :key_$dimAlias
+                    WHERE LOWER(sub_dk.name) = :key_$dimAlias OR LOWER(REPLACE(sub_dk.name, '_', '')) = :key_norm_$dimAlias
                 )");
                     $safeLeftJoin('dimension_values', "dv_$dimAlias", "dsi_$dimAlias.dimension_value_id = dv_$dimAlias.id");
 

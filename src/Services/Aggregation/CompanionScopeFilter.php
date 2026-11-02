@@ -14,8 +14,8 @@ final class CompanionScopeFilter
         $condition = (new FilterConditionResolver)->resolve($filters[$field]);
         if ($condition['operator'] !== 'eq' || !is_scalar($condition['value'])) return null;
         return [
-            'sql' => 'wc.dimension_set_id IN (SELECT wi.dimension_set_id FROM dimension_set_items wi JOIN dimension_values wv ON wv.id = wi.dimension_value_id JOIN dimension_keys wk ON wk.id = wv.dimension_key_id WHERE LOWER(wk.name) = :companion_scope_key AND wv.value = :companion_scope_value)',
-            'params' => ['companion_scope_key' => strtolower(substr($field, 11)), 'companion_scope_value' => (string)$condition['value']],
+            'sql' => 'wc.dimension_set_id IN (SELECT wi.dimension_set_id FROM dimension_set_items wi JOIN dimension_values wv ON wv.id = wi.dimension_value_id JOIN dimension_keys wk ON wk.id = wv.dimension_key_id WHERE LOWER(REPLACE(wk.name, \'_\', \'\')) = :companion_scope_key AND wv.value = :companion_scope_value)',
+            'params' => ['companion_scope_key' => strtolower(str_replace('_', '', substr($field, 11))), 'companion_scope_value' => (string)$condition['value']],
         ];
     }
 }

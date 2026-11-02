@@ -56,11 +56,11 @@
                         continue;
                     }
 
-                    $qb->setParameter("key_$dimAlias", $dimKey);
+                    $qb->setParameter("key_$dimAlias", strtolower(str_replace('_', '', $dimKey)));
                     $safeLeftJoin($dimRootAlias, 'dimension_set_items', "dsi_$dimAlias", "$dimRootAlias.dimension_set_id = dsi_$dimAlias.dimension_set_id AND dsi_$dimAlias.dimension_value_id IN (
                     SELECT sub_dv.id FROM dimension_values sub_dv 
                     JOIN dimension_keys sub_dk ON sub_dv.dimension_key_id = sub_dk.id 
-                    WHERE sub_dk.name = :key_$dimAlias
+                    WHERE LOWER(REPLACE(sub_dk.name, '_', '')) = :key_$dimAlias
                 )");
                     $safeLeftJoin("dsi_$dimAlias", 'dimension_values', "dv_$dimAlias", "dsi_$dimAlias.dimension_value_id = dv_$dimAlias.id");
                     $qb->addSelect("dv_$dimAlias.value AS $quotedField")
