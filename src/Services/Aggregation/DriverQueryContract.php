@@ -68,8 +68,15 @@ final class DriverQueryContract
         foreach ($groupBy as $field) {
             $trailing = str_starts_with($field, 'trailing_') && ($contract['temporal_policy'] ?? null) === 'bounded_calendar_and_trailing';
             if (str_starts_with($field, 'trailing_') && !$trailing) throw new InvalidArgumentException('Rolling windows are unavailable for this metric contract. Select a calendar granularity.');
-            if (!$trailing && isset($contract['groupable_fields'][$scope]) && !in_array($field, ['daily', 'metric_date', 'weekly', 'monthly', 'quarterly', 'semiannual', 'yearly', 'annually'], true) && !in_array($field, $contract['groupable_fields'][$scope], true)) {
-                throw new InvalidArgumentException('The selected breakdown is unavailable in this reporting scope.');
+            if (!$trailing && isset($contract['groupable_fields'][$scope]) && !in_array($field, ['daily', 'metric_date', 'weekly', 'monthly', 'quarterly', 'semiannual', 'yearly', 'annually'], true)) {
+                $allowedGroupFields = (array)$contract['groupable_fields'][$scope];
+                $normField = str_starts_with($field, 'dimensions.') ? substr($field, 11) : $field;
+                $isAllowed = in_array($field, $allowedGroupFields, true)
+                    || in_array("dimensions.{$normField}", $allowedGroupFields, true)
+                    || in_array($normField, $allowedGroupFields, true);
+                if (!$isAllowed) {
+                    throw new InvalidArgumentException('The selected breakdown is unavailable in this reporting scope.');
+                }
             }
         }
         if (!empty($filters['snapshot_delta']) || !empty($filters['latest_snapshot'])) throw new InvalidArgumentException('Snapshot queries are unavailable for this daily reporting contract.');
