@@ -576,17 +576,6 @@
                 return null;
             }
 
-            $repository = $plan->getContextValue('repository');
-            if ($repository instanceof BaseRepository) {
-                $repository->appendOptimizedStrategyMeta([
-                    'metric_resolution' => [
-                        'channel'          => $channelKey,
-                        'strategy'         => $this->getKey(),
-                        'resolved_metrics' => $resolvedMetrics,
-                    ],
-                ]);
-            }
-
             $orderSql = '';
             if ($orderBy !== null && trim($orderBy) !== '') {
                 $direction = strtoupper((string)$orderDir) === 'DESC' ? 'DESC' : 'ASC';
@@ -611,7 +600,21 @@
                 $groupSql
                 $orderSql";
 
-            error_log("[UniversalSqlDebug] Executing SQL: " . preg_replace('/\s+/', ' ', $sql) . " | Params: " . json_encode($sqlParams));
+            $executedSqlClean = preg_replace('/\s+/', ' ', $sql);
+            error_log("[UniversalSqlDebug] Executing SQL: " . $executedSqlClean . " | Params: " . json_encode($sqlParams));
+
+            $repository = $plan->getContextValue('repository');
+            if ($repository instanceof BaseRepository) {
+                $repository->appendOptimizedStrategyMeta([
+                    'metric_resolution' => [
+                        'channel'          => $channelKey,
+                        'strategy'         => $this->getKey(),
+                        'resolved_metrics' => $resolvedMetrics,
+                    ],
+                    'executed_sql'      => $executedSqlClean,
+                    'executed_params'   => $sqlParams,
+                ]);
+            }
 
             $sqlStarted = microtime(true);
             $rows = $connection->fetchAllAssociative($sql, $sqlParams);

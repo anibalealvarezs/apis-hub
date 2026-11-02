@@ -112,7 +112,11 @@ class AstDataHydrator
             $rows = $result->getRows();
             self::assertInputsAvailable($result->getMeta());
             if ($this->logger) {
-                $this->logger->info("Fetched rows for channel {$channel}", ['rowCount' => count($rows), 'sample' => $rows[0] ?? null]);
+                $this->logger->info("Fetched rows for channel {$channel}", [
+                    'rowCount' => count($rows),
+                    'sample' => $rows[0] ?? null,
+                    'meta' => $result->getMeta(),
+                ]);
             }
             $isSeries = false;
             $groupField = null;
