@@ -507,6 +507,23 @@
                 }
 
                 if ($metricSql === null) {
+                    // Try search metric as fallback
+                    $searchPeriod = $this->resolveOrganicFallbackPeriod($filtersArr, $groupBy);
+                    $resolvedSearchMetric = $metricSqlResolver->resolveSearchMetric(
+                        requestedMetric: $normalizedExpr,
+                        channel: $channelKey,
+                        nameCol: $nameCol,
+                        periodCol: $periodCol,
+                        period: $searchPeriod
+                    );
+
+                    if (is_string($resolvedSearchMetric['sql_expression'])) {
+                        $metricSql = $resolvedSearchMetric['sql_expression'];
+                        $resolvedMetric = $resolvedSearchMetric;
+                    }
+                }
+
+                if ($metricSql === null) {
                     $repository = $plan->getContextValue('repository');
                     if ($repository instanceof BaseRepository) {
                         $repository->appendOptimizedStrategyMeta([

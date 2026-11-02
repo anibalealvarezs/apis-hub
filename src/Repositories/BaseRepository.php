@@ -447,6 +447,7 @@
             $connection = $this->_em->getConnection();
             $qb = $this->createLegacyAggregateQueryBuilder($connection);
             $context = $this->createLegacyExecutionContext($qb, $plan);
+            $this->isChanneledMetric = str_ends_with($context->getEntityName(), 'ChanneledMetric');
             $results = $this->runLegacyAggregatePipeline($context);
 
             return $this->buildAggregateExecutionResult($results, [

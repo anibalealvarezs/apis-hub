@@ -279,7 +279,10 @@
          */
         public function resolveSearchMetric(
             string  $requestedMetric,
-            ?string $channel
+            ?string $channel,
+            string  $nameCol = 'LOWER(mc.name)',
+            string  $periodCol = 'LOWER(mc.period)',
+            string  $period = 'daily'
         ): array
         {
             $normalizedRequested = strtolower(trim($requestedMetric));
@@ -319,6 +322,16 @@
 
             $resolvedNames = $this->resolveRawMetricNamesSearch($resolutionMetric, $channel);
 
+            $sqlExpression = match ($resolutionMetric) {
+                'clicks', 'impressions' =>
+                $this->buildSumExpression($resolvedNames['raw_names'], $nameCol, $periodCol, $period),
+                'position' =>
+                $this->buildAverageExpression($resolvedNames['raw_names'], $nameCol, $periodCol, $period),
+                'ctr' =>
+                $this->buildCtrExpression($channel, $nameCol, $periodCol),
+                default => null,
+            };
+
             return [
                 'requested_metric' => $normalizedRequested,
                 'canonical_metric' => $canonicalMetric,
@@ -327,7 +340,7 @@
                 'deprecation'      => $inputMeta['deprecation'],
                 'raw_names'        => $resolvedNames['raw_names'],
                 'source'           => $resolvedNames['source'],
-                'sql_expression'   => null,
+                'sql_expression'   => $sqlExpression,
             ];
         }
 
