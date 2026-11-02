@@ -40,7 +40,7 @@
 
             $attributeJoins = [];
             foreach ($filters as $key => $value) {
-                if ($key === 'debug_sql' || $key === '_' || $key === 'latest_snapshot' || $key === 'snapshot_delta' || $key === 'snapshot_fallback_mode') {
+                if (str_starts_with((string)$key, '_') || $key === 'debug_sql' || $key === 'latest_snapshot' || $key === 'snapshot_delta' || $key === 'snapshot_fallback_mode') {
                     continue;
                 }
 

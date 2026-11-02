@@ -277,8 +277,8 @@
                     continue;
                 }
 
-                // Exclude some internal filters that shouldn't generate SQL WHERE clauses directly
-                if (in_array($baseKey, ['snapshot_delta', 'latest_snapshot', 'period'], true)) {
+                // Exclude internal/UI state filters that shouldn't generate SQL WHERE clauses directly
+                if (str_starts_with($baseKey, '_') || in_array($baseKey, ['snapshot_delta', 'latest_snapshot', 'period', '_ui_state'], true)) {
                     continue;
                 }
 
