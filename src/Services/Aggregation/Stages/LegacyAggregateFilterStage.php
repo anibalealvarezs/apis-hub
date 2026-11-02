@@ -243,6 +243,11 @@
                             if (is_numeric($value)) {
                                 $qb->andWhere("$targetCol = :f_$key")
                                     ->setParameter("f_$key", (int)$value);
+                            } elseif (is_array($value) && !empty($value) && count(array_filter($value, 'is_numeric')) === count($value)) {
+                                $paramName = 'f_' . preg_replace('/[^a-z0-9]/i', '_', $key);
+                                $numericValues = array_map('intval', array_values($value));
+                                $qb->andWhere("$targetCol IN (:$paramName)")
+                                    ->setParameter($paramName, $numericValues, \Doctrine\DBAL\ArrayParameterType::INTEGER);
                             } else {
                                 $qb->andWhere('1 = 0');
                             }
