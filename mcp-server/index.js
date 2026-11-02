@@ -16,6 +16,7 @@ import dotenv from "dotenv";
 import express from "express";
 import cors from "cors";
 import waitPort from "wait-port";
+import crypto from "crypto";
 
 const execAsync = promisify(exec);
 
@@ -57,6 +58,66 @@ async function runCliCommand(command) {
 
 // Load .env relative to project root
 dotenv.config({ path: path.join(APIS_HUB_ROOT, ".env") });
+
+/**
+ * Helper to call Facade internal API endpoints with bearer authentication and HMAC signature.
+ */
+async function callFacadeInternal(endpoint, method = "GET", body = null) {
+  let facadeBase = process.env.APIS_HUB_FACADE_URL || process.env.MONITOR_FACADE_URL;
+  if (!facadeBase) {
+    facadeBase = "http://localhost:8001";
+  }
+
+  // If facadeBase points to /api/heartbeat or other sub-paths, strip to root
+  try {
+    const parsed = new URL(facadeBase);
+    facadeBase = `${parsed.protocol}//${parsed.host}`;
+  } catch (e) {
+    // Leave as is if URL parse fails
+  }
+
+  const url = `${facadeBase}${endpoint.startsWith("/") ? endpoint : "/" + endpoint}`;
+  const secret = (process.env.ADMIN_API_KEY || process.env.APP_API_KEY || "").trim();
+  const timestamp = Math.floor(Date.now() / 1000).toString();
+  const serializedBody = body ? JSON.stringify(body) : "";
+
+  const payloadToSign = `${timestamp}.${serializedBody}`;
+  const signature = crypto.createHmac("sha256", secret).update(payloadToSign).digest("hex");
+
+  const headers = {
+    Authorization: `Bearer ${secret}`,
+    "X-Tenant-Signature": signature,
+    "X-Tenant-Timestamp": timestamp,
+    "Content-Type": "application/json",
+    Accept: "application/json",
+  };
+
+  const response = await fetch(url, {
+    method,
+    headers,
+    body: method !== "GET" && method !== "HEAD" ? serializedBody : undefined,
+  });
+
+  const responseText = await response.text();
+  let responseData;
+  try {
+    responseData = JSON.parse(responseText);
+  } catch (e) {
+    responseData = { raw: responseText };
+  }
+
+  if (!response.ok) {
+    const errorMsg =
+      responseData.message ||
+      (responseData.errors ? JSON.stringify(responseData.errors) : `HTTP ${response.status}: ${response.statusText}`);
+    const err = new Error(errorMsg);
+    err.status = response.status;
+    err.data = responseData;
+    throw err;
+  }
+
+  return responseData;
+}
 
 /**
  * Authentication and Security Middleware Helper
@@ -372,6 +433,180 @@ const USER_TOOLS = [
       type: "object",
       properties: {},
     },
+  },
+  {
+    name: "get_dashboard_authoring_context",
+    description:
+      "Get project authoring context, active connected channels, available asset groups, and current dashboard/widget billing quotas before creating or modifying a dashboard.",
+    inputSchema: {
+      type: "object",
+      properties: {}
+    }
+  },
+  {
+    name: "read_dashboard_spec",
+    description:
+      "Read the full JSON specification (widgets, layout, controls, source configurations) of an existing dashboard to prepare modifications or a full rewrite.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        dashboard_id: {
+          type: "number",
+          description: "The ID of the existing dashboard to read"
+        }
+      },
+      required: ["dashboard_id"]
+    }
+  },
+  {
+    name: "create_dashboard_draft",
+    description:
+      "Create a staged dashboard draft session with full validation of widget limits, quotas, and criteria (audience, account mode). Returns draft_token and preview_url for user review.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        dashboard_id: {
+          type: "number",
+          description: "Optional: ID of existing dashboard if proposing modifications/rewrite. Omit for new dashboard."
+        },
+        name: {
+          type: "string",
+          description: "Title of the dashboard"
+        },
+        description: {
+          type: "string",
+          description: "Optional description explaining dashboard purpose"
+        },
+        target_audience: {
+          type: "string",
+          description: "Target audience for styling & metric focus",
+          enum: ["client", "agency", "internal", "executive"]
+        },
+        account_mode: {
+          type: "string",
+          description: "Account grouping strategy",
+          enum: ["standalone", "asset_groups", "blended"]
+        },
+        grid_layout: {
+          type: "object",
+          description: "Optional grid configuration"
+        },
+        widgets: {
+          type: "array",
+          description: "Array of widget specifications",
+          items: {
+            type: "object",
+            properties: {
+              name: { type: "string" },
+              title: { type: "string" },
+              description: { type: "string" },
+              widget_type: {
+                type: "string",
+                enum: ["tile", "line_chart", "bar_chart", "table", "gauge", "sparkline", "anomaly_list"]
+              },
+              source_type: {
+                type: "string",
+                enum: ["kpi", "metric", "entity", "derived_metric"]
+              },
+              source_config: { type: "object" },
+              controls: { type: "object" },
+              grid_x: { type: "number" },
+              grid_y: { type: "number" },
+              grid_w: { type: "number" },
+              grid_h: { type: "number" },
+              custom_kpi_id: { type: "number" },
+              derived_metric_id: { type: "number" }
+            },
+            required: ["name", "widget_type", "source_type"]
+          }
+        }
+      },
+      required: ["name", "widgets"]
+    }
+  },
+  {
+    name: "update_dashboard_draft",
+    description:
+      "Iteratively update staged widgets, layout, or metadata in an active draft session based on user feedback before committing.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        draft_token: {
+          type: "string",
+          description: "The draft token returned by create_dashboard_draft"
+        },
+        name: { type: "string" },
+        description: { type: "string" },
+        target_audience: {
+          type: "string",
+          enum: ["client", "agency", "internal", "executive"]
+        },
+        account_mode: {
+          type: "string",
+          enum: ["standalone", "asset_groups", "blended"]
+        },
+        grid_layout: { type: "object" },
+        widgets: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              name: { type: "string" },
+              title: { type: "string" },
+              description: { type: "string" },
+              widget_type: {
+                type: "string",
+                enum: ["tile", "line_chart", "bar_chart", "table", "gauge", "sparkline", "anomaly_list"]
+              },
+              source_type: {
+                type: "string",
+                enum: ["kpi", "metric", "entity", "derived_metric"]
+              },
+              source_config: { type: "object" },
+              controls: { type: "object" },
+              grid_x: { type: "number" },
+              grid_y: { type: "number" },
+              grid_w: { type: "number" },
+              grid_h: { type: "number" },
+              custom_kpi_id: { type: "number" },
+              derived_metric_id: { type: "number" }
+            },
+            required: ["name", "widget_type", "source_type"]
+          }
+        }
+      },
+      required: ["draft_token", "widgets"]
+    }
+  },
+  {
+    name: "commit_dashboard_draft",
+    description:
+      "Atomically commit an approved dashboard draft to production. This creates/updates the dashboard and widgets and syncs project metadata.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        draft_token: {
+          type: "string",
+          description: "The draft token to commit"
+        }
+      },
+      required: ["draft_token"]
+    }
+  },
+  {
+    name: "discard_dashboard_draft",
+    description:
+      "Discard an active draft session and clean up staged resources if user cancels authoring.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        draft_token: {
+          type: "string",
+          description: "The draft token to discard"
+        }
+      },
+      required: ["draft_token"]
+    }
   },
 ];
 
@@ -1469,6 +1704,172 @@ function createMcpServer(role = "admin", userContext = null) {
       } catch (error) {
         return {
           content: [{ type: "text", text: `Failed to load dashboards: ${error.message}` }],
+          isError: true,
+        };
+      }
+    }
+
+    if (name === "get_dashboard_authoring_context") {
+      try {
+        const data = await callFacadeInternal("/api/internal/v1/tenant-dashboards/context", "GET");
+        return {
+          content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  status: "error",
+                  message: `Failed to fetch dashboard authoring context from Facade: ${error.message}`,
+                  details: error.data || null,
+                },
+                null,
+                2
+              ),
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+
+    if (name === "read_dashboard_spec") {
+      const { dashboard_id } = args;
+      try {
+        const data = await callFacadeInternal(`/api/internal/v1/tenant-dashboards/spec/${dashboard_id}`, "GET");
+        return {
+          content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  status: "error",
+                  message: `Failed to read dashboard spec for dashboard ID ${dashboard_id}: ${error.message}`,
+                  details: error.data || null,
+                },
+                null,
+                2
+              ),
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+
+    if (name === "create_dashboard_draft") {
+      try {
+        const data = await callFacadeInternal("/api/internal/v1/tenant-dashboards/drafts", "POST", args);
+        return {
+          content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  status: "error",
+                  message: `Failed to create dashboard draft: ${error.message}`,
+                  details: error.data || null,
+                },
+                null,
+                2
+              ),
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+
+    if (name === "update_dashboard_draft") {
+      const { draft_token, ...payload } = args;
+      try {
+        const data = await callFacadeInternal(`/api/internal/v1/tenant-dashboards/drafts/${draft_token}`, "PUT", payload);
+        return {
+          content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  status: "error",
+                  message: `Failed to update dashboard draft ${draft_token}: ${error.message}`,
+                  details: error.data || null,
+                },
+                null,
+                2
+              ),
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+
+    if (name === "commit_dashboard_draft") {
+      const { draft_token } = args;
+      try {
+        const data = await callFacadeInternal(`/api/internal/v1/tenant-dashboards/drafts/${draft_token}/commit`, "POST");
+        return {
+          content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  status: "error",
+                  message: `Failed to commit dashboard draft ${draft_token}: ${error.message}`,
+                  details: error.data || null,
+                },
+                null,
+                2
+              ),
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+
+    if (name === "discard_dashboard_draft") {
+      const { draft_token } = args;
+      try {
+        const data = await callFacadeInternal(`/api/internal/v1/tenant-dashboards/drafts/${draft_token}`, "DELETE");
+        return {
+          content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  status: "error",
+                  message: `Failed to discard dashboard draft ${draft_token}: ${error.message}`,
+                  details: error.data || null,
+                },
+                null,
+                2
+              ),
+            },
+          ],
           isError: true,
         };
       }
