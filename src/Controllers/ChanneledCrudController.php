@@ -2,7 +2,11 @@
 
 namespace Controllers;
 
+use Anibalealvarezs\ApiDriverCore\Classes\CanonicalMetricDefinitionRegistry;
+use Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory;
+use Anibalealvarezs\ApiDriverCore\Interfaces\LiveWindowProviderInterface;
 use Anibalealvarezs\ApiDriverCore\Services\CacheStrategyService;
+use Classes\DriverInitializer;
 use Entities\Analytics\Channel;
 use Entities\Analytics\Channeled\ChanneledAccount;
 use Entities\Analytics\Channeled\ChanneledDiscount;
@@ -487,20 +491,33 @@ class ChanneledCrudController extends BaseController
                     ], $aggregateMeta)
                 );
             }
-            // ---------------------------
-
-            $data = $repository->aggregate(
+            $liveWindowResult = $this->tryResolveLiveWindowExecution(
+                channelKey: $channelKey,
+                entity: $entity,
                 aggregations: $aggregations,
                 groupBy: $groupBy,
                 filters: $params['filters'] ?? null,
                 startDate: $params['startDate'] ?? null,
-                endDate: $params['endDate'] ?? null,
-                orderBy: $params['orderBy'] ?? null,
-                orderDir: $params['orderDir'] ?? 'ASC'
+                endDate: $endDate
             );
-            $aggregateMeta = method_exists($repository, 'getLastAggregateMeta')
-                ? (array)$repository->getLastAggregateMeta()
-                : [];
+
+            if ($liveWindowResult !== null) {
+                $data = $liveWindowResult['data'];
+                $aggregateMeta = $liveWindowResult['meta'];
+            } else {
+                $data = $repository->aggregate(
+                    aggregations: $aggregations,
+                    groupBy: $groupBy,
+                    filters: $params['filters'] ?? null,
+                    startDate: $params['startDate'] ?? null,
+                    endDate: $params['endDate'] ?? null,
+                    orderBy: $params['orderBy'] ?? null,
+                    orderDir: $params['orderDir'] ?? 'ASC'
+                );
+                $aggregateMeta = method_exists($repository, 'getLastAggregateMeta')
+                    ? (array)$repository->getLastAggregateMeta()
+                    : [];
+            }
 
             $logger = Helpers::setLogger('api_debug.log');
             $logger->info("=== API AGGREGATE DEBUG ===");
@@ -751,4 +768,203 @@ class ChanneledCrudController extends BaseController
 
         return null;
     }
+
+    /**
+     * Attempts to resolve non-additive metric aggregations via LiveWindowProviderInterface.
+     *
+     * @param string $channelKey
+     * @param string $entity
+     * @param array $aggregations
+     * @param array $groupBy
+     * @param mixed $filters
+     * @param string|null $startDate
+     * @param string|null $endDate
+     * @return array{data: array, meta: array}|null
+     */
+    protected function tryResolveLiveWindowExecution(
+        string $channelKey,
+        string $entity,
+        array $aggregations,
+        array $groupBy,
+        mixed $filters,
+        ?string $startDate,
+        ?string $endDate
+    ): ?array {
+        if (!$startDate || !$endDate) {
+            return null;
+        }
+
+        // 1. Identify non-additive metrics in requested aggregations
+        $nonAdditiveMetrics = [];
+        foreach ($aggregations as $metric => $op) {
+            $metricKey = is_string($metric) ? $metric : (string)$op;
+            if (!CanonicalMetricDefinitionRegistry::isAdditive($metricKey)) {
+                $nonAdditiveMetrics[] = $metricKey;
+            }
+        }
+
+        if (empty($nonAdditiveMetrics)) {
+            return null;
+        }
+
+        // 2. Resolve driver configuration
+        try {
+            $baseConfig = DriverInitializer::validateConfig($channelKey);
+        } catch (\Throwable) {
+            $allConfigs = Helpers::getChannelsConfig();
+            $baseConfig = $allConfigs[$channelKey] ?? [];
+        }
+
+        // 3. Check if the channel driver implements LiveWindowProviderInterface
+        $driver = $this->resolveChannelDriver($channelKey, $baseConfig);
+        if (!($driver instanceof LiveWindowProviderInterface)) {
+            return null;
+        }
+
+        // Verify driver supports all requested non-additive metrics
+        foreach ($nonAdditiveMetrics as $nam) {
+            if (!$driver::supportsLiveWindow($nam)) {
+                return null;
+            }
+        }
+
+        // 4. Resolve the platform_id from channeledAccount filter
+        $filtersArr = is_object($filters) ? (array)$filters : (is_array($filters) ? $filters : []);
+        $rawAccount = $filtersArr['channeledAccount'] ?? $filtersArr['channeled_account'] ?? null;
+        if (is_array($rawAccount) && isset($rawAccount['value'])) {
+            $rawAccount = $rawAccount['value'];
+        }
+        if (is_array($rawAccount)) {
+            $rawAccount = reset($rawAccount);
+        }
+
+        $platformId = null;
+        if (!empty($rawAccount)) {
+            if (is_numeric($rawAccount)) {
+                $ca = $this->em->getRepository(ChanneledAccount::class)->find((int)$rawAccount);
+                $platformId = $ca?->getPlatformId();
+            } else {
+                $platformId = (string)$rawAccount;
+            }
+        }
+
+        if (!$platformId) {
+            return null;
+        }
+
+        // 5. Execute live window query
+        try {
+            $liveRows = $driver->fetchLiveWindow(
+                config: $baseConfig,
+                platformId: (string)$platformId,
+                metrics: $nonAdditiveMetrics,
+                startDate: $startDate,
+                endDate: $endDate,
+                dimensions: $groupBy,
+                filters: $filtersArr
+            );
+
+            // If query requested only non-additive metrics, return liveRows directly
+            $totalMetricCount = count($aggregations);
+            if (count($nonAdditiveMetrics) === $totalMetricCount) {
+                return [
+                    'data' => $liveRows,
+                    'meta' => [
+                        'engine' => 'live_window',
+                        'provider' => $channelKey,
+                        'non_additive_metrics' => $nonAdditiveMetrics,
+                        'resolved_live' => true,
+                    ],
+                ];
+            }
+
+            // Mixed query: compute additive metrics via SQL and merge
+            $additiveAggs = [];
+            foreach ($aggregations as $k => $v) {
+                $m = is_string($k) ? $k : (string)$v;
+                if (!in_array($m, $nonAdditiveMetrics, true)) {
+                    $additiveAggs[$k] = $v;
+                }
+            }
+
+            $repository = $this->getRepository(entity: $entity, configKey: 'channeled_class');
+            $additiveRows = $repository->aggregate(
+                aggregations: $additiveAggs,
+                groupBy: $groupBy,
+                filters: $filters,
+                startDate: $startDate,
+                endDate: $endDate
+            );
+
+            // If no groupings (summary card), merge the single rows
+            if (empty($groupBy)) {
+                $mergedRow = array_merge($additiveRows[0] ?? [], $liveRows[0] ?? []);
+                return [
+                    'data' => [$mergedRow],
+                    'meta' => [
+                        'engine' => 'hybrid_live_window',
+                        'provider' => $channelKey,
+                        'non_additive_metrics' => $nonAdditiveMetrics,
+                        'resolved_live' => true,
+                    ],
+                ];
+            }
+
+            // Grouped breakdown: merge on grouping keys
+            $indexed = [];
+            foreach ($additiveRows as $row) {
+                $key = implode('|', array_map(fn($g) => (string)($row[$g] ?? ''), $groupBy));
+                $indexed[$key] = $row;
+            }
+            foreach ($liveRows as $lRow) {
+                $key = implode('|', array_map(fn($g) => (string)($lRow[$g] ?? ''), $groupBy));
+                if (isset($indexed[$key])) {
+                    $indexed[$key] = array_merge($indexed[$key], $lRow);
+                } else {
+                    $indexed[$key] = $lRow;
+                }
+            }
+
+            return [
+                'data' => array_values($indexed),
+                'meta' => [
+                    'engine' => 'hybrid_live_window',
+                    'provider' => $channelKey,
+                    'non_additive_metrics' => $nonAdditiveMetrics,
+                    'resolved_live' => true,
+                ],
+            ];
+        } catch (\Throwable $e) {
+            $logger = Helpers::setLogger('live_window_error.log');
+            $logger->error("Live window resolution error: " . $e->getMessage(), [
+                'channel' => $channelKey,
+                'metrics' => $nonAdditiveMetrics,
+                'exception' => $e,
+            ]);
+
+            // Graceful fallback to SQL aggregation
+            return null;
+        }
+    }
+
+    /**
+     * Resolves the channel driver instance.
+     *
+     * @param string $channelKey
+     * @param array $config
+     * @return mixed
+     */
+    protected function resolveChannelDriver(string $channelKey, array $config = []): mixed
+    {
+        try {
+            return DriverFactory::get($channelKey, $this->logger, $config);
+        } catch (\Throwable) {
+            try {
+                return DriverFactory::get($channelKey);
+            } catch (\Throwable) {
+                return null;
+            }
+        }
+    }
 }
+
