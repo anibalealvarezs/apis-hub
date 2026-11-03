@@ -73,7 +73,13 @@ final class DriverQueryContract
                 $normField = str_starts_with($field, 'dimensions.') ? substr($field, 11) : $field;
                 $isAllowed = in_array($field, $allowedGroupFields, true)
                     || in_array("dimensions.{$normField}", $allowedGroupFields, true)
-                    || in_array($normField, $allowedGroupFields, true);
+                    || in_array($normField, $allowedGroupFields, true)
+                    || ($normField === 'page' && (
+                        in_array('landing_page', $allowedGroupFields, true)
+                        || in_array('landingPage', $allowedGroupFields, true)
+                        || in_array('dimensions.landing_page', $allowedGroupFields, true)
+                        || in_array('dimensions.landingPage', $allowedGroupFields, true)
+                    ));
                 if (!$isAllowed) {
                     throw new InvalidArgumentException('The selected breakdown is unavailable in this reporting scope.');
                 }
