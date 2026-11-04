@@ -180,7 +180,10 @@
                 'opens_standard', 'opens_proxy', 'clicks_unique', 'bounces_hard', 'bounces_soft',
                 'purchases', 'purchase_value', 'leads' =>
                 $this->buildSumExpression($resolvedNames['raw_names'], $nameCol, $periodCol),
-                'frequency', 'roas_purchase', 'bounce_rate', 'average_session_duration' =>
+                'roas_purchase' => strtolower(trim((string)$channel)) === 'google_ads'
+                    ? $this->buildGoogleAdsRoasExpression($nameCol, $periodCol)
+                    : $this->buildAverageExpression($resolvedNames['raw_names'], $nameCol, $periodCol),
+                'frequency', 'bounce_rate', 'average_session_duration' =>
                 $this->buildAverageExpression($resolvedNames['raw_names'], $nameCol, $periodCol),
                 'ctr' => $this->buildCtrExpression($channel, $nameCol, $periodCol),
                 'cpc' => $this->buildCpcExpression($channel, $nameCol, $periodCol),
@@ -400,6 +403,25 @@
             }
 
             return "$spendSql / NULLIF($impressionsSql, 0) * 1000";
+        }
+
+        private function buildGoogleAdsRoasExpression(string $nameCol, string $periodCol): string
+        {
+            $spendNames = $this->resolveRawMetricNames('spend', 'google_ads')['raw_names'];
+            if ($spendNames === []) {
+                return 'NULL';
+            }
+
+            $spend = "$nameCol IN (".$this->toSqlStringList($spendNames).") AND $periodCol = 'daily'";
+            $value = "$nameCol = 'conversion_value' AND $periodCol = 'daily'";
+            $legacy = "$nameCol IN ('roas_purchase', 'metrics.roas_purchase') AND $periodCol = 'daily'";
+
+            // Legacy rows store conversion amounts under the ratio name. Suppress
+            // mixed windows until those observations have been reconciled.
+            return "CASE WHEN COUNT(CASE WHEN $legacy THEN 1 END) = 0 "
+                ."AND COUNT(CASE WHEN $spend THEN m.value END) = COUNT(CASE WHEN $value THEN m.value END) "
+                ."THEN SUM(CASE WHEN $value THEN m.value END) "
+                ."/ NULLIF(SUM(CASE WHEN $spend THEN m.value END), 0) END";
         }
 
         private function buildCostPerConversionExpression(?string $channel, string $nameCol, string $periodCol): ?string

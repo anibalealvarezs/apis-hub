@@ -10,6 +10,30 @@ use Tests\Unit\BaseUnitTestCase;
 
 final class CanonicalMetricSqlResolverTest extends BaseUnitTestCase
 {
+    public function testGoogleAdsRoasUsesTotalsAndRejectsIncompleteOrLegacyWindows(): void
+    {
+        $resolver = new CanonicalMetricSqlResolver(driverDictionaryResolver: fn () => [
+            'spend' => ['spend'],
+            'roas_purchase' => ['roas_purchase'],
+        ]);
+        $formula = $resolver->resolveMarketingMetricExpression('roas_purchase', 'google_ads', 'm.name', 'm.period');
+        $db = new \PDO('sqlite::memory:');
+        $db->exec('CREATE TABLE observations (name TEXT, period TEXT, value REAL)');
+        $evaluate = fn () => $db->query("SELECT $formula FROM observations m")->fetchColumn();
+
+        $db->exec("INSERT INTO observations VALUES ('spend','daily',2), ('conversion_value','daily',10), ('spend','daily',8), ('conversion_value','daily',0)");
+        $this->assertEquals(1.0, $evaluate());
+
+        $db->exec("INSERT INTO observations VALUES ('roas_purchase','daily',10)");
+        $this->assertNull($evaluate());
+
+        $db->exec("DELETE FROM observations WHERE name = 'roas_purchase'; DELETE FROM observations WHERE name = 'conversion_value' AND value = 0");
+        $this->assertNull($evaluate());
+
+        $db->exec("DELETE FROM observations; INSERT INTO observations VALUES ('spend','daily',0), ('conversion_value','daily',10)");
+        $this->assertNull($evaluate());
+    }
+
     public function testExplicitUnsupportedDictionaryEntryCannotFallBackToGenericCost(): void
     {
         $resolver = new CanonicalMetricSqlResolver(driverDictionaryResolver: fn () => ['spend' => [], 'revenue' => ['totalRevenue']]);
