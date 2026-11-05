@@ -35,6 +35,15 @@ class ChanneledStore extends ChanneledEntity
     #[ORM\JoinColumn(name: 'account_id', referencedColumnName: 'id', nullable: true, onDelete: 'CASCADE')]
     protected ?Account $account = null;
 
+    #[ORM\ManyToOne(targetEntity: ChanneledAccount::class)]
+    #[ORM\JoinColumn(name: 'channeled_account_id', referencedColumnName: 'id', nullable: true, onDelete: 'SET NULL')]
+    protected ?ChanneledAccount $channeledAccount = null;
+
+    public function getChanneledAccount(): ?ChanneledAccount
+    {
+        return $this->channeledAccount;
+    }
+
     public function getName(): ?string
     {
         return $this->name;

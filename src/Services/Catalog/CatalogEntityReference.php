@@ -11,6 +11,10 @@ final class CatalogEntityReference
     public const array SUPPORTED_LAYERS = ['channeled', 'base'];
 
     public const array ALL_ENTITY_TYPES = [
+        'stores',
+        'variants',
+        'promotions',
+        'carts',
         'accounts',
         'campaigns',
         'ad-sets',
@@ -34,6 +38,12 @@ final class CatalogEntityReference
     ];
 
     public const array SUPPORTED_ENTITY_TYPES = [
+        'orders',
+        'products',
+        'stores',
+        'variants',
+        'promotions',
+        'carts',
         'accounts',
         'campaigns',
         'ad-sets',

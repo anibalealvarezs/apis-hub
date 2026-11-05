@@ -164,6 +164,35 @@
                 ];
             }
 
+            if ($channel === 'mailchimp' && in_array($normalizedRequested, ['orders', 'revenue', 'total_revenue'], true)) {
+                $name = $normalizedRequested === 'orders' ? 'orders_count' : 'revenue';
+                $currency = "(SELECT dv.value FROM dimension_set_items dsi"
+                    ." JOIN dimension_values dv ON dv.id = dsi.dimension_value_id"
+                    ." JOIN dimension_keys dk ON dk.id = dv.dimension_key_id"
+                    ." WHERE dsi.dimension_set_id = mc.dimension_set_id AND dk.name = 'currency')";
+                $store = "EXISTS (SELECT 1 FROM dimension_set_items si"
+                    ." JOIN dimension_values sv ON sv.id = si.dimension_value_id"
+                    ." JOIN dimension_keys sk ON sk.id = sv.dimension_key_id"
+                    ." WHERE si.dimension_set_id = mc.dimension_set_id AND sk.name = 'store_id')";
+                $predicate = "$nameCol = '$name' AND $periodCol = 'daily' AND $store AND $currency IS NOT NULL";
+                $sum = "SUM(CASE WHEN $predicate THEN m.value END)";
+                if ($name === 'revenue') {
+                    $sum = "CASE WHEN COUNT(DISTINCT CASE WHEN $predicate THEN $currency END) = 1 THEN $sum END";
+                }
+
+                return [
+                    'requested_metric' => $normalizedRequested,
+                    'canonical_metric' => $normalizedRequested,
+                    'input_type' => 'canonical',
+                    'legacy_alias_of' => null,
+                    'deprecation' => null,
+                    'raw_names' => [$name],
+                    'source' => 'mailchimp_store_orders',
+                    'exclusive_source' => true,
+                    'sql_expression' => $sum,
+                ];
+            }
+
             if ($channel === 'mailchimp' && in_array($normalizedRequested, ['open_rate', 'click_rate'], true)) {
                 $numerator = $normalizedRequested === 'open_rate' ? 'opens' : 'clicks';
                 $numeratorNames = $this->resolveRawMetricNames($numerator, $channel)['raw_names'];

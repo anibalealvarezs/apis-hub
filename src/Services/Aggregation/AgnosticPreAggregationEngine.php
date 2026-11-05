@@ -127,15 +127,45 @@ class AgnosticPreAggregationEngine
             $sourceEntity = $ruleDef['source_entity'] ?? 'channeled_events';
             $metricDefinitions = $ruleDef['metrics'] ?? [];
 
-            // Query atomic records for this channel & target date
+            if (!empty($ruleDef['identity_dimensions'])) {
+                $day = $this->connection->transactional(function () use ($ruleDef, $sourceEntity, $channel, $dateStr): array {
+                    if ($this->connection->getDatabasePlatform() instanceof \Doctrine\DBAL\Platforms\PostgreSQLPlatform) {
+                        $this->connection->executeQuery('SELECT pg_advisory_xact_lock(hashtext(?))',
+                            ['identity-rollup:'.$channel.':'.$sourceEntity.':'.$dateStr]);
+                    }
+                    $records = $this->fetchAtomicRecordsForDate($sourceEntity, $channel, $dateStr, true);
+                    if (!empty($ruleDef['require_source_date'])) {
+                        $records = array_values(array_filter($records, static fn (array $record): bool =>
+                            !empty($record['platform_created_at'])));
+                    }
+                    $metricNames = array_keys($ruleDef['metrics']);
+                    $placeholders = implode(', ', array_fill(0, count($metricNames), '?'));
+                    $dimension = array_key_first($ruleDef['identity_dimensions']);
+                    $this->connection->executeStatement(
+                        "DELETE FROM metrics WHERE metric_date = ? AND metric_config_id IN"
+                        ." (SELECT mc.id FROM metric_configs mc WHERE mc.channel = ? AND mc.name IN ($placeholders)"
+                        ." AND EXISTS (SELECT 1 FROM dimension_set_items si JOIN dimension_values sv ON sv.id = si.dimension_value_id"
+                        ." JOIN dimension_keys sk ON sk.id = sv.dimension_key_id"
+                        ." WHERE si.dimension_set_id = mc.dimension_set_id AND sk.name = ?))",
+                        [$dateStr, $this->resolveChannelId($channel), ...$metricNames, $dimension],
+                    );
+
+                    return [
+                        'metrics' => $this->persistIdentityMetrics($records, $ruleDef, $channel, $dateStr),
+                        'records' => count($records),
+                    ];
+                });
+                $metricsEmitted += $day['metrics'];
+                $recordsEvaluated += $day['records'];
+                continue;
+            }
+
             $atomicRecords = $this->fetchAtomicRecordsForDate($sourceEntity, $channel, $dateStr);
             $recordsEvaluated += count($atomicRecords);
-
             if (empty($atomicRecords)) {
                 continue;
             }
 
-            // Group records by scope (e.g. platform_id or associated campaign/asset)
             $groupedByScope = $this->partitionByScope($atomicRecords, $ruleDef);
 
             foreach ($groupedByScope as $scopeKey => $records) {
@@ -338,7 +368,7 @@ class AgnosticPreAggregationEngine
     /**
      * Fetches atomic records for a given date partition.
      */
-    protected function fetchAtomicRecordsForDate(string $tableName, string $channel, string $dateStr): array
+    protected function fetchAtomicRecordsForDate(string $tableName, string $channel, string $dateStr, bool $throwOnFailure = false): array
     {
         try {
             $channelId = $this->resolveChannelId($channel);
@@ -369,9 +399,76 @@ class AgnosticPreAggregationEngine
 
             return $rows;
         } catch (Exception $e) {
+            if ($throwOnFailure) {
+                throw $e;
+            }
             $this->logger?->warning("Could not fetch atomic records from {$tableName}: " . $e->getMessage());
             return [];
         }
+    }
+
+    private function persistIdentityMetrics(array $records, array $rule, string $channel, string $date): int
+    {
+        $partitions = [];
+        $accounts = [];
+        foreach ($records as $record) {
+            $dimensions = [];
+            foreach ($rule['identity_dimensions'] as $dimension => $field) {
+                $value = trim((string) ($record['data'][$field] ?? $record[$field] ?? ''));
+                if ($value === '') {
+                    continue 2;
+                }
+                $dimensionRule = $rule['identity_dimension_rules'][$dimension] ?? [];
+                if (!empty($dimensionRule['uppercase'])) {
+                    $value = strtoupper($value);
+                }
+                if (isset($dimensionRule['pattern']) && !preg_match($dimensionRule['pattern'], $value)) {
+                    continue 2;
+                }
+                $dimensions[] = ['dimensionKey' => $dimension, 'dimensionValue' => $value];
+            }
+
+            $accountField = $rule['account_platform_id_field'];
+            $platformId = (string) ($record['data'][$accountField] ?? $record[$accountField] ?? '');
+            if ($platformId === '') {
+                continue;
+            }
+            $accounts[$platformId] ??= (int) $this->connection->fetchOne(
+                'SELECT id FROM channeled_accounts WHERE channel = ? AND platform_id = ?',
+                [$this->resolveChannelId($channel), $platformId],
+            );
+            if ($accounts[$platformId] === 0) {
+                continue;
+            }
+            $record['channeled_account_id'] = $accounts[$platformId];
+            $key = json_encode([$accounts[$platformId], $dimensions], JSON_THROW_ON_ERROR);
+            $partitions[$key]['dimensions'] = $dimensions;
+            $partitions[$key]['records'][] = $record;
+        }
+
+        $emitted = 0;
+        foreach ($partitions as $partition) {
+            $dimensions = $partition['dimensions'];
+            $dimensionSetId = $this->resolveDimensionSetId($dimensions);
+            $hash = KeyGenerator::generateDimensionsHash($dimensions);
+            foreach ($this->computeMetricsFromPayloads($partition['records'], $rule['metrics']) as $metric => $value) {
+                $this->persistCanonicalMetricSlice(
+                    channel: $channel,
+                    scopeKey: (string) ($partition['records'][0]['data'][$rule['scope_field']] ?? ''),
+                    metricKey: $metric,
+                    value: $value,
+                    date: $date,
+                    ruleDef: $rule,
+                    sampleRecord: $partition['records'][0],
+                    dimensionSetId: $dimensionSetId,
+                    dimensionsHash: $hash,
+                    throwOnFailure: true,
+                );
+                $emitted++;
+            }
+        }
+
+        return $emitted;
     }
 
     /**
@@ -402,7 +499,8 @@ class AgnosticPreAggregationEngine
         array $ruleDef = [],
         ?array $sampleRecord = null,
         ?int $dimensionSetId = null,
-        ?string $dimensionsHash = null
+        ?string $dimensionsHash = null,
+        bool $throwOnFailure = false
     ): void {
         $this->logger?->debug("Persisting pre-aggregated metric: [{$channel}] [{$scopeKey}] {$metricKey} = {$value} on {$date}" . ($dimensionSetId ? " (dim_set: {$dimensionSetId})" : ""));
 
@@ -485,7 +583,11 @@ class AgnosticPreAggregationEngine
                     'config_signature' => $configSignature,
                 ];
 
-                $sql = Helpers::buildUpsertSql('metric_configs', $cols, ['name'], ['config_signature'], 1);
+                $sql = $throwOnFailure
+                    ? 'INSERT INTO metric_configs ('.implode(', ', $cols).') VALUES ('
+                        .implode(', ', array_fill(0, count($cols), '?')).')'
+                        .' ON CONFLICT (config_signature) DO UPDATE SET name = EXCLUDED.name'
+                    : Helpers::buildUpsertSql('metric_configs', $cols, ['name'], ['config_signature'], 1);
                 $this->connection->executeStatement($sql, array_values($insertValues));
 
                 $metricConfigId = (int)$this->connection->fetchOne(
@@ -505,7 +607,10 @@ class AgnosticPreAggregationEngine
                 $date,
             ];
 
-            $metricSql = Helpers::buildUpsertSql(
+            $metricSql = $throwOnFailure
+                ? 'INSERT INTO metrics ('.implode(', ', $metricCols).') VALUES (?, ?, ?, ?, ?)'
+                    .' ON CONFLICT (metric_config_id, dimensions_hash, metric_date) DO UPDATE SET value = EXCLUDED.value'
+                : Helpers::buildUpsertSql(
                 'metrics',
                 $metricCols,
                 ['value'],
@@ -515,6 +620,9 @@ class AgnosticPreAggregationEngine
 
             $this->connection->executeStatement($metricSql, $metricValues);
         } catch (Exception $e) {
+            if ($throwOnFailure) {
+                throw $e;
+            }
             $this->logger?->warning("[AgnosticPreAggregationEngine] Failed to persist canonical metric slice: " . $e->getMessage(), [
                 'channel' => $channel,
                 'metric' => $metricKey,

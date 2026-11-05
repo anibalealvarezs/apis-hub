@@ -872,7 +872,7 @@ final class CatalogReadServiceTest extends TestCase
             'customer_id'         => 851,
             'channel'             => 6,
             'platform_created_at' => '2026-03-01 08:00:00',
-            'data'                => json_encode(['full_name' => 'Jane VIP', 'status' => 'subscribed', 'vip' => true]),
+            'data'                => json_encode(['full_name' => 'Jane VIP', 'status' => 'subscribed', 'vip' => true, 'audience_id' => 'mc_list_1']),
             'created_at'          => '2026-03-01 08:05:00',
             'updated_at'          => '2026-03-15 08:05:00',
         ]);
