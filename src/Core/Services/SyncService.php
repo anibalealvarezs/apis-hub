@@ -458,6 +458,13 @@
         protected function processUniversalEntity(string $type, ArrayCollection $collection, mixed $manager): void
         {
             switch ($type) {
+                case 'account':
+                case 'store':
+                case 'product':
+                case 'price_rule':
+                case 'cart':
+                    \Classes\CommerceProcessor::process($type, $collection, $manager);
+                    break;
                 case 'campaign':
                     MarketingProcessor::processCampaigns($collection, $manager);
                     break;
@@ -480,12 +487,14 @@
                 case 'customer':
                 case 'customers':
                 case 'channeled_customer':
-                    \Classes\CustomerProcessor::processCustomers($collection, $manager);
+                    \Classes\CommerceProcessor::process('customer', $collection, $manager);
                     break;
                 case 'order':
                 case 'orders':
                 case 'channeled_order':
-                    \Classes\OrderProcessor::processOrders($collection, $manager);
+                    $manager->getConnection()->transactional(
+                        fn () => \Classes\OrderProcessor::processOrders($collection, $manager)
+                    );
                     break;
                 case 'event':
                 case 'events':

@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "774bfdae1cfbc94d7cee9349c637bb1b",
+    "content-hash": "9f0f9c3d1b3cba68afeda2556dae7ae4",
     "packages": [
         {
             "name": "anibalealvarezs/amazon-api",
@@ -573,17 +573,17 @@
         },
         {
             "name": "anibalealvarezs/mailchimp-api",
-            "version": "v1.0.0",
+            "version": "v1.1.0",
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/mailchimp-api.git",
-                "reference": "25e6ec49175c6cc9e48f7b69d4094a0568be7ae6"
+                "reference": "a1e76077b0e5fff126e1137877948c67e9d025a0"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/mailchimp-api/anibalealvarezs-mailchimp-api-25e6ec49175c6cc9e48f7b69d4094a0568be7ae6-zip-b17a77.zip",
-                "reference": "25e6ec49175c6cc9e48f7b69d4094a0568be7ae6",
-                "shasum": "3680a93cd283758df9ca358119c7ae930250aaae"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/mailchimp-api/anibalealvarezs-mailchimp-api-a1e76077b0e5fff126e1137877948c67e9d025a0-zip-d2b409.zip",
+                "reference": "a1e76077b0e5fff126e1137877948c67e9d025a0",
+                "shasum": "0a5ff87b366a5c8d5a5ee2a0648d6a77b1bea944"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "^1.0.0",
@@ -622,26 +622,26 @@
                 }
             ],
             "description": "description",
-            "time": "2026-10-14T13:46:58+00:00"
+            "time": "2026-11-05T23:40:12+00:00"
         },
         {
             "name": "anibalealvarezs/mailchimp-hub-driver",
-            "version": "v1.1.2",
+            "version": "v1.1.3",
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/mailchimp-hub-driver.git",
-                "reference": "1aa95990387178a3133c86090d70af278ff10edf"
+                "reference": "c867801cdd6e3e7ddb7727358bae95258173e5a8"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/mailchimp-hub-driver/anibalealvarezs-mailchimp-hub-driver-1aa95990387178a3133c86090d70af278ff10edf-zip-8eae6a.zip",
-                "reference": "1aa95990387178a3133c86090d70af278ff10edf",
-                "shasum": "2a3894898a903fd0c3293368560751ba55f3e69a"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/mailchimp-hub-driver/anibalealvarezs-mailchimp-hub-driver-c867801cdd6e3e7ddb7727358bae95258173e5a8-zip-fd886c.zip",
+                "reference": "c867801cdd6e3e7ddb7727358bae95258173e5a8",
+                "shasum": "3360ed5469bbdec38478cdf942e158f777e8baec"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "^1.0.0",
                 "anibalealvarezs/api-driver-core": "^1.1.4",
-                "anibalealvarezs/mailchimp-api": "1.0.0",
+                "anibalealvarezs/mailchimp-api": "1.1.0",
                 "doctrine/orm": "^2.12.3 || ^3.0",
                 "nesbot/carbon": "^2.0 || ^3.0",
                 "php": ">=8.3",
@@ -668,7 +668,7 @@
                 }
             ],
             "description": "APIs-Hub driver for Mailchimp marketing & eCommerce integration.",
-            "time": "2026-11-04T23:49:32+00:00"
+            "time": "2026-11-05T23:45:46+00:00"
         },
         {
             "name": "anibalealvarezs/meta-hub-driver",

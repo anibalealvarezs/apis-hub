@@ -97,6 +97,10 @@ class OrderProcessor
                 $uCOrd[$coKey] = [
                     'order_id' => (string)$co->platformId,
                     'customer_ref' => $customerRef,
+                    'channeled_store_id' => CommerceProcessor::storeId($conn, (object)[
+                        'channel' => $chanId, 'data' => (array)($co->data ?? []),
+                        'storePlatformId' => $co->storePlatformId ?? null,
+                    ]),
                     'channel' => $chanId,
                     'platform_id' => (string)$co->platformId,
                     'platform_created_at' => isset($co->platformCreatedAt) ? $co->platformCreatedAt : null,
@@ -455,6 +459,7 @@ class OrderProcessor
                 $row = [
                     'order_id' => $orderId,
                     'channeled_customer_id' => $cCustId,
+                    'channeled_store_id' => $co['channeled_store_id'],
                     'channel' => $co['channel'],
                     'platform_id' => $co['platform_id'],
                     'platform_created_at' => $co['platform_created_at'] instanceof DateTime ? $co['platform_created_at']->format('Y-m-d H:i:s') : $co['platform_created_at'],
@@ -469,8 +474,8 @@ class OrderProcessor
                 }
             }
 
-            self::bulkInsert($conn, 'channeled_orders', ['order_id', 'channeled_customer_id', 'channel', 'platform_id', 'platform_created_at', 'data'], $insertRows);
-            self::bulkUpsert($conn, 'channeled_orders', ['id', 'order_id', 'channeled_customer_id', 'channel', 'platform_id', 'platform_created_at', 'data'], ['order_id', 'channeled_customer_id', 'channel', 'platform_id', 'platform_created_at', 'data', 'updated_at' => 'CURRENT_TIMESTAMP'], $updateRows);
+            self::bulkInsert($conn, 'channeled_orders', ['order_id', 'channeled_customer_id', 'channeled_store_id', 'channel', 'platform_id', 'platform_created_at', 'data'], $insertRows);
+            self::bulkUpsert($conn, 'channeled_orders', ['id', 'order_id', 'channeled_customer_id', 'channeled_store_id', 'channel', 'platform_id', 'platform_created_at', 'data'], ['order_id', 'channeled_customer_id', 'channeled_store_id', 'channel', 'platform_id', 'platform_created_at', 'data', 'updated_at' => 'CURRENT_TIMESTAMP'], $updateRows);
 
             $channeledOrderMap = self::fetchChanneledEntities(
                 $conn,

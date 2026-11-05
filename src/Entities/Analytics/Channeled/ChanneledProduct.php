@@ -24,6 +24,15 @@
     class ChanneledProduct extends ChanneledEntity
     {
 
+        #[ORM\ManyToOne(targetEntity: ChanneledStore::class)]
+        #[ORM\JoinColumn(name: 'channeled_store_id', referencedColumnName: 'id', nullable: true, onDelete: 'SET NULL')]
+        protected ?ChanneledStore $channeledStore = null;
+
+        public function getChanneledStore(): ?ChanneledStore
+        {
+            return $this->channeledStore;
+        }
+
         #[ORM\Column(type: 'string', nullable: true)]
         protected int|string|null $sku;
 

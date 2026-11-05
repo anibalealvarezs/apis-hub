@@ -70,6 +70,8 @@ final class CatalogReadService
     /** @var array<int, string> */
     private array $channelIdToNameCache = [];
 
+    private array $customerScopePredicates = [];
+
     public function __construct(
         private readonly EntityManagerInterface $em,
         ?Connection $connection = null,
@@ -329,6 +331,8 @@ final class CatalogReadService
             ],
         ];
 
+        $entities = array_replace($entities, (new CatalogCommerceReadService($this->connection))->capabilities());
+
         return [
             'contract_version'     => 1,
             'supported_operations' => ['capabilities', 'list', 'profile', 'activity'],
@@ -403,6 +407,10 @@ final class CatalogReadService
 
         $search = isset($payload['search']) && is_string($payload['search']) ? trim($payload['search']) : '';
 
+        if (isset(CatalogCommerceReadService::TYPES[$entityType])) {
+            return (new CatalogCommerceReadService($this->connection))->list($entityType, $payload, $permittedAccountsByChannel);
+        }
+
         return match ($entityType) {
             'accounts'  => $this->listAccounts($permittedAccountIds, $permittedAccountsByChannel, $filters, $search, $requestedSort, $requestedDir, $page, $perPage, $offset),
             'campaigns' => $this->listCampaigns($permittedAccountIds, $permittedAccountsByChannel, $filters, $search, $requestedSort, $requestedDir, $page, $perPage, $offset),
@@ -470,6 +478,10 @@ final class CatalogReadService
 
         $dateRange = $this->resolveDateRange(is_array($payload['date_range'] ?? null) ? $payload['date_range'] : []);
         $filters = is_array($payload['filters'] ?? null) ? $payload['filters'] : [];
+
+        if (isset(CatalogCommerceReadService::TYPES[$entityType])) {
+            return (new CatalogCommerceReadService($this->connection))->profile($entityType, $ref, $payload, $permittedAccountsByChannel);
+        }
 
         return match ($entityType) {
             'accounts'  => $this->profileAccount($ref, $permittedAccountIds, $dateRange),
@@ -3099,12 +3111,14 @@ final class CatalogReadService
             return $this->emptyListResponse($page, $perPage, $requestedSort, $requestedDir, $permittedAccountsByChannel);
         }
 
-        $where = ['EXISTS (SELECT 1 FROM channeled_customers cc WHERE cc.customer_id = c.id AND cc.channel IN (:channelIds))'];
+        $membership = $this->customerSourcePredicate('cc', $authorizedScope);
+        $searchMembership = $this->customerSourcePredicate('cc2', $authorizedScope);
+        $where = ["EXISTS (SELECT 1 FROM channeled_customers cc WHERE cc.customer_id = c.id AND cc.channel IN (:channelIds) AND $membership)"];
         $params = ['channelIds' => $channelIds];
         $types = ['channelIds' => ArrayParameterType::INTEGER];
 
         if ($search !== '') {
-            $where[] = '(LOWER(c.email) LIKE :search OR EXISTS (SELECT 1 FROM channeled_customers cc2 WHERE cc2.customer_id = c.id AND cc2.channel IN (:channelIds) AND (LOWER(cc2.platform_id) LIKE :search OR LOWER(COALESCE(cc2.data, \'\')) LIKE :search)))';
+            $where[] = "(LOWER(c.email) LIKE :search OR EXISTS (SELECT 1 FROM channeled_customers cc2 WHERE cc2.customer_id = c.id AND cc2.channel IN (:channelIds) AND $searchMembership AND (LOWER(cc2.platform_id) LIKE :search OR LOWER(CAST(cc2.data AS TEXT)) LIKE :search)))";
             $params['search'] = '%' . strtolower($search) . '%';
         }
 
@@ -3131,7 +3145,7 @@ final class CatalogReadService
                 LIMIT {$perPage} OFFSET {$offset}";
 
         $rows = $this->connection->fetchAllAssociative($sql, $params, $types);
-        $items = array_map(fn (array $row): array => $this->hydrateCustomerRow($row, $channelIds), $rows);
+        $items = array_map(fn (array $row): array => $this->hydrateCustomerRow($row, $channelIds, null, $authorizedScope), $rows);
 
         return $this->buildListResponse($items, $total, $page, $perPage, $sortFieldUsed, $requestedDir, $permittedAccountsByChannel);
     }
@@ -3168,7 +3182,7 @@ final class CatalogReadService
             'SELECT c.*
              FROM customers c
              WHERE c.id = :id
-               AND EXISTS (SELECT 1 FROM channeled_customers cc WHERE cc.customer_id = c.id AND cc.channel IN (:channelIds))',
+               AND EXISTS (SELECT 1 FROM channeled_customers cc WHERE cc.customer_id = c.id AND cc.channel IN (:channelIds) AND '.$this->customerSourcePredicate('cc', $authorizedScope).')',
             [
                 'id'         => $ref->getId(),
                 'channelIds' => $channelIds,
@@ -3182,12 +3196,12 @@ final class CatalogReadService
             return null;
         }
 
-        $hydrated = $this->hydrateCustomerRow($row, $channelIds, $ref->getChannel());
+        $hydrated = $this->hydrateCustomerRow($row, $channelIds, $ref->getChannel(), $authorizedScope);
         $customerId = (int)$row['id'];
         $channelName = (string)$hydrated['channel'];
 
         $ccRows = $this->connection->fetchAllAssociative(
-            'SELECT cc.* FROM channeled_customers cc WHERE cc.customer_id = :customerId AND cc.channel IN (:channelIds) ORDER BY cc.id ASC',
+            'SELECT cc.* FROM channeled_customers cc WHERE cc.customer_id = :customerId AND cc.channel IN (:channelIds) AND '.$this->customerSourcePredicate('cc', $authorizedScope).' ORDER BY cc.id ASC',
             ['customerId' => $customerId, 'channelIds' => $channelIds],
             ['channelIds' => ArrayParameterType::INTEGER]
         );
@@ -3487,13 +3501,14 @@ final class CatalogReadService
     private function hydrateCustomerRow(
         array $row,
         array $permittedChannelIds,
-        ?string $preferredChannel = null
+        ?string $preferredChannel = null,
+        array $authorizedScope = []
     ): array {
         $id = (int)$row['id'];
         $email = (string)($row['email'] ?? '');
 
         $ccRows = $this->connection->fetchAllAssociative(
-            'SELECT cc.* FROM channeled_customers cc WHERE cc.customer_id = :customerId AND cc.channel IN (:channelIds) ORDER BY cc.updated_at DESC, cc.id ASC',
+            'SELECT cc.* FROM channeled_customers cc WHERE cc.customer_id = :customerId AND cc.channel IN (:channelIds) AND '.$this->customerSourcePredicate('cc', $authorizedScope).' ORDER BY cc.updated_at DESC, cc.id ASC',
             ['customerId' => $id, 'channelIds' => $permittedChannelIds],
             ['channelIds' => ArrayParameterType::INTEGER]
         );
@@ -3560,6 +3575,37 @@ final class CatalogReadService
      * @param array<string, mixed> $authorizedScope
      * @return array<int, string>
      */
+
+    private function customerSourcePredicate(string $alias, array $scope): string
+    {
+        $cacheKey = $alias.':'.hash('sha256', serialize($scope));
+        if (isset($this->customerScopePredicates[$cacheKey])) return $this->customerScopePredicates[$cacheKey];
+        $accounts = $this->resolveAuthorizedAccounts($scope);
+        $ids = $this->flattenPermittedAccountIds($accounts);
+        $columns = $this->connection->createSchemaManager()->listTableColumns('channeled_customers');
+        $conditions = [];
+        if ($ids !== [] && isset($columns['channeled_account_id'])) {
+            $conditions[] = "EXISTS (SELECT 1 FROM channeled_accounts scoped_ca WHERE scoped_ca.id = $alias.channeled_account_id AND scoped_ca.channel = $alias.channel AND scoped_ca.id IN (".implode(', ', array_map('intval', $ids)).'))';
+        }
+        foreach (['audience_id' => ['mailchimp'], 'list_id' => ['mailchimp'], 'page_id' => ['facebook_leads', 'facebook_organic', 'facebook_marketing']] as $field => $channelNames) {
+            $selected = array_intersect_key($accounts, array_flip($channelNames));
+            $platformIds = $this->flattenPermittedPlatformIds($selected);
+            $channelName = $field === 'page_id' ? 'facebook_leads' : 'mailchimp';
+            $channelId = $this->resolveChannelId($channelName);
+            if ($platformIds !== [] && $channelId) {
+                $quoted = implode(', ', array_map(fn ($id) => $this->connection->quote((string)$id), $platformIds));
+                $expression = $this->connection->getDatabasePlatform() instanceof \Doctrine\DBAL\Platforms\AbstractMySQLPlatform
+                    ? "JSON_UNQUOTE(JSON_EXTRACT($alias.data, '$.$field'))"
+                    : "$alias.data->>'$field'";
+                $conditions[] = "($alias.channel = ".(int)$channelId." AND $expression IN ($quoted))";
+            }
+        }
+        if (!empty($scope['is_unrestricted']) && ($scope['mode'] ?? 'all') === 'all') {
+            $conditions[] = isset($columns['channeled_account_id']) ? "$alias.channeled_account_id IS NULL" : '1 = 1';
+        }
+        return $this->customerScopePredicates[$cacheKey] = $conditions === [] ? '1 = 0' : '('.implode(' OR ', $conditions).')';
+    }
+
     private function resolvePermittedCustomerChannels(array $authorizedScope, ?string $channelFilter): array
     {
         $channelsScope = $authorizedScope['channels'] ?? null;
@@ -4208,7 +4254,7 @@ final class CatalogReadService
         }
 
         $ccRows = $this->connection->fetchAllAssociative(
-            'SELECT cc.* FROM channeled_customers cc WHERE cc.customer_id = :customerId AND cc.channel IN (:channelIds) ORDER BY cc.id ASC',
+            'SELECT cc.* FROM channeled_customers cc WHERE cc.customer_id = :customerId AND cc.channel IN (:channelIds) AND '.$this->customerSourcePredicate('cc', $authorizedScope).' ORDER BY cc.id ASC',
             ['customerId' => $customerId, 'channelIds' => $channelIds],
             ['channelIds' => ArrayParameterType::INTEGER]
         );

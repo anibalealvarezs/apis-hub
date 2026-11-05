@@ -20,6 +20,23 @@
     #[ORM\HasLifecycleCallbacks]
     class ChanneledCustomer extends ChanneledEntity
     {
+        #[ORM\ManyToOne(targetEntity: ChanneledAccount::class)]
+        #[ORM\JoinColumn(name: 'channeled_account_id', referencedColumnName: 'id', nullable: true, onDelete: 'SET NULL')]
+        protected ?ChanneledAccount $channeledAccount = null;
+
+        public function getChanneledAccount(): ?ChanneledAccount
+        {
+            return $this->channeledAccount;
+        }
+
+        #[ORM\ManyToOne(targetEntity: ChanneledStore::class)]
+        #[ORM\JoinColumn(name: 'channeled_store_id', referencedColumnName: 'id', nullable: true, onDelete: 'SET NULL')]
+        protected ?ChanneledStore $channeledStore = null;
+
+        public function getChanneledStore(): ?ChanneledStore
+        {
+            return $this->channeledStore;
+        }
         #[ORM\Column(type: 'string', nullable: true)]
         protected ?string $email = null;
 

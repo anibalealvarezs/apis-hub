@@ -106,7 +106,7 @@ class ProductProcessor
                     $vKey = KeyGenerator::generateProductVariantKey($varPId);
                     if (! isset($uVar[$vKey])) {
                         $uVar[$vKey] = [
-                            'productVariantId' => $varPId,
+                            'product_variant_id' => $varPId,
                             'sku' => $varObj->sku ?? '',
                         ];
                     }

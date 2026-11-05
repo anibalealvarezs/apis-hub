@@ -418,11 +418,12 @@ class AgnosticPreAggregationEngine
                 if ($value === '') {
                     continue 2;
                 }
-                if ($dimension === 'currency') {
+                $dimensionRule = $rule['identity_dimension_rules'][$dimension] ?? [];
+                if (!empty($dimensionRule['uppercase'])) {
                     $value = strtoupper($value);
-                    if (!preg_match('/^[A-Z]{3}$/D', $value)) {
-                        continue 2;
-                    }
+                }
+                if (isset($dimensionRule['pattern']) && !preg_match($dimensionRule['pattern'], $value)) {
+                    continue 2;
                 }
                 $dimensions[] = ['dimensionKey' => $dimension, 'dimensionValue' => $value];
             }

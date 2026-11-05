@@ -17,6 +17,15 @@
     #[ORM\HasLifecycleCallbacks]
     class ChanneledPriceRule extends ChanneledEntity
     {
+
+        #[ORM\ManyToOne(targetEntity: ChanneledStore::class)]
+        #[ORM\JoinColumn(name: 'channeled_store_id', referencedColumnName: 'id', nullable: true, onDelete: 'SET NULL')]
+        protected ?ChanneledStore $channeledStore = null;
+
+        public function getChanneledStore(): ?ChanneledStore
+        {
+            return $this->channeledStore;
+        }
         // Relationships with channeled entities
 
         #[ORM\OneToMany(targetEntity: ChanneledDiscount::class, mappedBy: 'channeledPriceRule', orphanRemoval: true)]
