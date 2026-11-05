@@ -152,7 +152,7 @@ echo -e "${YELLOW}🚀 [4/5] Orchestrating containers...${NC}"
 if [ -f "docker-compose.yml" ]; then
     echo "  🧹 Cleaning up existing deployment..."
     rm -rf storage/db_lock
-    docker compose --env-file "$ENV_FILE" down --remove-orphans || echo "  ⚠️ Cleanup had issues, continuing..."
+    docker compose --env-file "$ENV_FILE" down --remove-orphans --timeout 15 || echo "  ⚠️ Cleanup had issues, continuing..."
 fi
 
 DEPLOYMENT_NAME=$(grep -E '^DEPLOYMENT_NAME=' "$ENV_FILE" | cut -d '=' -f 2 | tr -d '"' | tr -d "'" || echo "apis-hub")
