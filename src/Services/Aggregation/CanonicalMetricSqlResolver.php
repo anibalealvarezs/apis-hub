@@ -151,6 +151,38 @@
                 ];
             }
 
+            if ($channel === 'mailchimp' && $normalizedRequested === 'opens_unique_daily') {
+                return [
+                    'requested_metric' => $normalizedRequested,
+                    'canonical_metric' => $normalizedRequested,
+                    'input_type' => 'canonical',
+                    'legacy_alias_of' => null,
+                    'deprecation' => null,
+                    'raw_names' => [$normalizedRequested],
+                    'source' => 'mailchimp_daily_openers',
+                    'sql_expression' => "SUM(CASE WHEN $nameCol = 'opens_unique_daily' AND $periodCol = 'daily' THEN m.value END)",
+                ];
+            }
+
+            if ($channel === 'mailchimp' && in_array($normalizedRequested, ['open_rate', 'click_rate'], true)) {
+                $numerator = $normalizedRequested === 'open_rate' ? 'opens' : 'clicks';
+                $numeratorNames = $this->resolveRawMetricNames($numerator, $channel)['raw_names'];
+                $denominatorNames = $this->resolveRawMetricNames('sends', $channel)['raw_names'];
+                $events = $this->buildSumExpression($numeratorNames, $nameCol, $periodCol);
+                $sends = $this->buildSumExpression($denominatorNames, $nameCol, $periodCol);
+
+                return [
+                    'requested_metric' => $normalizedRequested,
+                    'canonical_metric' => $normalizedRequested,
+                    'input_type' => 'canonical',
+                    'legacy_alias_of' => null,
+                    'deprecation' => null,
+                    'raw_names' => array_values(array_unique([...$numeratorNames, ...$denominatorNames])),
+                    'source' => 'mailchimp_engagement_rate',
+                    'sql_expression' => $events !== null && $sends !== null ? "1.0 * $events / NULLIF($sends, 0)" : null,
+                ];
+            }
+
             $inputMeta = CanonicalMetricDefinitionRegistry::resolveInput($normalizedRequested);
             $canonicalMetric = $inputMeta['canonical_metric'];
             $resolutionMetric = $canonicalMetric;
@@ -215,7 +247,9 @@
             ?string $channel,
             string  $nameCol,
             string  $periodCol,
-            string  $period = 'daily'
+            string  $period = 'daily',
+            bool    $dailySnapshot = false,
+            bool    $snapshotHasEndDate = true
         ): array
         {
             $normalizedRequested = strtolower(trim($requestedMetric));
@@ -229,6 +263,24 @@
                     'raw_names'        => [],
                     'source'           => 'none',
                     'sql_expression'   => null,
+                ];
+            }
+
+            if ($channel === 'facebook_organic' && $normalizedRequested === 'follower_total') {
+                $latest = $dailySnapshot ? '' : ' AND m.metric_date = (SELECT MAX(snapshot.metric_date)'
+                    .' FROM metrics snapshot WHERE snapshot.metric_config_id = m.metric_config_id'
+                    .($snapshotHasEndDate ? ' AND snapshot.metric_date <= :endDate' : '').')';
+
+                return [
+                    'requested_metric' => $normalizedRequested,
+                    'canonical_metric' => $normalizedRequested,
+                    'input_type' => 'canonical',
+                    'legacy_alias_of' => null,
+                    'deprecation' => null,
+                    'raw_names' => [$normalizedRequested],
+                    'source' => 'organic_follower_snapshot',
+                    'sql_expression' => "SUM(CASE WHEN $nameCol = 'follower_total' AND $periodCol = 'lifetime'"
+                        ." AND mc.post_id IS NULL AND mc.dimension_set_id IS NULL$latest THEN m.value END)",
                 ];
             }
 

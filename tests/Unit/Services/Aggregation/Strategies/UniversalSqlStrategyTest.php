@@ -12,6 +12,35 @@ use Tests\Unit\BaseUnitTestCase;
 
 final class UniversalSqlStrategyTest extends BaseUnitTestCase
 {
+    public function testMailchimpUniqueOpensCanShareAnAggregationWithTotalOpens(): void
+    {
+        $connection = $this->createMock(Connection::class);
+        $connection->expects(self::once())->method('fetchAllAssociative')->willReturnCallback(
+            static function (string $sql): array {
+                self::assertStringContainsString("LOWER(mc.name) = 'opens_unique_daily'", $sql);
+                self::assertStringContainsString('AS "opens_unique_daily"', $sql);
+                self::assertStringContainsString('AS "opens"', $sql);
+
+                return [['daily' => '2026-10-29', 'opens' => 7, 'opens_unique_daily' => 3]];
+            }
+        );
+        $resolver = new \Services\Aggregation\CanonicalMetricSqlResolver(
+            driverDictionaryResolver: static fn () => ['opens' => ['opens']],
+        );
+        $plan = new AggregationPlan(
+            aggregations: ['opens' => 'opens', 'opens_unique_daily' => 'opens_unique_daily'],
+            groupBy: ['daily'],
+            filters: (object) ['channel' => 'mailchimp', 'channeledAccount' => '42'],
+            startDate: '2026-10-29',
+            endDate: '2026-10-29',
+        );
+
+        $rows = (new UniversalSqlStrategy(metricSqlResolver: $resolver))->execute($connection, $plan, true);
+
+        self::assertSame(3, $rows[0]['opens_unique_daily']);
+        self::assertSame(7, $rows[0]['opens']);
+    }
+
     public function testWeightedContractSharesABoundedCompanionScanAndPrunesUnrequestedMetrics(): void
     {
         $connection = $this->createMock(Connection::class);

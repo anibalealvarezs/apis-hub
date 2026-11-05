@@ -500,7 +500,9 @@
                         channel: $channelKey,
                         nameCol: $nameCol,
                         periodCol: $periodCol,
-                        period: $organicPeriod
+                        period: $organicPeriod,
+                        dailySnapshot: in_array('daily', $groupBy, true),
+                        snapshotHasEndDate: $endDate !== null
                     );
 
                     if (is_string($resolvedOrganicMetric['sql_expression'])) {

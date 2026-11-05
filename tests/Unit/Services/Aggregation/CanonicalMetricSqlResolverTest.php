@@ -10,6 +10,25 @@ use Tests\Unit\BaseUnitTestCase;
 
 final class CanonicalMetricSqlResolverTest extends BaseUnitTestCase
 {
+    public function testFollowerSnapshotUsesTheLatestObservationWithinTheWindow(): void
+    {
+        $resolver = new CanonicalMetricSqlResolver();
+        $db = new \PDO('sqlite::memory:');
+        $db->exec("CREATE TABLE metric_configs (id INT, name TEXT, period TEXT, post_id INT, dimension_set_id INT);
+            CREATE TABLE metrics (metric_config_id INT, metric_date TEXT, value REAL);
+            INSERT INTO metric_configs VALUES (1, 'follower_total', 'lifetime', NULL, NULL);
+            INSERT INTO metrics VALUES (1, '2026-10-25', 12), (1, '2026-10-26', 9), (1, '2026-10-28', 20)");
+        $formula = $resolver->resolveOrganicMetric('follower_total', 'facebook_organic', 'mc.name', 'mc.period')['sql_expression'];
+        $query = $db->prepare("SELECT $formula FROM metrics m JOIN metric_configs mc ON mc.id = m.metric_config_id
+            WHERE m.metric_date BETWEEN :startDate AND :endDate");
+
+        $query->execute(['startDate' => '2026-10-25', 'endDate' => '2026-10-26']);
+        self::assertEquals(9, $query->fetchColumn());
+
+        $query->execute(['startDate' => '2026-10-27', 'endDate' => '2026-10-27']);
+        self::assertNull($query->fetchColumn());
+    }
+
     public function testGoogleAdsRoasUsesTotalsAndRejectsIncompleteOrLegacyWindows(): void
     {
         $resolver = new CanonicalMetricSqlResolver(driverDictionaryResolver: fn () => [
