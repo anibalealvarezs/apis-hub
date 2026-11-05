@@ -325,5 +325,51 @@
             'public'     => true,
             'admin'      => false
         ],
-    ]);
 
+        // --- Catalog Read API (Phase 1) ---
+
+        '/api/catalog/capabilities'           => [
+            'httpMethod' => 'POST',
+            'callable'   => function (...$args) {
+                $request = $args['request'] ?? Request::createFromGlobals();
+
+                return (new \Controllers\CatalogController())->capabilities($request);
+            },
+            'public'     => false,
+            'html'       => false,
+            'admin'      => false
+        ],
+        '/api/catalog/list'                   => [
+            'httpMethod' => 'POST',
+            'callable'   => function (...$args) {
+                $request = $args['request'] ?? Request::createFromGlobals();
+
+                return (new \Controllers\CatalogController())->list($request);
+            },
+            'public'     => false,
+            'html'       => false,
+            'admin'      => false
+        ],
+        '/api/catalog/profile'                => [
+            'httpMethod' => 'POST',
+            'callable'   => function (...$args) {
+                $request = $args['request'] ?? Request::createFromGlobals();
+
+                return (new \Controllers\CatalogController())->profile($request);
+            },
+            'public'     => false,
+            'html'       => false,
+            'admin'      => false
+        ],
+        '/api/catalog/activity'               => [
+            'httpMethod' => 'POST',
+            'callable'   => function (...$args) {
+                $request = $args['request'] ?? Request::createFromGlobals();
+
+                return (new \Controllers\CatalogController())->activity($request);
+            },
+            'public'     => false,
+            'html'       => false,
+            'admin'      => false
+        ],
+    ]);
