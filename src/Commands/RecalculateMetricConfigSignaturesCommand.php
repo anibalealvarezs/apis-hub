@@ -39,10 +39,15 @@ class RecalculateMetricConfigSignaturesCommand extends Command
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $batchSize = (int) $input->getOption('batch-size');
-        $fromId = $input->getOption('from-id') ? (int) $input->getOption('from-id') : null;
-        $toId = $input->getOption('to-id') ? (int) $input->getOption('to-id') : null;
+        $fromId = $input->getOption('from-id') !== null ? (int) $input->getOption('from-id') : null;
+        $toId = $input->getOption('to-id') !== null ? (int) $input->getOption('to-id') : null;
         $dryRun = (bool) $input->getOption('dry-run');
         $force = (bool) $input->getOption('force');
+        if ($batchSize < 1 || ($fromId !== null && $fromId < 1) || ($toId !== null && $toId < 1)
+            || ($fromId !== null && $toId !== null && $fromId > $toId)) {
+            $output->writeln('<error>Use a positive batch size and a valid positive ID range.</error>');
+            return Command::INVALID;
+        }
 
         $conn = $this->entityManager->getConnection();
 
@@ -85,7 +90,11 @@ class RecalculateMetricConfigSignaturesCommand extends Command
             $output->writeln('<comment>Force mode: all rows will be updated regardless of current signature.</comment>');
         }
 
-        $selectSql = $this->buildSelectSql();
+        $selectSql = str_replace(
+            'ORDER BY mc.id ASC',
+            'WHERE mc.id > :after_id'.($toId !== null ? ' AND mc.id <= :to_id' : '').' ORDER BY mc.id ASC',
+            $this->buildSelectSql()
+        );
 
         $progressBar = new ProgressBar($output, $total);
         $progressBar->setFormat(' %current%/%max% [%bar%] %percent:3s%% %elapsed:6s%/%estimated:-6s% %memory:6s%');
@@ -93,17 +102,19 @@ class RecalculateMetricConfigSignaturesCommand extends Command
 
         $updatedCount = 0;
         $batchesProcessed = 0;
-        $offset = 0;
+        $afterId = ($fromId ?? 1) - 1;
 
         while (true) {
-            $rows = $conn->fetchAllAssociative(
-                $selectSql . ' OFFSET ' . (int) $offset . ' LIMIT ' . (int) $batchSize,
-                []
-            );
+            $selectParams = ['after_id' => $afterId];
+            if ($toId !== null) {
+                $selectParams['to_id'] = $toId;
+            }
+            $rows = $conn->fetchAllAssociative($selectSql.' LIMIT '.$batchSize, $selectParams);
 
             if (empty($rows)) {
                 break;
             }
+            $afterId = (int) $rows[array_key_last($rows)]['id'];
 
             $updates = [];
             $deletes = [];
@@ -203,8 +214,6 @@ class RecalculateMetricConfigSignaturesCommand extends Command
             $updatedCount += count($updates);
             $batchesProcessed++;
             $progressBar->advance(count($rows));
-
-            $offset += count($rows);
 
             if ($batchesProcessed % 10 === 0) {
                 $this->entityManager->clear();

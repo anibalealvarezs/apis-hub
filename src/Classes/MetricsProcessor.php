@@ -981,9 +981,6 @@ class MetricsProcessor
     ): array {
         $logger = self::resolveLogger($logger, $channel);
 
-        // Inject virtual DAILY metrics from LIFETIME ones (Channel Agnostic Delta Engine)
-        self::injectVirtualDailyMetrics($metrics, $manager);
-
         // Initialize null maps
         $queryMap = null;
         $productMap = null;
@@ -1096,7 +1093,7 @@ class MetricsProcessor
         }
 
         // Extract metrics from metrics
-        $uniqueMetricConfigs = [];
+        $resolvedConfigs = [];
         foreach ($metrics->toArray() as $metric) {
             if (! $metric) {
                 continue;
@@ -1121,36 +1118,6 @@ class MetricsProcessor
                 $cityId = (int)$cityMap['map'][$cityLookupKey];
             }
 
-            $countryLookupKey = self::extractMetricLookupKey($mObj, 'country');
-
-            $metricConfigKey = KeyGenerator::generateMetricConfigKey(
-                channel: $mObj->channel ?? null,
-                name: $mObj->name ?? null,
-                period: $mObj->period ?? null,
-                account: (self::extractMetricLookupKey($mObj, 'account', $logger)) ?: null,
-                channeledAccount: (self::extractMetricLookupKey($mObj, 'channeledAccount', $logger)) ?: null,
-                campaign: (self::extractMetricLookupKey($mObj, 'campaign', $logger)) ?: null,
-                channeledCampaign: (self::extractMetricLookupKey($mObj, 'channeledCampaign', $logger)) ?: null,
-                channeledAdGroup: (self::extractMetricLookupKey($mObj, 'channeledAdGroup', $logger)) ?: null,
-                channeledAd: (self::extractMetricLookupKey($mObj, 'channeledAd', $logger)) ?: null,
-                creative: (self::extractMetricLookupKey($mObj, 'creative', $logger)) ?: null,
-                page: (self::extractMetricLookupKey($mObj, 'page', $logger)) ?: null,
-                query: self::extractMetricLookupKey($mObj, 'query', $logger),
-                post: self::extractMetricLookupKey($mObj, 'post', $logger),
-                product: (self::extractMetricLookupKey($mObj, 'product', $logger)) ?: null,
-                customer: (self::extractMetricLookupKey($mObj, 'customer', $logger)) ?: null,
-                order: (self::extractMetricLookupKey($mObj, 'order', $logger)) ?: null,
-                event: (self::extractMetricLookupKey($mObj, 'event', $logger)) ?: null,
-                channeledEvent: (self::extractMetricLookupKey($mObj, 'channeledEvent', $logger)) ?: null,
-                country: $mObj->countryCode ?? ($mObj->country ?? null),
-                device: $mObj->deviceType ?? ($mObj->device ?? null),
-                dimensionSet: $mObj->dimensionsHash ?? (isset($mObj->dimensions) ? KeyGenerator::generateDimensionsHash((array)$mObj->dimensions) : null),
-                location: $mObj->location ?? null,
-                state: $mObj->state ?? null,
-                city: $mObj->city ?? null
-            );
-            $metric->metricConfigKey = $metricConfigKey;
-
             $channelObj = Channel::tryFromName((string)$metric->channel);
             $channelId = $channelObj ? $channelObj->getId() : $metric->channel;
 
@@ -1168,7 +1135,7 @@ class MetricsProcessor
                 }
             }
 
-            $uniqueMetricConfigs[$metricConfigKey] = [
+            $resolvedConfig = [
                 'channel' => $channelId,
                 'name' => $metric->name,
                 'period' => $metric->period,
@@ -1188,13 +1155,47 @@ class MetricsProcessor
                 'country_id' => self::resolveCountryId($metric, $countryMap),
                 'device_id' => self::resolveDeviceId($metric, $deviceMap),
                 'dimension_set_id' => self::resolveDimensionSetId($metric, $dimensionSetMap),
+                'location_id' => $locationId,
+                'state_id' => $stateId,
+                'city_id' => $cityId,
                 'event_id' => self::resolveEventId($metric, $eventMap) ?? (isset($channeledEventMap['map']['global_by_account'])
                     ? ($channeledEventMap['map']['global_by_account'][self::resolveChanneledAccountId($metric, $channeledAccountMap)][self::extractMetricLookupKey($metric, 'channeledEvent')] ?? null)
                     : ($channeledEventMap['global'][self::extractMetricLookupKey($metric, 'channeledEvent')] ?? null)),
                 'channeled_event_id' => self::resolveChanneledEventId($metric, $channeledEventMap, $channeledAccountMap),
-                'key' => $metricConfigKey,
             ];
+            $resolvedConfigs[spl_object_id($metric)] = $resolvedConfig;
         }
+
+        // Delta lookups must use the same resolved identity as normal persistence.
+        self::injectVirtualDailyMetrics($metrics, $manager, $resolvedConfigs);
+        $uniqueMetricConfigs = [];
+        foreach ($metrics as $metric) {
+            if ($metric) {
+                $config = $resolvedConfigs[spl_object_id($metric)];
+                $key = \Services\Analytics\MetricConfigIdentity::key($config);
+                $metric->metricConfigKey = $key;
+                $uniqueMetricConfigs[$key] = $config;
+            }
+        }
+
+        // Hash the resolved records using the same inputs as reconciliation.
+        // Raw labels that resolved to NULL must not create distinct signatures.
+        $signatures = \Services\Analytics\MetricConfigIdentity::signatures(
+            $manager->getConnection(),
+            $uniqueMetricConfigs
+        );
+        $canonicalConfigs = [];
+        foreach ($uniqueMetricConfigs as $key => $config) {
+            $signature = $signatures[$key];
+            $config['key'] = $signature;
+            $canonicalConfigs[$signature] = $config;
+        }
+        foreach ($metrics as $metric) {
+            if ($metric) {
+                $metric->metricConfigKey = $signatures[$metric->metricConfigKey];
+            }
+        }
+        $uniqueMetricConfigs = $canonicalConfigs;
 
         // Batch select metrics from list by signature
         $selectParams = array_column($uniqueMetricConfigs, 'key');
@@ -1216,6 +1217,14 @@ class MetricsProcessor
                 }
             }
         }
+
+        // Old signatures may contain unresolved source values. Match their stored
+        // identity before inserting so deployment does not duplicate existing data.
+        $missingConfigs = array_diff_key($uniqueMetricConfigs, $metricConfigMap);
+        $metricConfigMap += \Services\Analytics\MetricConfigIdentity::findExisting(
+            $manager->getConnection(),
+            $missingConfigs
+        );
 
         // INSERT IGNORE / ON CONFLICT: atomic upsert.
         if (! empty($uniqueMetricConfigs)) {

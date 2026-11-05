@@ -20,7 +20,7 @@ trait CalculatesMetricDeltas
      * @param EntityManager $manager
      * @return void
      */
-    public static function injectVirtualDailyMetrics(ArrayCollection $metrics, EntityManager $manager): void
+    public static function injectVirtualDailyMetrics(ArrayCollection $metrics, EntityManager $manager, array &$resolvedConfigs = []): void
     {
         $lifetimeMetrics = [];
         foreach ($metrics as $metric) {
@@ -36,10 +36,30 @@ trait CalculatesMetricDeltas
             return;
         }
 
+        $existingConfigs = [];
+        if ($resolvedConfigs !== []) {
+            $lifetimeConfigs = [];
+            foreach ($lifetimeMetrics as $metric) {
+                $config = $resolvedConfigs[spl_object_id($metric)];
+                $lifetimeConfigs[\Services\Analytics\MetricConfigIdentity::key($config)] = $config;
+            }
+            $existingConfigs = \Services\Analytics\MetricConfigIdentity::findExisting(
+                $manager->getConnection(), $lifetimeConfigs
+            );
+        }
+
         // 1. Generate "Yesterday Signatures" for all lifetime metrics
         $signatures = [];
         foreach ($lifetimeMetrics as $metric) {
             $yesterdayDate = Carbon::parse($metric->metricDate)->subDay()->toDateString();
+
+            if ($resolvedConfigs !== []) {
+                $key = \Services\Analytics\MetricConfigIdentity::key($resolvedConfigs[spl_object_id($metric)]);
+                $metric->atemporalSignature = (string) ($existingConfigs[$key] ?? 0);
+                $metric->yesterdayDate = $yesterdayDate;
+                $signatures[] = $metric->atemporalSignature;
+                continue;
+            }
 
             $signature = KeyGenerator::generateMetricConfigKey(
                 channel: $metric->channel,
@@ -84,10 +104,11 @@ trait CalculatesMetricDeltas
                     $tuples[] = '(?, ?)';
                 }
                 $placeholders = implode(', ', $tuples);
-                $sql = "SELECT mc.config_signature, m.metric_date, m.value 
+                $lookupColumn = $resolvedConfigs === [] ? 'mc.config_signature' : 'mc.id';
+                $sql = "SELECT $lookupColumn AS config_signature, m.metric_date, m.value
                         FROM metrics m 
                         JOIN metric_configs mc ON m.metric_config_id = mc.id 
-                        WHERE (mc.config_signature, m.metric_date) IN ($placeholders)";
+                        WHERE ($lookupColumn, m.metric_date) IN ($placeholders)";
 
                 $results = $manager->getConnection()->executeQuery($sql, $params)->fetchAllAssociative();
                 foreach ($results as $row) {
@@ -108,6 +129,12 @@ trait CalculatesMetricDeltas
             $virtual->name = $metric->name . '_daily';
             $virtual->period = Period::Daily->value;
             $virtual->value = max(0, $delta);
+            if ($resolvedConfigs !== []) {
+                $resolvedConfigs[spl_object_id($virtual)] = array_replace(
+                    $resolvedConfigs[spl_object_id($metric)],
+                    ['name' => $virtual->name, 'period' => $virtual->period]
+                );
+            }
             $virtual->isVirtualDelta = true;
             $rowPost = $virtual->post ?? $virtual->postPlatformId ?? null;
             $pVal = $rowPost ? (is_object($rowPost) ? (method_exists($rowPost, 'getPostId') ? $rowPost->getPostId() : (method_exists($rowPost, 'getPlatformId') ? $rowPost->getPlatformId() : (string)$rowPost)) : (string)$rowPost) : null;
