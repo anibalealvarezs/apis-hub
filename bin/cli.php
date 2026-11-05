@@ -108,6 +108,7 @@
             new RefreshInstancesCommand(),
             new SetupDatabaseCommand(),
             new RecalculateMetricConfigSignaturesCommand(Helpers::getManager()),
+            new \Commands\RebuildMailchimpStoresCommand($entityManager),
             new SeedDemoDataCommand(Helpers::getManager()),
             new SeedGoogleAdsMetricsCommand($entityManager),
             new ResetMetricsCommand($entityManager),

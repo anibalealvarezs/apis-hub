@@ -570,7 +570,15 @@
                     'deprecation'      => $resolvedMetric['deprecation'] ?? null,
                     'raw_names'        => $resolvedMetric['raw_names'] ?? [],
                     'source'           => $resolvedMetric['source'] ?? 'none',
+                    'exclusive_source' => $resolvedMetric['exclusive_source'] ?? false,
                 ];
+            }
+
+            if ($resolvedMetrics !== [] && !in_array(false, array_column($resolvedMetrics, 'exclusive_source'), true)) {
+                $sourceNames = array_unique(array_merge(...array_column($resolvedMetrics, 'raw_names')));
+                $quotedNames = array_map(static fn (string $name): string => "'".str_replace("'", "''", strtolower($name))."'", $sourceNames);
+                $whereClauses[] = "$nameCol IN (".implode(', ', $quotedNames).")";
+                $whereClauses[] = "$periodCol = 'daily'";
             }
 
             // If there are no select fields (e.g., no aggregations requested), we can't execute
