@@ -410,6 +410,12 @@
                             $preAggResult['rows_rolled_up'] ?? 0
                         ));
                     } catch (\Throwable $aggEx) {
+                        foreach ($driver::getPreAggregationRules() as $rule) {
+                            if (!empty($rule['identity_dimensions'])) {
+                                // Keep the job retryable when replacement of materialized snapshots fails.
+                                throw $aggEx;
+                            }
+                        }
                         $this->logger->warning("[SyncService] Non-blocking pre-aggregation rollup error: " . $aggEx->getMessage());
                     }
                 }
@@ -492,9 +498,7 @@
                 case 'order':
                 case 'orders':
                 case 'channeled_order':
-                    $manager->getConnection()->transactional(
-                        fn () => \Classes\OrderProcessor::processOrders($collection, $manager)
-                    );
+                    \Classes\CommerceProcessor::process('order', $collection, $manager);
                     break;
                 case 'event':
                 case 'events':

@@ -1,4 +1,11 @@
 # APIs Hub Memory
+
+## Mailchimp commerce expansion (2026-11-06)
+
+- `CommerceProcessor` owns generic normalized commerce dispatch and transactions. Orders resolve promotions only when code text has a unique match within the verified store. Supplied source line/promo collections replace their prior pivots. Cart snapshots are optional.
+- Identity rollup metadata supports `record_identity_field`, `required_fields`, persisted `account_relationship` and `refresh_all_source_dates`. The last option includes cached source dates and prior materialized dates so moving an old order clears its old daily slice. Identity materialization failure propagates to sync retry. Rebuild output reports exclusions.
+- Commerce Catalog reads are scoped through store-to-audience foreign keys. Source-specific promo codes are distinct by store/rule/code identity. Customer Catalog source memberships require an authorized audience before search, count or profile hydration.
+- See `docs/mailchimp-store-rollout.md` for dependency order, replay needs and acceptance gaps. SQLite/mocked checks do not establish PostgreSQL concurrency or live Mailchimp completeness. Do not delete ambiguous legacy identities without a verified source replay.
 ## Scope
 - Package role: Orchestration (Worker)
 - Purpose: This package operates within the Orchestration (Worker) layer of the APIs Hub SaaS hierarchy, coordinating caching, normalization, persistence, and data aggregation across source integrations.

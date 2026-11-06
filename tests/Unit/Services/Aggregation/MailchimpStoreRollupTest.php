@@ -38,7 +38,8 @@ final class MailchimpStoreRollupTest extends TestCase
             }
             protected function fetchAtomicRecordsForDate(string $tableName, string $channel, string $dateStr, bool $throwOnFailure = false): array
             {
-                return $this->records;
+                return array_values(array_filter($this->records, static fn (array $row): bool =>
+                    substr((string)($row['platform_created_at'] ?? ''), 0, 10) === $dateStr));
             }
         };
         $record = static fn (string $store, string $currency, float $amount, string $id): array => [
@@ -99,5 +100,40 @@ final class MailchimpStoreRollupTest extends TestCase
         $connection->executeStatement("INSERT INTO metric_configs (id, channel, name, period, channeled_account_id, config_signature) VALUES (999, 4, 'revenue', 'daily', 42, 'legacy')");
         $connection->executeStatement("INSERT INTO metrics (value, metric_config_id, metric_date, dimensions_hash) VALUES (1000, 999, '2026-11-01', 'legacy')");
         self::assertEquals(0, $evaluate());
+        $connection->executeStatement('CREATE TABLE channeled_stores (id INTEGER PRIMARY KEY, channel INTEGER, channeled_account_id INTEGER)');
+        $connection->executeStatement('INSERT INTO channeled_stores VALUES (5, 4, 42), (6, 99, 42)');
+        $rules['store_conversions']['account_relationship'] = [
+            'table' => 'channeled_stores', 'foreign_key' => 'channeled_store_id',
+            'account_column' => 'channeled_account_id',
+        ];
+        $rules['store_conversions']['record_identity_field'] = 'store_order_key';
+        $rules['store_conversions']['required_fields'] = ['total_amount'];
+        $valid = $record('verified', 'USD', 21, 'verified-order');
+        $valid['channeled_store_id'] = 5;
+        $valid['data']['store_order_key'] = 'verified-order';
+        // Ownership comes from the persisted store relationship, even when raw attribution is stale.
+        $valid['data']['audience_id'] = 'stale';
+        $missingTotal = $valid;
+        $missingTotal['data']['total_amount'] = null;
+        $wrongChannel = $valid;
+        $wrongChannel['channeled_store_id'] = 6;
+        $wrongIdentity = $valid;
+        $wrongIdentity['platform_id'] = 'legacy-order';
+        $engine->records = [$valid, $missingTotal, $wrongChannel, $wrongIdentity];
+        $result = $engine->preAggregateDay($rules, 'mailchimp', '2026-11-01', 30);
+        self::assertSame(3, $result['records_excluded']);
+        self::assertEquals(21, $evaluate());
+        self::assertEquals(1, $connection->fetchOne("SELECT m.value FROM metrics m JOIN metric_configs mc ON mc.id=m.metric_config_id WHERE mc.name='orders_count'"));
+        $connection->executeStatement('CREATE TABLE channeled_orders (channel INTEGER, platform_created_at TEXT)');
+        $connection->executeStatement("INSERT INTO channeled_orders VALUES (4, '2026-10-01 12:00:00')");
+        $valid['platform_created_at'] = '2026-10-01 12:00:00';
+        $valid['data']['total_amount'] = 33;
+        $engine->records = [$valid];
+        $rules['store_conversions']['refresh_all_source_dates'] = true;
+        $engine->rollup($rules, 'mailchimp', '2026-11-02', '2026-11-02');
+        self::assertEquals(33, $evaluate());
+        self::assertSame(['2026-10-01'], $connection->fetchFirstColumn(
+            "SELECT DISTINCT m.metric_date FROM metrics m JOIN metric_configs mc ON mc.id=m.metric_config_id WHERE mc.name='orders_count'"
+        ));
     }
 }
