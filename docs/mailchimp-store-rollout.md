@@ -116,3 +116,7 @@ Desktop/mobile and light/dark checks are completed above. Provider history, opti
 rate-limit behavior and source deletion completeness are not established by local
 fixtures. General entity measures, product/cart/promotion performance, accounting
 net revenue, refunds, campaign attribution and FX conversion remain separate work.
+
+### Audience prerequisite during order sync
+
+The driver must persist authoritative enabled ecommerce audiences before importing stores in metric jobs. This removes the scheduling dependency on the separate entity job and fixes `Store audience must be synchronized before its store` for missing parents. Deploy the updated Mailchimp driver before retrying affected jobs; no schema change or forced historical resync is required. Worker ownership checks remain enforced. Local regression covers a metric job running against an empty cache before entity sync.

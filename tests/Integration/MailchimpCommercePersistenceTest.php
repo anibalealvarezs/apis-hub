@@ -131,6 +131,11 @@ final class MailchimpCommercePersistenceTest extends TestCase
         $rule = MailchimpDriver::getPreAggregationRules()['store_conversions'];
         self::assertTrue($rule['refresh_all_source_dates'], 'Install the commerce expansion driver before releasing the worker.');
         $engine = new AgnosticPreAggregationEngine($db);
+        // Historical metric jobs can arrive before the scheduled entity job.
+        $driver->sync(new \DateTime('2026-11-01'), new \DateTime('2026-11-02'), $config, static fn (): bool => true);
+        self::assertSame(1, (int)$db->fetchOne('SELECT COUNT(*) FROM channeled_accounts'));
+        self::assertSame(2, (int)$db->fetchOne('SELECT COUNT(*) FROM channeled_stores WHERE channeled_account_id IS NOT NULL'));
+        self::assertSame(2, (int)$db->fetchOne('SELECT COUNT(*) FROM channeled_orders WHERE channeled_store_id IS NOT NULL'));
         foreach ([0, 0, 1] as $revision) {
             $driver->sync(new \DateTime('2026-11-01'), new \DateTime('2026-11-02'),
                 $config + ['entity' => 'entities'], static fn (): bool => true);
