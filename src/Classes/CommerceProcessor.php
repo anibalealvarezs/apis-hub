@@ -107,16 +107,27 @@ final class CommerceProcessor
                     if ($connection->getDatabasePlatform() instanceof \Doctrine\DBAL\Platforms\PostgreSQLPlatform) {
                         $connection->executeQuery('SELECT pg_advisory_xact_lock(hashtext(?))', ['commerce-account:'.$accountName]);
                     }
-                    $accountId = (int)$connection->fetchOne('SELECT id FROM accounts WHERE name = ? ORDER BY id LIMIT 1', [$accountName]);
+                    $existing = $connection->fetchAssociative(
+                        'SELECT account_id, data FROM channeled_accounts WHERE channel = ? AND platform_id = ?', [$channel, $platformId]
+                    );
+                    $previousData = $existing ? json_decode((string)($existing['data'] ?? '{}'), true) : [];
+                    $previousOwner = (string)($previousData['account_id'] ?? '');
+                    if ($previousOwner !== '' && $previousOwner !== $accountName) throw new RuntimeException('Source account identity collision.');
+                    // Base accounts are configurable groups, not provider identities.
+                    // Adopt legacy rows without an ownership marker without changing their group/ID.
+                    $accountId = (int)($existing['account_id'] ?? 0);
                     if (!$accountId) {
-                        $connection->insert('accounts', [
-                            'name' => $accountName, 'created_at' => date('Y-m-d H:i:s'),
-                            'updated_at' => date('Y-m-d H:i:s'), 'version' => 1,
-                        ]);
-                        $accountId = (int)$connection->lastInsertId();
+                        $accountId = (int)$connection->fetchOne('SELECT id FROM accounts WHERE name = ? ORDER BY id LIMIT 1', [$accountName]);
+                        if (!$accountId) {
+                            $connection->insert('accounts', [
+                                'name' => $accountName, 'created_at' => date('Y-m-d H:i:s'),
+                                'updated_at' => date('Y-m-d H:i:s'), 'version' => 1,
+                            ]);
+                            $accountId = (int)$connection->lastInsertId();
+                        }
                     }
-                    $existing = $connection->fetchOne('SELECT account_id FROM channeled_accounts WHERE channel = ? AND platform_id = ?', [$channel, $platformId]);
-                    if ($existing && (int)$existing !== $accountId) throw new RuntimeException('Source account identity collision.');
+                    $data['account_id'] = $accountName;
+                    $base['data'] = json_encode($data, JSON_THROW_ON_ERROR);
                     self::upsert($connection, 'channeled_accounts', $base + [
                         'account_id' => $accountId, 'name' => (string)($record->title ?? $data['name'] ?? $platformId),
                         'type' => 'audience', 'enabled' => 1,
@@ -125,11 +136,15 @@ final class CommerceProcessor
                 }
                 if ($type === 'store') {
                     $audience = $connection->fetchAssociative(
-                        'SELECT ca.id, ca.account_id FROM channeled_accounts ca JOIN accounts a ON a.id = ca.account_id
-                         WHERE ca.channel = ? AND ca.platform_id = ? AND a.name = ?',
-                        [$channel, (string)($data['audience_id'] ?? ''), (string)($data['account_id'] ?? '')]
+                        'SELECT ca.id, ca.account_id, ca.data FROM channeled_accounts ca
+                         WHERE ca.channel = ? AND ca.platform_id = ?',
+                        [$channel, (string)($data['audience_id'] ?? '')]
                     );
-                    if (!$audience) throw new RuntimeException('Store audience must be synchronized before its store.');
+                    $audienceData = $audience ? json_decode((string)($audience['data'] ?? '{}'), true) : [];
+                    $providerAccount = (string)($data['account_id'] ?? '');
+                    if (!$audience || $providerAccount === '' || (string)($audienceData['account_id'] ?? '') !== $providerAccount) {
+                        throw new RuntimeException('Store audience must be synchronized before its store.');
+                    }
                     $canonical = $channel.':'.$platformId;
                     $metadata = [
                         'name' => $data['name'] ?? null, 'domain' => $data['domain'] ?? null,
