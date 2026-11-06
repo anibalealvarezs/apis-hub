@@ -41,6 +41,56 @@ final class CommerceProcessor
                 self::linkStores($connection, 'channeled_products', $normalized);
                 return;
             }
+            if ($type === 'order') {
+                foreach ($normalized as $record) {
+                    $storeId = self::storeId($connection, $record);
+                    if (!$storeId) continue;
+                    $data = (array)($record->data ?? []);
+                    // A supplied source collection is authoritative for this snapshot.
+                    // Clear old pivots inside the transaction before rebuilding relationships.
+                    foreach ([['promos', 'channeled_order_channeled_discounts'], ['lines', 'channeled_order_channeled_products'],
+                        ['lines', 'channeled_order_channeled_product_variants']] as [$field, $table]) {
+                        if (!isset($data[$field]) || !is_array($data[$field])) continue;
+                        $connection->executeStatement(
+                            "DELETE FROM $table WHERE channeled_order_id IN (SELECT id FROM channeled_orders WHERE channel = ? AND platform_id = ?)",
+                            [(int)$record->channel, (string)$record->platformId]
+                        );
+                    }
+                    $codes = [];
+                    foreach ($data['promos'] ?? [] as $promotion) {
+                        $code = $promotion['code'] ?? null;
+                        if (!is_string($code) || $code === '') continue;
+                        $expression = $connection->getDatabasePlatform() instanceof \Doctrine\DBAL\Platforms\AbstractMySQLPlatform
+                            ? "JSON_UNQUOTE(JSON_EXTRACT(d.data, '$.code'))" : "d.data->>'code'";
+                        $matches = $connection->fetchFirstColumn(
+                            "SELECT d.code FROM channeled_discounts d JOIN channeled_price_rules r ON r.id = d.channeled_price_rule_id
+                             WHERE r.channeled_store_id = ? AND d.channel = ? AND d.platform_id = d.code AND $expression = ?",
+                            [$storeId, (int)$record->channel, $code]
+                        );
+                        if (count($matches) === 1) $codes[] = $matches[0];
+                    }
+                    $record->discountCodes = array_values(array_unique($codes));
+                }
+                OrderProcessor::processOrders($normalized, $manager);
+                foreach ($normalized as $record) {
+                    $storeId = self::storeId($connection, $record);
+                    if (!$storeId) continue;
+                    $accountId = $connection->fetchOne('SELECT channeled_account_id FROM channeled_stores WHERE id = ?', [$storeId]);
+                    $connection->executeStatement(
+                        'UPDATE channeled_customers SET channeled_store_id = ?, channeled_account_id = ?
+                         WHERE id IN (SELECT channeled_customer_id FROM channeled_orders WHERE channel = ? AND platform_id = ?)',
+                        [$storeId, $accountId, (int)$record->channel, (string)$record->platformId]
+                    );
+                    $connection->executeStatement(
+                        'UPDATE channeled_products SET channeled_store_id = ? WHERE channel = ? AND id IN
+                         (SELECT link.channeled_product_id FROM channeled_order_channeled_products link
+                          JOIN channeled_orders source ON source.id = link.channeled_order_id
+                          WHERE source.channel = ? AND source.platform_id = ?)',
+                        [$storeId, (int)$record->channel, (int)$record->channel, (string)$record->platformId]
+                    );
+                }
+                return;
+            }
             foreach ($normalized as $record) {
                 $data = (array)($record->data ?? []);
                 $channel = (int)$record->channel;
@@ -112,7 +162,7 @@ final class CommerceProcessor
                         self::upsert($connection, 'discounts', ['code' => $code['identity']], ['code']);
                         $discountId = (int)$connection->fetchOne('SELECT id FROM discounts WHERE code = ?', [$code['identity']]);
                         self::upsert($connection, 'channeled_discounts', [
-                            'channel' => $channel, 'platform_id' => (string)$code['id'], 'code' => $code['identity'],
+                            'channel' => $channel, 'platform_id' => $code['identity'], 'code' => $code['identity'],
                             'discount_id' => $discountId, 'channeled_price_rule_id' => $channeledRuleId,
                             'platform_created_at' => $code['created_at_foreign'] ?? null,
                             'data' => json_encode($code, JSON_THROW_ON_ERROR),

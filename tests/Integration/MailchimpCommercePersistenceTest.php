@@ -81,6 +81,9 @@ final class MailchimpCommercePersistenceTest extends TestCase
             'currency' => 'EUR', 'total_amount' => 12.5,
         ]);
         $order->platformCreatedAt = new \Carbon\Carbon('2026-11-01');
+        $order->customer = (object)['id' => 'scoped-customer', 'email' => 'customer@example.test'];
+        $order->lineItems = [['product_id' => 'scoped-product', 'variant_id' => 'scoped-variant']];
+        $order->data['lines'] = [['quantity' => 2]];
         foreach ([1, 2] as $attempt) {
             $this->dispatch('account', [$audience]);
             $this->dispatch('store', [$store]);
@@ -92,6 +95,21 @@ final class MailchimpCommercePersistenceTest extends TestCase
         self::assertSame(1, (int)$db->fetchOne('SELECT COUNT(*) FROM channeled_orders o
             JOIN channeled_stores s ON s.id = o.channeled_store_id
             JOIN channeled_accounts a ON a.id = s.channeled_account_id'));
+        self::assertSame(1, (int)$db->fetchOne('SELECT COUNT(*) FROM channeled_customers WHERE channeled_store_id IS NOT NULL AND channeled_account_id IS NOT NULL'));
+        $scope = ['channels' => ['mailchimp' => [
+            'account_ids' => [(int)$db->fetchOne('SELECT id FROM channeled_accounts')], 'platform_ids' => ['audience'],
+        ]]];
+        $catalog = new CatalogReadService($this->manager);
+        $listed = $catalog->list('orders', ['authorized_scope' => $scope]);
+        self::assertStringStartsWith('base:mailchimp:customers:', $listed['data'][0]['relationships']['customer']['reference']);
+        $profile = $catalog->profile('orders', $listed['data'][0]['reference'], ['authorized_scope' => $scope]);
+        self::assertSame(1, $profile['relationships']['children']['products']['total_count']);
+        self::assertSame(1, $profile['relationships']['children']['variants']['total_count']);
+        $order->lineItems = [];
+        $order->data['lines'] = [];
+        $this->dispatch('order', [$order]);
+        $profile = $catalog->profile('orders', $listed['data'][0]['reference'], ['authorized_scope' => $scope]);
+        self::assertSame(0, $profile['relationships']['children']['variants']['total_count']);
     }
 
     public function testCommerceBatchRollsBackWhenStoreAudienceIsMissing(): void
@@ -123,6 +141,17 @@ final class MailchimpCommercePersistenceTest extends TestCase
         self::assertSame(1, (int)$db->fetchOne('SELECT COUNT(*) FROM channeled_product_variants'));
         self::assertSame(1, (int)$db->fetchOne('SELECT COUNT(*) FROM channeled_customers WHERE channeled_store_id IS NOT NULL'));
         self::assertSame(1, (int)$db->fetchOne('SELECT COUNT(*) FROM channeled_products WHERE channeled_store_id IS NOT NULL'));
+        $cart = $this->record('cart-key', ['store_platform_id' => 'store-key', 'lines' => [['quantity' => 2]],
+            'customer' => ['email_address' => 'private@example.test']]);
+        $this->dispatch('cart', [$cart]);
+        $this->dispatch('cart', [$cart]);
+        $scope = ['channels' => ['mailchimp' => [
+            'account_ids' => [(int)$db->fetchOne('SELECT id FROM channeled_accounts')], 'platform_ids' => ['audience'],
+        ]]];
+        $carts = (new CatalogReadService($this->manager))->list('carts', ['authorized_scope' => $scope]);
+        self::assertSame(1, $carts['meta']['total']);
+        self::assertSame(2, $carts['data'][0]['attributes']['item_quantity']);
+        self::assertStringNotContainsString('private@example.test', json_encode($carts));
     }
 
     public function testCommerceCatalogAndCustomerProfilesEnforceAudienceScope(): void
@@ -168,6 +197,46 @@ final class MailchimpCommercePersistenceTest extends TestCase
         $routine->up($this->manager, $output);
         $routine->up($this->manager, $output);
         self::assertTrue($db->createSchemaManager()->tablesExist(['channeled_carts', 'metrics']));
+    }
+
+    public function testPromotionCodesRemainDistinctAndAmbiguousOrderCodesAreNotLinked(): void
+    {
+        $this->dispatch('account', [$this->record('audience', ['account_id' => 'source-account'])]);
+        $this->dispatch('store', [$this->record('store', [
+            'account_id' => 'source-account', 'audience_id' => 'audience', 'store_platform_id' => 'store',
+        ])]);
+        foreach (['a', 'b'] as $suffix) {
+            $rule = $this->record('rule-'.$suffix, ['store_platform_id' => 'store', 'title' => 'Rule '.$suffix,
+                'codes' => [['id' => 'same-id', 'identity' => 'code-'.$suffix, 'code' => 'SALE']]]);
+            $this->dispatch('price_rule', [$rule]);
+            $this->dispatch('price_rule', [$rule]);
+        }
+        $db = $this->manager->getConnection();
+        self::assertSame(2, (int)$db->fetchOne('SELECT COUNT(*) FROM channeled_discounts'));
+        $scope = ['mode' => 'asset_group', 'channels' => ['mailchimp' => [
+            'account_ids' => [(int)$db->fetchOne('SELECT id FROM channeled_accounts')], 'platform_ids' => ['audience'],
+        ]]];
+        $service = new CatalogReadService($this->manager);
+        $codes = $service->list('promo-codes', ['authorized_scope' => $scope, 'search' => 'SALE']);
+        self::assertSame(2, $codes['meta']['total']);
+        self::assertNotSame($codes['data'][0]['platform_id'], $codes['data'][1]['platform_id']);
+        self::assertArrayHasKey('promotion', $codes['data'][0]['relationships']);
+        $ruleId = $db->fetchOne("SELECT id FROM channeled_price_rules WHERE platform_id = 'rule-a'");
+        $profile = $service->profile('promotions', 'channeled:mailchimp:promotions:'.$ruleId, ['authorized_scope' => $scope]);
+        self::assertSame(1, $profile['relationships']['children']['promo-codes']['total_count']);
+        $order = $this->record('order', ['store_platform_id' => 'store', 'promos' => [['code' => 'SALE']]]);
+        $this->dispatch('order', [$order]);
+        self::assertSame(0, (int)$db->fetchOne('SELECT COUNT(*) FROM channeled_order_channeled_discounts'));
+        $db->executeStatement("DELETE FROM channeled_discounts WHERE code = 'code-b'");
+        $db->executeStatement("INSERT INTO channeled_discounts
+            (channel, platform_id, code, channeled_price_rule_id, data, version)
+            SELECT channel, 'legacy-source-id', 'legacy-identity', channeled_price_rule_id, data, 1
+            FROM channeled_discounts WHERE code = 'code-a'");
+        $this->dispatch('order', [$order]);
+        self::assertSame(1, (int)$db->fetchOne('SELECT COUNT(*) FROM channeled_order_channeled_discounts'));
+        $order->data['promos'] = [];
+        $this->dispatch('order', [$order]);
+        self::assertSame(0, (int)$db->fetchOne('SELECT COUNT(*) FROM channeled_order_channeled_discounts'));
     }
 }
 

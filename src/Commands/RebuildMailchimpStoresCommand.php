@@ -47,10 +47,10 @@ final class RebuildMailchimpStoresCommand extends Command
         for ($date = $first; $date <= $last; $date = $date->modify('+1 day')) {
             $day = $date->format('Y-m-d');
             $result = $engine->preAggregateDay(['store_conversions' => $rule], 'mailchimp', $day, 30);
-            $output->writeln(sprintf('%s: evaluated %d cached orders, wrote %d store metric slices.',
-                $day, $result['records_evaluated'], $result['metrics_emitted']));
+            $output->writeln(sprintf('%s: evaluated %d cached orders, excluded %d incomplete or unverified orders, wrote %d store metric slices.',
+                $day, $result['records_evaluated'], $result['records_excluded'], $result['metrics_emitted']));
         }
-        $output->writeln('Completed. Orders without a source date, store currency, or linked audience require a Mailchimp resync.');
+        $output->writeln('Completed. Orders without verified identity, source date, total, currency, or store ownership require source reconciliation.');
         return Command::SUCCESS;
     }
 }

@@ -43,7 +43,7 @@ class AgnosticPreAggregationEngine
      * @param DateTimeInterface|string $startDate
      * @param DateTimeInterface|string $endDate
      * @param int $attributionWindowDays
-     * @return array{processed_days: int, metrics_emitted: int, records_evaluated: int, rows_rolled_up: int}
+     * @return array{processed_days: int, metrics_emitted: int, records_evaluated: int, records_excluded: int, rows_rolled_up: int}
      */
     public function rollup(
         array $rules,
@@ -58,6 +58,7 @@ class AgnosticPreAggregationEngine
         $processedDays = 0;
         $metricsEmitted = 0;
         $recordsEvaluated = 0;
+        $recordsExcluded = 0;
 
         $current = clone $start;
         while ($current <= $end) {
@@ -67,8 +68,23 @@ class AgnosticPreAggregationEngine
             $processedDays++;
             $metricsEmitted += $dayResult['metrics_emitted'];
             $recordsEvaluated += $dayResult['records_evaluated'];
+            $recordsExcluded += $dayResult['records_excluded'];
 
             $current->modify('+1 day');
+        }
+
+        // Snapshot importers may revise records outside the requested event window.
+        // Include materialized dates so moving an order to another day clears its old slice.
+        foreach ($rules as $ruleName => $rule) {
+            if (empty($rule['refresh_all_source_dates']) || empty($rule['identity_dimensions'])) continue;
+            foreach ($this->identityRefreshDates($rule, $channel) as $date) {
+                if ($date >= $start->format('Y-m-d') && $date <= $end->format('Y-m-d')) continue;
+                $dayResult = $this->preAggregateDay([$ruleName => $rule], $channel, $date, $attributionWindowDays);
+                $processedDays++;
+                $metricsEmitted += $dayResult['metrics_emitted'];
+                $recordsEvaluated += $dayResult['records_evaluated'];
+                $recordsExcluded += $dayResult['records_excluded'];
+            }
         }
 
         return [
@@ -76,7 +92,33 @@ class AgnosticPreAggregationEngine
             'metrics_emitted' => $metricsEmitted,
             'records_evaluated' => $recordsEvaluated,
             'rows_rolled_up' => $recordsEvaluated,
+            'records_excluded' => $recordsExcluded,
         ];
+    }
+
+    private function identityRefreshDates(array $rule, string $channel): array
+    {
+        $table = $rule['source_entity'];
+        if (!preg_match('/^[a-z][a-z0-9_]*$/D', $table)) {
+            throw new \InvalidArgumentException('Invalid snapshot source table.');
+        }
+        $channelId = $this->resolveChannelId($channel);
+        $dates = $this->connection->fetchFirstColumn(
+            "SELECT DISTINCT DATE(platform_created_at) FROM $table WHERE channel = ? AND platform_created_at IS NOT NULL",
+            [$channelId]
+        );
+        $metricNames = array_keys($rule['metrics']);
+        $placeholders = implode(', ', array_fill(0, count($metricNames), '?'));
+        $materialized = $this->connection->fetchFirstColumn(
+            'SELECT DISTINCT m.metric_date FROM metrics m JOIN metric_configs mc ON mc.id = m.metric_config_id'
+            ." WHERE mc.channel = ? AND mc.name IN ($placeholders) AND EXISTS"
+            .' (SELECT 1 FROM dimension_set_items si JOIN dimension_values sv ON sv.id = si.dimension_value_id'
+            .' JOIN dimension_keys sk ON sk.id = sv.dimension_key_id WHERE si.dimension_set_id = mc.dimension_set_id AND sk.name = ?)',
+            [$channelId, ...$metricNames, array_key_first($rule['identity_dimensions'])]
+        );
+        $dates = array_values(array_unique(array_merge($dates, $materialized)));
+        sort($dates);
+        return $dates;
     }
 
     /**
@@ -86,7 +128,7 @@ class AgnosticPreAggregationEngine
      * @param string $channel
      * @param DateTimeInterface $startDate
      * @param DateTimeInterface $endDate
-     * @return array{processed_days: int, metrics_emitted: int, records_evaluated: int, rows_rolled_up: int}
+     * @return array{processed_days: int, metrics_emitted: int, records_evaluated: int, records_excluded: int, rows_rolled_up: int}
      * @throws Exception
      */
     public function preAggregateDateRange(
@@ -112,7 +154,7 @@ class AgnosticPreAggregationEngine
      * @param string $channel
      * @param string $dateStr
      * @param int $attributionWindowDays
-     * @return array{metrics_emitted: int, records_evaluated: int}
+     * @return array{metrics_emitted: int, records_evaluated: int, records_excluded: int}
      */
     public function preAggregateDay(
         array $rules,
@@ -122,6 +164,7 @@ class AgnosticPreAggregationEngine
     ): array {
         $metricsEmitted = 0;
         $recordsEvaluated = 0;
+        $recordsExcluded = 0;
 
         foreach ($rules as $ruleName => $ruleDef) {
             $sourceEntity = $ruleDef['source_entity'] ?? 'channeled_events';
@@ -134,6 +177,7 @@ class AgnosticPreAggregationEngine
                             ['identity-rollup:'.$channel.':'.$sourceEntity.':'.$dateStr]);
                     }
                     $records = $this->fetchAtomicRecordsForDate($sourceEntity, $channel, $dateStr, true);
+                    $fetchedCount = count($records);
                     if (!empty($ruleDef['require_source_date'])) {
                         $records = array_values(array_filter($records, static fn (array $record): bool =>
                             !empty($record['platform_created_at'])));
@@ -150,13 +194,13 @@ class AgnosticPreAggregationEngine
                         [$dateStr, $this->resolveChannelId($channel), ...$metricNames, $dimension],
                     );
 
-                    return [
-                        'metrics' => $this->persistIdentityMetrics($records, $ruleDef, $channel, $dateStr),
-                        'records' => count($records),
-                    ];
+                    $result = $this->persistIdentityMetrics($records, $ruleDef, $channel, $dateStr);
+                    return ['metrics' => $result['metrics'], 'records' => $fetchedCount,
+                        'excluded' => $fetchedCount - $result['accepted']];
                 });
                 $metricsEmitted += $day['metrics'];
                 $recordsEvaluated += $day['records'];
+                $recordsExcluded += $day['excluded'];
                 continue;
             }
 
@@ -264,6 +308,7 @@ class AgnosticPreAggregationEngine
         return [
             'metrics_emitted' => $metricsEmitted,
             'records_evaluated' => $recordsEvaluated,
+            'records_excluded' => $recordsExcluded,
         ];
     }
 
@@ -407,11 +452,21 @@ class AgnosticPreAggregationEngine
         }
     }
 
-    private function persistIdentityMetrics(array $records, array $rule, string $channel, string $date): int
+    private function persistIdentityMetrics(array $records, array $rule, string $channel, string $date): array
     {
         $partitions = [];
         $accounts = [];
+        $accepted = 0;
         foreach ($records as $record) {
+            foreach ($rule['required_fields'] ?? [] as $field) {
+                if (($record['data'][$field] ?? $record[$field] ?? null) === null) {
+                    continue 2;
+                }
+            }
+            if (isset($rule['record_identity_field']) &&
+                (string) ($record['data'][$rule['record_identity_field']] ?? '') !== (string) ($record['platform_id'] ?? '')) {
+                continue;
+            }
             $dimensions = [];
             foreach ($rule['identity_dimensions'] as $dimension => $field) {
                 $value = trim((string) ($record['data'][$field] ?? $record[$field] ?? ''));
@@ -428,22 +483,45 @@ class AgnosticPreAggregationEngine
                 $dimensions[] = ['dimensionKey' => $dimension, 'dimensionValue' => $value];
             }
 
-            $accountField = $rule['account_platform_id_field'];
-            $platformId = (string) ($record['data'][$accountField] ?? $record[$accountField] ?? '');
-            if ($platformId === '') {
+            if (isset($rule['account_relationship'])) {
+                $relationship = $rule['account_relationship'];
+                foreach (['table', 'foreign_key', 'account_column'] as $identifier) {
+                    if (!preg_match('/^[a-z][a-z0-9_]*$/D', $relationship[$identifier] ?? '')) {
+                        throw new \InvalidArgumentException('Invalid account relationship identifier.');
+                    }
+                }
+                $foreignId = $record[$relationship['foreign_key']] ?? null;
+                if (!$foreignId) {
+                    continue;
+                }
+                $cacheKey = $relationship['table'].':'.$foreignId;
+                $accounts[$cacheKey] ??= (int) $this->connection->fetchOne(
+                    'SELECT parent.'.$relationship['account_column'].' FROM '.$relationship['table'].' parent'
+                    .' JOIN channeled_accounts account ON account.id = parent.'.$relationship['account_column']
+                    .' AND account.channel = parent.channel WHERE parent.id = ? AND parent.channel = ?',
+                    [$foreignId, $this->resolveChannelId($channel)],
+                );
+                $accountId = $accounts[$cacheKey];
+            } else {
+                $accountField = $rule['account_platform_id_field'];
+                $platformId = (string) ($record['data'][$accountField] ?? $record[$accountField] ?? '');
+                if ($platformId === '') {
+                    continue;
+                }
+                $accounts[$platformId] ??= (int) $this->connection->fetchOne(
+                    'SELECT id FROM channeled_accounts WHERE channel = ? AND platform_id = ?',
+                    [$this->resolveChannelId($channel), $platformId],
+                );
+                $accountId = $accounts[$platformId];
+            }
+            if ($accountId === 0) {
                 continue;
             }
-            $accounts[$platformId] ??= (int) $this->connection->fetchOne(
-                'SELECT id FROM channeled_accounts WHERE channel = ? AND platform_id = ?',
-                [$this->resolveChannelId($channel), $platformId],
-            );
-            if ($accounts[$platformId] === 0) {
-                continue;
-            }
-            $record['channeled_account_id'] = $accounts[$platformId];
-            $key = json_encode([$accounts[$platformId], $dimensions], JSON_THROW_ON_ERROR);
+            $record['channeled_account_id'] = $accountId;
+            $key = json_encode([$accountId, $dimensions], JSON_THROW_ON_ERROR);
             $partitions[$key]['dimensions'] = $dimensions;
             $partitions[$key]['records'][] = $record;
+            $accepted++;
         }
 
         $emitted = 0;
@@ -468,7 +546,7 @@ class AgnosticPreAggregationEngine
             }
         }
 
-        return $emitted;
+        return ['metrics' => $emitted, 'accepted' => $accepted];
     }
 
     /**
