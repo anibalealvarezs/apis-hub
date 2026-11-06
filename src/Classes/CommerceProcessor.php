@@ -102,7 +102,7 @@ final class CommerceProcessor
                     'data' => json_encode($data, JSON_THROW_ON_ERROR),
                 ];
                 if ($type === 'account') {
-                    $accountName = (string)($data['account_id'] ?? '');
+                    $accountName = (string)($record->account_id ?? $data['account_id'] ?? '');
                     if ($accountName === '') throw new RuntimeException('Account identity is required.');
                     if ($connection->getDatabasePlatform() instanceof \Doctrine\DBAL\Platforms\PostgreSQLPlatform) {
                         $connection->executeQuery('SELECT pg_advisory_xact_lock(hashtext(?))', ['commerce-account:'.$accountName]);

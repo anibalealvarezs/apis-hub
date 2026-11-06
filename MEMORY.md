@@ -2,6 +2,8 @@
 
 ## Mailchimp commerce expansion (2026-11-06)
 
+- Launch acceptance follow-up: automatic/forced upgrade replay is explicitly out of scope. Validate normal fresh-project entity jobs instead. Audience ownership comes from the normalized `account_id` property, with raw fallback. The driver must declare and dispatch `entity=entities` jobs before order dependencies. SQLite end-to-end fixtures now use actual converters and foreign keys, plus a 20,000-order replay check. `tests/bootstrap-mailchimp-commerce.php` permits an explicit `MAILCHIMP_TEST_DRIVER_SOURCE` checkout for coordinated local tests without Composer/vendor changes. Live Mailchimp and PostgreSQL remain unverified at the operator's local-only request.
+
 - `CommerceProcessor` owns generic normalized commerce dispatch and transactions. Orders resolve promotions only when code text has a unique match within the verified store. Supplied source line/promo collections replace their prior pivots. Cart snapshots are optional.
 - Identity rollup metadata supports `record_identity_field`, `required_fields`, persisted `account_relationship` and `refresh_all_source_dates`. The last option includes cached source dates and prior materialized dates so moving an old order clears its old daily slice. Identity materialization failure propagates to sync retry. Rebuild output reports exclusions.
 - Commerce Catalog reads are scoped through store-to-audience foreign keys. Source-specific promo codes are distinct by store/rule/code identity. Customer Catalog source memberships require an authorized audience before search, count or profile hydration.

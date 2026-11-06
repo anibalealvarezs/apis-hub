@@ -8,7 +8,10 @@ The tenant consumes those declarations using the existing dimension tables.
 
 ## Commerce expansion contract (2026-11-06)
 
+Launch acceptance targets brand-new projects. Automatic or forced upgrade resyncs are explicitly excluded from this launch scope. The historical repair instructions below remain optional operator tools for old data.
+
 - Source SDK 1.1.0 and driver 1.1.3 contain the initial expansion. Further feature-branch changes must be released and installed before the stricter rules below take effect. Do not reuse an existing release tag.
+- The acceptance follow-up also requires the driver's scheduled `entities_sync: entities` rule and `sync(entity=entities)` dispatch. Fresh projects run that entity job before dependent order jobs using the normal instance generator. Audience persistence reads normalized provider account ownership as well as the legacy raw field. Installing only the earlier driver will not populate the complete graph through normal scheduling.
 - The worker's 1.20.0 additive upgrade introduces store-to-audience and commerce source relationships plus cart storage. Run the normal tenant upgrade before entity synchronization. The upgrade can be repeated and retains existing metrics.
 - Store identity is the SHA-256 hash of JSON `[providerAccount, sourceStore, "store"]`. Order identity is the hash of JSON `[providerAccount, sourceStore, sourceOrder]`. Raw source IDs remain in payloads. Promo-code identities also include the parent rule and source code ID.
 - Catalog lists and profiles are gated by physical schema capability and scoped through the persisted store/audience relationship. Variants belong to products, codes belong to promotions, and orders link to verified customers. Order profiles list related products, variants and uniquely matched promo codes. Connected Stores resolves names, domains and Catalog links in bounded metadata batches.
@@ -59,7 +62,8 @@ The new rule also requires the persisted store foreign key, scoped order identit
 and known total. Legacy snapshots failing those checks need source replay.
 
 The upgrade does not automatically schedule a historical source job or delete old
-ambiguous identities. Explicitly enqueue entity sync followed by the required
+ambiguous identities. This is accepted for launch, not an unfinished requirement.
+When repairing old data explicitly, enqueue entity sync followed by the required
 historical order sync using the normal tenant job lifecycle, then rebuild the
 range above. Historical collisions require source data and cannot be recovered
 from aggregate values. Automatic retirement is deferred until a canary verifies
@@ -80,6 +84,23 @@ deployment environment. No production replay is performed by these tests.
 
 ## Acceptance evidence and remaining release gates
 
+Local acceptance completed in the 2026-11-06 follow-up:
+
+- Installed source SDK plus the current driver checkout run against a new Doctrine schema with SQLite foreign keys enabled. Actual source converters, the driver's entity/metric dispatch and worker processors populate two stores with overlapping provider IDs, products, variants, customers, promotions, codes, carts and orders. Disabled audiences are excluded. Repeated syncs preserve row counts and older date/amount edits replace the correct daily aggregates.
+- A 20,000-order synthetic cache rebuild runs twice without duplicating configurations or observations. It verifies exact order counts and EUR totals. The focused suite including Catalog and instance generation passed 24 tests / 334 assertions at this volume. This is local SQLite scale evidence, not PostgreSQL production sizing.
+- Browser fixtures render the real Livewire/Blade Preview, store list and store profile at 1440px and 390px, in light and dark mode. All four browser scenarios pass. They exercise Alpine requests, currency filtering, Catalog links, related order links and screen-width containment. Synthetic tenant API responses are used. Screenshots are saved under Facade `test-results/`.
+- The checks fixed audience ownership, scheduled entity dispatch, mobile Preview control wrapping and profile ID wrapping. Commerce profiles point to Connected Stores instead of claiming a missing daily-performance window.
+
+To validate a coordinated unreleased driver without changing Composer or vendor files:
+
+```powershell
+$env:MAILCHIMP_TEST_DRIVER_SOURCE = 'D:\laragon\www\mailchimp-hub-driver'
+$env:MAILCHIMP_VOLUME_ORDERS = '20000'
+php vendor/bin/phpunit --bootstrap tests/bootstrap-mailchimp-commerce.php --filter='MailchimpCommercePersistenceTest|CatalogReadServiceTest|MailchimpStoreRollupTest|InstanceGeneratorServiceTest|InstanceGeneratorCacheAllTest'
+```
+
+After installing the released driver, the source override is unnecessary. The fresh-project test explicitly rejects a driver lacking scheduled entity sync. The local source override is a test bootstrap only and does not change production dependency resolution.
+
 Local checks cover source paging/cancellation, driver callback types and audience
 selection, converter graph identities, repeated entity writes, store ownership,
 customer audience isolation, promotion ambiguity/removal, mixed currency,
@@ -89,9 +110,9 @@ failures in `SocialOrganicStrategyTest` sentinel-account telemetry expectations.
 Those tests do not execute store materialization. Record their baseline separately
 before treating the full regression suite as green.
 
-Before broad release, run PostgreSQL concurrency and production-volume checks,
-an authenticated Mailchimp canary, historical replay reconciliation, and desktop,
-mobile, light/dark visual review. Provider history, optional fields, access errors,
+The operator requested local validation only. PostgreSQL concurrency/production-volume
+checks and an authenticated Mailchimp canary remain unverified deployment checks.
+Desktop/mobile and light/dark checks are completed above. Provider history, optional fields, access errors,
 rate-limit behavior and source deletion completeness are not established by local
 fixtures. General entity measures, product/cart/promotion performance, accounting
 net revenue, refunds, campaign attribution and FX conversion remain separate work.

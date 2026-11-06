@@ -2,11 +2,15 @@
 
 ## Objective and current state
 
+Launch scope decision (2026-11-06): forced or automatically scheduled historical resyncs for upgrading projects are out of scope at the operator's request. Acceptance focuses on new projects and their ordinary entity/order synchronization. Existing history can still be repaired explicitly with the documented rebuild command. PostgreSQL and authenticated provider checks are deferred by the operator's local-validation-only instruction.
+
 Make Mailchimp's connected stores and their related ecommerce entities usable throughout APIs Hub, from synchronization through aggregation, Data Preview, the Catalog, and custom widgets. Email engagement and ecommerce orders have different sources and grains. Maintain a complete, versioned channel metrics catalog as each capability is delivered.
 
 Implementation status, 2026-11-06: `feature-mailchimp-expansion` includes the existing store rollup and Connected Stores work, the source SDK expansion, normalized commerce persistence, additive schema upgrade, and audience-scoped Catalog reads. Store discovery persists `ChanneledStore`, and order persistence resolves its store foreign key. Stores, orders, products, variants, promotions, promo codes and optional carts are queryable as source records. Customers reuse the existing canonical customer Catalog with audience-scoped source records.
 
 Further integration on the feature branch adds verified store ownership to rollups, incomplete-order exclusions, historical snapshot refresh, unambiguous promotion matching, relationship replacement on order updates, and Connected Stores names/domain/profile links. See [rollout and acceptance evidence](mailchimp-store-rollout.md) and the driver's `docs/surface-manifest.md` for the implemented contracts and remaining gates. This status does not establish production deployment or authenticated provider coverage.
+
+Local acceptance follow-up (2026-11-06): real converter-to-processor testing identified and fixed normalized audience account ownership. The driver now declares `entities_sync: entities` and dispatches those jobs to its entity importer so normal new-project scheduling can populate the commerce graph. Repeated imports, historical edits and a 20,000-order cached rebuild pass locally. Real Blade/Alpine browser fixtures cover Preview, store lists and profiles at desktop/mobile widths in both themes, including profile links and currency requests. This follow-up must be released in the driver before installing the coordinated worker changes.
 
 Mailchimp places customers, products, carts, orders, and promo rules under a store. Product variants, order and cart lines, and promo codes belong to those parent entities. Each store has an associated audience, and an audience may have several stores. Availability depends on the connected store and the data it provides. [Mailchimp ecommerce model](https://mailchimp.com/developer/marketing/concepts/e-commerce/)
 

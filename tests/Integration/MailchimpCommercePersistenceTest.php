@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace Tests\Integration;
 
 use Anibalealvarezs\ApiDriverCore\Classes\UniversalEntity;
+use Anibalealvarezs\MailchimpHubDriver\Auth\MailchimpAuthProvider;
+use Anibalealvarezs\MailchimpHubDriver\Drivers\MailchimpDriver;
+use Anibalealvarezs\MailchimpApi\Services\Marketing\MarketingApi;
 use Classes\CommerceProcessor;
 use Classes\OrderProcessor;
 use Core\Services\SyncService;
@@ -16,6 +19,7 @@ use Doctrine\ORM\Tools\SchemaTool;
 use Helpers\Helpers;
 use PHPUnit\Framework\TestCase;
 use Services\Catalog\CatalogReadService;
+use Services\Aggregation\AgnosticPreAggregationEngine;
 
 final class MailchimpCommercePersistenceTest extends TestCase
 {
@@ -66,6 +70,84 @@ final class MailchimpCommercePersistenceTest extends TestCase
             }
         };
         $service->persist($type, new ArrayCollection($records), $this->manager);
+    }
+
+    public function testFreshProjectImportsTheCommerceGraphAndRebuildsHistoricalEditsWithoutAForcedResync(): void
+    {
+        self::assertSame('entities', MailchimpDriver::getInstanceRules()['entities_sync'],
+            'Install the driver with scheduled commerce entities, or use tests/bootstrap-mailchimp-commerce.php with MAILCHIMP_TEST_DRIVER_SOURCE.');
+        $db = $this->manager->getConnection();
+        $db->insert('providers', ['id' => 1, 'name' => 'mailchimp', 'label' => 'Mailchimp', 'version' => 1]);
+        $db->executeStatement('PRAGMA foreign_keys = ON');
+        $auth = $this->createMock(MailchimpAuthProvider::class);
+        $auth->method('getAccounts')->willReturn(['fixture-account' => ['is_valid' => true]]);
+        $api = $this->createMock(MarketingApi::class);
+        $api->method('getAllListsInfoAndProcess')->willReturnCallback(static function (callable $callback): void {
+            $callback([['id' => 'audience', 'name' => 'Audience']]);
+        });
+        $api->method('getAllEcommerceStoresAndProcess')->willReturnCallback(static function (callable $callback): void {
+            $callback([
+                ['id' => 'store-a', 'name' => 'Store A', 'list_id' => 'audience', 'currency_code' => 'EUR'],
+                ['id' => 'store-b', 'name' => 'Store B', 'list_id' => 'audience', 'currency_code' => 'EUR'],
+                ['id' => 'hidden-store', 'list_id' => 'disabled-audience'],
+            ]);
+        });
+        $api->method('getAllEcommerceProductsAndProcess')->willReturnCallback(static function (string $store, callable $callback): void {
+            $callback([['id' => 'product', 'title' => 'Product']]);
+        });
+        $api->method('getAllEcommerceProductVariantsAndProcess')->willReturnCallback(static function (string $store, string $product, callable $callback): void {
+            $callback([['id' => 'variant', 'sku' => 'SKU']]);
+        });
+        $api->method('getAllEcommerceCustomersAndProcess')->willReturnCallback(static function (string $store, callable $callback): void {
+            $callback([['id' => 'customer', 'email_address' => 'buyer@example.test']]);
+        });
+        $api->method('getAllEcommercePromoRulesAndProcess')->willReturnCallback(static function (string $store, callable $callback): void {
+            $callback([['id' => 'rule', 'title' => 'Promotion']]);
+        });
+        $api->method('getAllEcommercePromoCodesAndProcess')->willReturnCallback(static function (string $store, string $rule, callable $callback): void {
+            $callback([['id' => 'code', 'code' => 'SALE']]);
+        });
+        $api->method('getAllEcommerceCartsAndProcess')->willReturnCallback(static function (string $store, callable $callback): void {
+            $callback([['id' => 'cart', 'lines' => [['product_id' => 'product', 'quantity' => 1]]]]);
+        });
+        $revision = 0;
+        $api->method('getAllCampaigns')->willReturn(['campaigns' => []]);
+        $api->method('getAllAutomations')->willReturn(['automations' => []]);
+        $api->method('getAllEcommerceOrdersAndProcess')->willReturnCallback(static function (string $store, callable $callback) use (&$revision): void {
+            $callback([[
+                'id' => 'same-order', 'processed_at_foreign' => $store === 'store-a' && $revision ? '2026-10-01T12:00:00Z' : '2026-11-01T12:00:00Z',
+                'order_total' => $store === 'store-a' ? ($revision ? 15 : 12.5) : 7.5,
+                'customer' => ['id' => 'customer', 'email_address' => 'buyer@example.test'],
+                'lines' => [['product_id' => 'product', 'product_variant_id' => 'variant', 'quantity' => 1]],
+                'promos' => [['code' => 'SALE']],
+            ]]);
+        });
+        $driver = $this->getMockBuilder(MailchimpDriver::class)->setConstructorArgs([$auth])->onlyMethods(['getApi'])->getMock();
+        $driver->method('getApi')->willReturn($api);
+        $driver->setDataProcessor(function (ArrayCollection $records, string $type): void {
+            $this->dispatch($type, $records->toArray());
+        });
+        $config = ['audiences' => [['id' => 'audience', 'enabled' => true]], 'sync_carts' => true];
+        $rule = MailchimpDriver::getPreAggregationRules()['store_conversions'];
+        self::assertTrue($rule['refresh_all_source_dates'], 'Install the commerce expansion driver before releasing the worker.');
+        $engine = new AgnosticPreAggregationEngine($db);
+        foreach ([0, 0, 1] as $revision) {
+            $driver->sync(new \DateTime('2026-11-01'), new \DateTime('2026-11-02'),
+                $config + ['entity' => 'entities'], static fn (): bool => true);
+            $driver->sync(new \DateTime('2026-11-01'), new \DateTime('2026-11-02'), $config, static fn (): bool => true);
+            $engine->rollup(['store_conversions' => $rule], 'mailchimp', '2026-11-01', '2026-11-02');
+        }
+        foreach (['channeled_stores', 'channeled_products', 'channeled_product_variants', 'channeled_customers',
+            'channeled_price_rules', 'channeled_discounts', 'channeled_carts', 'channeled_orders',
+            'channeled_order_channeled_products', 'channeled_order_channeled_product_variants', 'channeled_order_channeled_discounts'] as $table) {
+            self::assertSame(2, (int)$db->fetchOne('SELECT COUNT(*) FROM '.$table), $table);
+        }
+        self::assertEquals(22.5, $db->fetchOne("SELECT SUM(m.value) FROM metrics m JOIN metric_configs mc ON mc.id=m.metric_config_id WHERE mc.name='revenue'"));
+        self::assertEquals(7.5, $db->fetchOne("SELECT SUM(m.value) FROM metrics m JOIN metric_configs mc ON mc.id=m.metric_config_id WHERE mc.name='revenue' AND m.metric_date='2026-11-01'"));
+        self::assertEquals(2, $db->fetchOne("SELECT SUM(m.value) FROM metrics m JOIN metric_configs mc ON mc.id=m.metric_config_id WHERE mc.name='orders_count'"));
+        self::assertCount(2, (new CatalogReadService($this->manager))->list('stores', ['authorized_scope' => [
+            'channels' => ['mailchimp' => ['account_ids' => [(int)$db->fetchOne('SELECT id FROM channeled_accounts')], 'platform_ids' => ['audience']]],
+        ]])['data']);
     }
 
     public function testStoreAndOrderDispatchPreservesRelationshipsAcrossRepeatedSyncs(): void
@@ -119,6 +201,35 @@ final class MailchimpCommercePersistenceTest extends TestCase
             $this->dispatch('store', [$this->record('missing-store', ['account_id' => 'source', 'audience_id' => 'missing'])]);
         } finally {
             self::assertSame(0, (int)$this->manager->getConnection()->fetchOne('SELECT COUNT(*) FROM stores'));
+        }
+    }
+
+    public function testCachedOrderVolumeRebuildKeepsCountsAndRevenueStable(): void
+    {
+        $db = $this->manager->getConnection();
+        $count = max(2000, min(100000, (int)(getenv('MAILCHIMP_VOLUME_ORDERS') ?: 2000)));
+        $this->dispatch('account', [$this->record('audience', ['account_id' => 'fixture-account'])]);
+        $this->dispatch('store', [$this->record('store-key', [
+            'account_id' => 'fixture-account', 'audience_id' => 'audience', 'store_platform_id' => 'store-key',
+        ])]);
+        $db->executeStatement("WITH RECURSIVE ids(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM ids WHERE i < CAST(? AS INTEGER))
+            INSERT INTO orders (order_id, version) SELECT 'order-' || i, 1 FROM ids", [$count]);
+        $db->executeStatement("INSERT INTO channeled_orders
+            (order_id, channel, platform_id, channeled_store_id, platform_created_at, data, version)
+            SELECT id, 1, order_id, (SELECT id FROM channeled_stores LIMIT 1), '2026-11-01 12:00:00',
+                json_object('store_order_key', order_id, 'store_platform_id', 'store-key', 'store_id', 'source-store',
+                    'currency', 'EUR', 'total_amount', 1.25), 1 FROM orders");
+        $rule = MailchimpDriver::getPreAggregationRules()['store_conversions'];
+        $engine = new AgnosticPreAggregationEngine($db);
+        foreach ([1, 2] as $attempt) {
+            $result = $engine->preAggregateDay(['store_conversions' => $rule], 'mailchimp', '2026-11-01', 30);
+            self::assertSame($count, $result['records_evaluated']);
+            self::assertSame(0, $result['records_excluded']);
+            self::assertSame(2, $result['metrics_emitted']);
+            self::assertSame(2, (int)$db->fetchOne('SELECT COUNT(*) FROM metric_configs'));
+            self::assertSame(2, (int)$db->fetchOne('SELECT COUNT(*) FROM metrics'));
+            self::assertEquals($count * 1.25, $db->fetchOne("SELECT m.value FROM metrics m JOIN metric_configs mc ON mc.id=m.metric_config_id WHERE mc.name='revenue'"));
+            self::assertEquals($count, $db->fetchOne("SELECT m.value FROM metrics m JOIN metric_configs mc ON mc.id=m.metric_config_id WHERE mc.name='orders_count'"));
         }
     }
 
