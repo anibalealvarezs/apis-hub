@@ -45,6 +45,9 @@ class Upgrade_v1_19_0_to_v1_20_0 implements UpgradeRoutineInterface
             foreach ($source->getColumns() as $column) {
                 $options = $column->toArray();
                 unset($options['name'], $options['type']);
+                // Column::toArray() may expose keys (e.g. ORM "version") that Table::addColumn() rejects.
+                $options = array_filter($options, fn ($key) => method_exists($column, 'set'.ucfirst((string) $key)),
+                    ARRAY_FILTER_USE_KEY);
                 $table->addColumn($column->getName(), Type::lookupName($column->getType()), $options);
             }
             foreach ($source->getIndexes() as $index) {
