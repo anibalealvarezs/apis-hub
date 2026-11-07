@@ -328,6 +328,28 @@
 
         // --- Catalog Read API (Phase 1) ---
 
+        '/api/catalog/aggregate/capabilities' => [
+            'httpMethod' => 'POST',
+            'callable'   => function (...$args) {
+                $request = $args['request'] ?? Request::createFromGlobals();
+
+                return (new \Controllers\CatalogController())->aggregateCapabilities($request);
+            },
+            'public'     => false,
+            'html'       => false,
+            'admin'      => false
+        ],
+        '/api/catalog/aggregate'              => [
+            'httpMethod' => 'POST',
+            'callable'   => function (...$args) {
+                $request = $args['request'] ?? Request::createFromGlobals();
+
+                return (new \Controllers\CatalogController())->aggregate($request);
+            },
+            'public'     => false,
+            'html'       => false,
+            'admin'      => false
+        ],
         '/api/catalog/capabilities'           => [
             'httpMethod' => 'POST',
             'callable'   => function (...$args) {
