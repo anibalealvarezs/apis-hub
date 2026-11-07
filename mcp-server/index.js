@@ -254,14 +254,14 @@ const USER_TOOLS = [
   {
     name: "get_mcp_guide",
     description:
-      "Comprehensive interaction guide and usage specifications for AI agents connecting to this APIs Hub MCP node. Explains data discovery, filtering by connected assets, temporal/dimensional breakdowns, data scopes, error prevention, and copy-paste ready query patterns.",
+      "Comprehensive interaction guide and usage specifications for AI agents connecting to this APIs Hub MCP node. Explains data discovery, filtering by connected assets, temporal/dimensional breakdowns, data scopes, entity measures aggregation, custom dashboard widget authoring, error prevention, and copy-paste ready query patterns.",
     inputSchema: {
       type: "object",
       properties: {
         topic: {
           type: "string",
           description:
-            "Optional: Specific guide topic ('overview', 'workflow', 'assets', 'datascopes', 'scopes', 'filters', 'breakdowns', 'formulas', 'examples')",
+            "Optional: Specific guide topic ('overview', 'workflow', 'assets', 'datascopes', 'scopes', 'filters', 'breakdowns', 'formulas', 'entity_measures', 'kpi_calculation', 'derived_metrics', 'dashboards', 'benchmarks', 'temporal_comparison', 'funnel_decomposition', 'examples')",
           enum: [
             "overview",
             "workflow",
@@ -271,6 +271,7 @@ const USER_TOOLS = [
             "filters",
             "breakdowns",
             "formulas",
+            "entity_measures",
             "kpi_calculation",
             "derived_metrics",
             "dashboards",
@@ -301,14 +302,14 @@ const USER_TOOLS = [
   {
     name: "get_analytics_catalog",
     description:
-      "Introspect and discover the full analytics capabilities of APIs Hub. Returns data scopes (scope_global, scope_channel, scope_asset), supported channels and tags, canonical metrics, formula-based derived metrics, allowed temporal/non-temporal breakdowns, and the platform-wide reference library of predefined KPIs and Derived Metrics. Use these reference formulas and AST templates as blueprints to query constituent metrics via 'summarize_performance' and evaluate composite KPIs.",
+      "Introspect and discover the full analytics capabilities of APIs Hub, including the exact current audited version of the metrics catalog for each channel ('catalog_versions' and 'channel_metrics_catalog' with contract_version, query_contract_version, minimum_release, audited_at, per-metric reducers, units, additivity, scopes, UI dependencies, dimensions, and caveats), data scopes (scope_global, scope_channel, scope_asset), supported channels and tags, canonical metrics, formula-based derived metrics, entity_measures (10 cached entity types with Two-Stage measures, dimensions, canonical deduplication, and multi-currency rules), allowed temporal/non-temporal breakdowns, and the platform-wide reference library of predefined KPIs and Derived Metrics.",
     inputSchema: {
       type: "object",
       properties: {
         section: {
           type: "string",
-          description: "Optional: Specific catalog section to inspect ('reference_library', 'predefined_kpis', 'predefined_derived_metrics', 'benchmarks', 'data_scopes', 'canonical_metrics', 'derived_formulas')",
-          enum: ["reference_library", "predefined_kpis", "predefined_derived_metrics", "benchmarks", "data_scopes", "canonical_metrics", "derived_formulas"]
+          description: "Optional: Specific catalog section to inspect ('catalog_versions', 'channel_metrics_catalog', 'reference_library', 'predefined_kpis', 'predefined_derived_metrics', 'entity_measures', 'benchmarks', 'data_scopes', 'canonical_metrics', 'derived_formulas')",
+          enum: ["catalog_versions", "channel_metrics_catalog", "reference_library", "predefined_kpis", "predefined_derived_metrics", "entity_measures", "benchmarks", "data_scopes", "canonical_metrics", "derived_formulas"]
         },
         scope: {
           type: "string",
@@ -317,7 +318,7 @@ const USER_TOOLS = [
         },
         channel: {
           type: "string",
-          description: "Optional: Channel identifier to inspect specific capabilities (e.g. 'facebook_marketing', 'google_search_console', 'shopify', 'klaviyo', 'amazon', 'tiktok')"
+          description: "Optional: Channel identifier to inspect its exact versioned metrics catalog, contract_version, scopes, dimensions, and caveats (e.g. 'google_search_console', 'google_analytics', 'google_ads', 'facebook_marketing', 'facebook_organic', 'mailchimp', 'shopify', 'klaviyo')"
         }
       }
     }
@@ -405,6 +406,60 @@ const USER_TOOLS = [
     },
   },
   {
+    name: "aggregate_entities",
+    description:
+      "Execute Two-Stage dynamic Entity Measures aggregation over cached entity tables ('orders', 'customers', 'stores', 'products', 'discounts', 'campaigns', 'ad-groups', 'ads', 'posts', 'events'). Computes order counts, canonical deduplicated orders, revenue, AOV, customer LTV, repeat buyer rate, pre-purchase touches, discount usage, and campaign budgets with dimensional breakdowns, time buckets, and multi-currency safety guards. Matches custom dashboard 'entity_measure' widgets.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        entity_type: {
+          type: "string",
+          description: "Target entity family to aggregate ('orders', 'customers', 'stores', 'products', 'discounts' / 'promotions' / 'promo-codes', 'campaigns', 'ad-groups' / 'ad-sets', 'ads', 'posts', 'events')",
+          enum: ["orders", "customers", "stores", "products", "discounts", "promotions", "promo-codes", "campaigns", "ad-groups", "ad-sets", "ads", "posts", "events"]
+        },
+        measures: {
+          type: "array",
+          items: { type: "string" },
+          description: "Measures to compute (e.g. for 'orders': ['order_count', 'canonical_order_count', 'unique_customers', 'revenue', 'subtotal', 'total_tax', 'total_discount', 'aov']; for 'customers': ['customer_count', 'canonical_customer_count', 'customer_ltv', 'avg_revenue_per_customer', 'repeat_customer_count', 'high_frequency_customer_count', 'repeat_buyer_rate', 'repeat_frequency', 'pre_purchase_touches'])"
+        },
+        dimensions: {
+          type: "array",
+          items: { type: "string" },
+          description: "Optional dimensions to group by (e.g. ['channel'], ['store'], ['currency'], ['financial_status'], ['status'], ['vendor'], ['code'])"
+        },
+        time_bucket: {
+          type: "string",
+          description: "Optional temporal bucket for time-series trends ('day', 'week', 'month', 'year'). Omit for scalar summary or dimensional table.",
+          enum: ["day", "week", "month", "year"]
+        },
+        channel: {
+          type: "string",
+          description: "Optional channel filter (e.g. 'shopify', 'mailchimp', 'klaviyo', 'facebook_marketing', 'google_ads')"
+        },
+        account_ids: {
+          type: "array",
+          items: { type: "number" },
+          description: "Optional array of connected asset/account integer IDs from list_connected_assets"
+        },
+        deduplicate_canonical: {
+          type: "boolean",
+          description: "When true (default for cross-channel queries without 'channel' dimension), collapses multi-channel references to the same canonical order into a single deduplicated record before summing revenue or computing AOV.",
+          default: true
+        },
+        filters: {
+          type: "object",
+          description: "Optional filter criteria (e.g. { date_from: '2026-10-01', date_to: '2026-10-31', currency: 'USD', store_id: 1, customer_id: 15, search: 'VIP' })"
+        },
+        limit: {
+          type: "number",
+          description: "Maximum rows to return (default 100, max 1000)",
+          default: 100
+        }
+      },
+      required: ["entity_type", "measures"]
+    }
+  },
+  {
     name: "check_coverage",
     description:
       "Analyze data gap coverage for a specific channel (e.g. facebook_marketing, google_search_console)",
@@ -437,7 +492,7 @@ const USER_TOOLS = [
   {
     name: "get_dashboard_authoring_context",
     description:
-      "Get project authoring context, active connected channels, available asset groups, and current dashboard/widget billing quotas before creating or modifying a dashboard.",
+      "Get project authoring context, active connected channels, available asset groups, supported widget/source types (including 'entity_measure' capabilities for orders, customers, stores, products, discounts, campaigns, ad-groups, ads, posts, events), the exact current per-channel metrics catalog and contract versions ('catalog_versions' and 'channel_metrics_catalog'), and current dashboard/widget billing quotas before creating or modifying a dashboard.",
     inputSchema: {
       type: "object",
       properties: {}
@@ -461,7 +516,7 @@ const USER_TOOLS = [
   {
     name: "create_dashboard_draft",
     description:
-      "Create a staged dashboard draft session with full validation of widget limits, quotas, and criteria (audience, account mode). Returns draft_token and preview_url for user review.",
+      "Create a staged dashboard draft session with full validation of widget limits, quotas, and criteria (audience, account mode). Supports 'metric', 'kpi', 'derived_metric', 'entity', and 'entity_measure' widgets (plus multi-series charts blending 'entity_measure' and 'metric' series via source_config.raw_series). Returns draft_token and preview_url for user review.",
     inputSchema: {
       type: "object",
       properties: {
@@ -502,14 +557,36 @@ const USER_TOOLS = [
               description: { type: "string" },
               widget_type: {
                 type: "string",
-                enum: ["tile", "line_chart", "bar_chart", "table", "gauge", "sparkline", "anomaly_list"]
+                enum: [
+                  "tile",
+                  "advanced_tile",
+                  "metric_breakdown",
+                  "stacked_area",
+                  "line_chart",
+                  "bar_chart",
+                  "table",
+                  "gauge",
+                  "sparkline",
+                  "anomaly_list",
+                  "pie_chart",
+                  "combo_chart",
+                  "anomaly_chart",
+                  "scatter_plot"
+                ]
               },
               source_type: {
                 type: "string",
-                enum: ["kpi", "metric", "entity", "derived_metric"]
+                description: "Data source type: 'metric' (standard OLAP metrics or multi-series raw_series), 'entity_measure' (Two-Stage entity aggregations over orders, customers, stores, products, discounts, campaigns, ad-groups, ads, posts, events), 'kpi' (statistical KPI), 'derived_metric' (AST formula), or 'entity'",
+                enum: ["kpi", "metric", "entity", "entity_measure", "derived_metric"]
               },
-              source_config: { type: "object" },
-              controls: { type: "object" },
+              source_config: {
+                type: "object",
+                description: "Source configuration. For source_type='entity_measure': { entity_type: 'orders'|'customers'|'stores'|'products'|'discounts'|'campaigns'|'ad-groups'|'ads'|'posts'|'events', measures: ['aov', 'revenue', ...], dimensions?: ['channel', 'store', ...], channel?: 'shopify'|'mailchimp'|..., deduplicate_canonical?: true, granularity?: 'daily'|'weekly'|'monthly'|'lifetime', filters?: { currency?: 'USD', ... } }. For multi-series blending (source_type='metric'): { raw_series: [{ type: 'entity_measure', entity_type: 'orders', measures: ['revenue'], deduplicate_canonical: true, label: 'Orders Revenue' }, { type: 'metric', channel: 'facebook_marketing', metrics: ['spend'], label: 'Ad Spend' }] }."
+              },
+              controls: {
+                type: "object",
+                description: "Optional runtime/display controls (e.g. granularity, date_start, date_end, filters, pie_style, color)"
+              },
               grid_x: { type: "number" },
               grid_y: { type: "number" },
               grid_w: { type: "number" },
@@ -527,7 +604,7 @@ const USER_TOOLS = [
   {
     name: "update_dashboard_draft",
     description:
-      "Iteratively update staged widgets, layout, or metadata in an active draft session based on user feedback before committing.",
+      "Iteratively update staged widgets, layout, or metadata in an active draft session based on user feedback before committing. Supports 'metric', 'kpi', 'derived_metric', 'entity', and 'entity_measure' widgets.",
     inputSchema: {
       type: "object",
       properties: {
@@ -556,13 +633,32 @@ const USER_TOOLS = [
               description: { type: "string" },
               widget_type: {
                 type: "string",
-                enum: ["tile", "line_chart", "bar_chart", "table", "gauge", "sparkline", "anomaly_list"]
+                enum: [
+                  "tile",
+                  "advanced_tile",
+                  "metric_breakdown",
+                  "stacked_area",
+                  "line_chart",
+                  "bar_chart",
+                  "table",
+                  "gauge",
+                  "sparkline",
+                  "anomaly_list",
+                  "pie_chart",
+                  "combo_chart",
+                  "anomaly_chart",
+                  "scatter_plot"
+                ]
               },
               source_type: {
                 type: "string",
-                enum: ["kpi", "metric", "entity", "derived_metric"]
+                description: "Data source type: 'metric', 'entity_measure', 'kpi', 'derived_metric', or 'entity'",
+                enum: ["kpi", "metric", "entity", "entity_measure", "derived_metric"]
               },
-              source_config: { type: "object" },
+              source_config: {
+                type: "object",
+                description: "Source configuration (for 'entity_measure': { entity_type, measures, dimensions, channel, deduplicate_canonical, granularity, filters }; for multi-series: { raw_series: [...] })"
+              },
               controls: { type: "object" },
               grid_x: { type: "number" },
               grid_y: { type: "number" },
@@ -826,9 +922,18 @@ function createMcpServer(role = "admin", userContext = null) {
             "1. Three-Tier Analytics Hierarchy: Always choose the appropriate data scope ('global', 'channel', or 'asset').",
             "2. Read-Only Safety: All analytics tools are non-destructive and optimized with in-memory deterministic caching.",
             "3. Asset Discovery First: Never guess asset IDs. Call 'list_connected_assets' to discover the exact IDs and channels available.",
-            "4. Formula Normalization: Metrics (spend, clicks, impressions, ctr, cpc, cpm, roas, position, sessions) are computed uniformly across Meta, Google, Shopify, Klaviyo, Amazon, and TikTok."
+            "4. Formula Normalization & Audited Channel Contracts: Metrics are governed by versioned per-channel contracts ('contract_version: 1', 'audited_at: 2026-10-30', GSC 'minimum_release: 1.18.3', GA4 'query_contract_version: 1'). Call 'get_analytics_catalog' with section='catalog_versions', section='channel_metrics_catalog', or channel='<channel>' to inspect exact metric definitions, reducers, units, additivity ('is_additive'), scopes, dimensions, and caveats.",
+            "5. Dual-Engine Analytics (Channeled Metrics + Entity Measures): In addition to pre-aggregated channel metrics via 'summarize_performance', APIs Hub provides Two-Stage dynamic Entity Measures via 'aggregate_entities' over 10 cached entity tables ('orders', 'customers', 'stores', 'products', 'discounts', 'campaigns', 'ad-groups', 'ads', 'posts', 'events'), which can also be added directly to Custom Dashboard widgets."
           ],
-          available_topics: ["overview", "workflow", "assets", "filters", "scopes", "breakdowns", "formulas", "kpi_calculation", "derived_metrics", "dashboards", "benchmarks", "temporal_comparison", "funnel_decomposition", "examples"]
+          catalog_versions_summary: {
+            google_search_console: { contract_version: 1, minimum_release: "1.18.3", audited_at: "2026-10-30", search_types: ["web", "image", "video", "news", "discover", "googleNews"], scopes: ["non-searchAppearance", "searchAppearance"] },
+            google_analytics: { contract_version: 1, query_contract_version: 1, audited_at: "2026-10-30", scopes: ["account", "traffic_matrix", "event_matrix", "acquisition_matrix", "ad_touchpoint_matrix", "engagement_matrix", "ecommerce_matrix", "product_matrix"] },
+            google_ads: { contract_version: 1, audited_at: "2026-10-30", scopes: ["account", "campaign", "ad_group", "ad", "query"], ui_dependencies: ["campaign_level", "adgroup_level", "ad_level", "device_level", "search_term_level"] },
+            facebook_marketing: { contract_version: 1, audited_at: "2026-10-30", scopes: ["account_level", "campaign_level", "adset_level", "ad_level"] },
+            facebook_organic: { contract_version: 1, audited_at: "2026-10-30", scopes: ["facebook_page", "instagram_account", "fb_post", "ig_post"] },
+            mailchimp: { contract_version: 1, audited_at: "2026-10-30", scopes: ["campaign_engagement", "store_conversions"] }
+          },
+          available_topics: ["overview", "workflow", "assets", "filters", "scopes", "breakdowns", "formulas", "entity_measures", "kpi_calculation", "derived_metrics", "dashboards", "benchmarks", "temporal_comparison", "funnel_decomposition", "examples"]
         },
         workflow: {
           title: "Recommended Agent Workflow",
@@ -841,7 +946,7 @@ function createMcpServer(role = "admin", userContext = null) {
             {
               step: 2,
               tool: "get_analytics_catalog",
-              purpose: "Inspect available canonical metrics, derived formulas, channel datascopes, valid breakdowns, and the platform-wide reference library of predefined KPIs and Derived Metrics for analytical inspiration."
+              purpose: "Inspect available canonical metrics, derived formulas, entity_measures (orders, customers, stores, products, discounts, campaigns, ad-groups, ads, posts, events), channel datascopes, valid breakdowns, and the platform-wide reference library of predefined KPIs and Derived Metrics."
             },
             {
               step: 3,
@@ -860,13 +965,18 @@ function createMcpServer(role = "admin", userContext = null) {
             },
             {
               step: 6,
-              tool: "summarize_performance",
-              purpose: "Run targeted aggregation queries passing discovered asset IDs into 'filters: { channeledAccount: \"<id>\" }' or 'groupBy'."
+              tool: "summarize_performance / aggregate_entities",
+              purpose: "Run targeted OLAP metric queries via 'summarize_performance' or Two-Stage entity aggregations (Order AOV, Canonical Revenue, Customer LTV, Repeat Rate, Promo Usage) via 'aggregate_entities'."
             },
             {
               step: 7,
               tool: "kpi_and_derived_metric_evaluation",
-              purpose: "To calculate or evaluate Predefined KPIs, Custom KPIs, or Derived Metrics (DMs): (1) inspect the AST / source_series via 'get_analytics_catalog' or 'list_custom_kpis', (2) fetch the constituent base metrics using 'summarize_performance' with matching filters and breakdowns, and (3) perform the mathematical operator or regression calculation over the returned series."
+              purpose: "To calculate or evaluate Predefined KPIs, Custom KPIs, or Derived Metrics (DMs): (1) inspect the AST / source_series via 'get_analytics_catalog' or 'list_custom_kpis', (2) fetch constituent metrics via 'summarize_performance' or 'aggregate_entities', and (3) perform the mathematical operator or regression calculation over the returned series."
+            },
+            {
+              step: 8,
+              tool: "create_dashboard_draft / update_dashboard_draft / commit_dashboard_draft",
+              purpose: "When authoring or updating custom dashboards, call 'get_dashboard_authoring_context' first, then stage widgets using 'source_type' = 'metric', 'entity_measure', 'derived_metric', or 'kpi'."
             }
           ]
         },
@@ -899,69 +1009,140 @@ function createMcpServer(role = "admin", userContext = null) {
           ]
         },
         datascopes: {
-          title: "Channel-Specific Datascopes & Dimension Orthogonality",
-          critical_rule: "Each marketing and analytics channel in APIs Hub possesses exclusive, non-overlapping datascopes. Mixing metrics or dimensions across different scopes within the same channel produces ambiguous cross-joins or duplicate row counting.",
+          title: "Channel-Specific Datascopes, Audited Catalog Versions & Dimension Orthogonality",
+          critical_rule: "Each marketing and analytics channel in APIs Hub is governed by an audited, versioned metrics catalog ('contract_version: 1', 'audited_at: 2026-10-30'). Mixing metrics or dimensions across different scopes within the same channel produces ambiguous cross-joins or duplicate row counting. Call 'get_analytics_catalog' with section='channel_metrics_catalog' or channel='<channel>' for the full per-metric contract.",
           channels: {
             google_search_console: {
+              contract_version: 1,
+              minimum_release: "1.18.3",
+              audited_at: "2026-10-30",
+              search_types: ["web", "image", "video", "news", "discover", "googleNews"],
+              default_search_type: "web",
+              feed_types_note: "Feed types ('discover', 'googleNews') support only metrics ['clicks', 'impressions', 'ctr'] (no 'position'), tabs ['pages', 'countries'], and scope 'non-searchAppearance'.",
               scopes: {
                 "non-searchAppearance (default / standard)": {
-                  description: "Standard web search performance metrics. Safe to cross with query, dimensions.page, country, device.",
+                  description: "Standard search performance metrics. Safe to cross with query, dimensions.page, country, device.",
                   enforced_filter: '{ "dimensions.searchAppearance": "standard" }',
                   explanation: "Google Search Console stores impressions separated by searchAppearance. If you do not filter to 'standard' (or group by dimensions.searchAppearance), metrics will double count because multiple feature rows exist for identical queries."
                 },
                 "searchAppearance": {
-                  description: "Performance by Google Search feature (AMP, Good Page Experience, Merchant Listings, Review Snippets, Video).",
-                  required_group_or_filter: 'groupBy: "dimensions.searchAppearance" or filters: { "dimensions.searchAppearance": { "operator": "not_equal", "value": "standard" } }'
+                  description: "Performance by Google Search feature (AMP, Good Page Experience, Merchant Listings, Review Snippets, Video). Overlaps standard scope; never merge with standard.",
+                  required_group_or_filter: 'groupBy: "dimensions.searchAppearance" or filters: { "dimensions.searchAppearance": { "operator": "neq", "value": "standard" } }'
                 }
               }
             },
             google_analytics_ga4: {
+              contract_version: 1,
+              query_contract_version: 1,
+              audited_at: "2026-10-30",
+              caveats_summary: "GA-01: 'spend' is unsupported in GA4 (revenue is not advertising cost). GA-02: 'newUsers', 'activeUsers', 'totalUsers' are non-additive reported sums, not window uniques. GA-03: 'dimensions.sessionSourceMedium' is a virtual dimension combining source + medium.",
               scopes: {
-                "traffic_matrix (session scope)": {
-                  description: "Traffic, visits, and engagement acquired in each session.",
-                  metrics: ["sessions", "bounce_rate", "average_session_duration", "engaged_sessions"],
-                  dimensions: ["dimensions.sessionDefaultChannelGroup", "dimensions.sessionSourceMedium", "dimensions.landing_page", "device", "country"]
+                "account": {
+                  description: "Property-level daily totals (dimensions.scope IS NULL).",
+                  metrics: ["screenPageViews", "sessions", "bounceRate", "totalRevenue"],
+                  dimensions: []
+                },
+                "traffic_matrix (default session scope)": {
+                  description: "Traffic, visits, revenue, conversions, and engagement acquired in each session.",
+                  metrics: ["screenPageViews", "sessions", "bounceRate", "averageSessionDuration", "totalRevenue", "conversions"],
+                  dimensions: ["dimensions.sessionDefaultChannelGroup", "dimensions.sessionSourceMedium", "dimensions.source", "dimensions.medium", "dimensions.landing_page", "channeledCampaign", "adGroup", "country", "device"]
                 },
                 "acquisition_matrix (first user scope)": {
-                  description: "First touchpoint / user acquisition attribution.",
-                  metrics: ["new_users", "total_users"],
-                  dimensions: ["dimensions.firstUserDefaultChannelGroup", "dimensions.firstUserSourceMedium"]
+                  description: "First touchpoint / user acquisition attribution (non-additive reported user sums).",
+                  metrics: ["newUsers", "activeUsers", "totalUsers"],
+                  dimensions: ["dimensions.firstUserDefaultChannelGroup", "dimensions.firstUserSourceMedium", "channeledCampaign", "adGroup", "ad"]
                 },
                 "event_matrix": {
-                  description: "Granular interaction event counting.",
-                  metrics: ["event_count", "conversions"],
-                  dimensions: ["event"]
+                  description: "Granular interaction event counting and key events.",
+                  metrics: ["eventCount", "conversions"],
+                  dimensions: ["event", "dimensions.page", "dimensions.sessionDefaultChannelGroup", "dimensions.sessionSourceMedium", "channeledCampaign", "adGroup", "ad"]
                 },
                 "ad_touchpoint_matrix": {
                   description: "Paid advertising attribution linking campaign, ad group, and ad.",
-                  dimensions: ["channeledCampaign", "channeledAdGroup", "channeledAd"]
+                  metrics: ["sessions", "conversions", "totalRevenue"],
+                  dimensions: ["channeledCampaign", "adGroup", "ad"]
+                },
+                "engagement_matrix (opt-in, recipe_revision='1')": {
+                  description: "Engaged sessions, engagement duration, and engagement rate.",
+                  metrics: ["sessions", "engagedSessions", "userEngagementDuration", "engagementRate"],
+                  dimensions: ["dimensions.sessionDefaultChannelGroup", "dimensions.sessionSourceMedium", "dimensions.landingPagePlusQueryString", "device", "country"]
+                },
+                "ecommerce_matrix (opt-in, recipe_revision='1')": {
+                  description: "Purchase transactions, gross/net purchase revenue, and refunds.",
+                  metrics: ["ecommercePurchases", "purchaseRevenue", "grossPurchaseRevenue", "refundAmount", "transactions"],
+                  dimensions: ["dimensions.sessionDefaultChannelGroup", "dimensions.sessionSourceMedium", "dimensions.sessionCampaignName", "device", "country"]
+                },
+                "product_matrix (opt-in, recipe_revision='1')": {
+                  description: "Item-level views, add-to-carts, purchases, item revenue, and refunds.",
+                  metrics: ["itemsViewed", "itemsAddedToCart", "itemsPurchased", "itemRevenue", "grossItemRevenue", "itemRefundAmount"],
+                  dimensions: ["dimensions.itemId", "dimensions.itemName", "dimensions.itemBrand", "dimensions.itemCategory", "dimensions.itemVariant"]
                 }
               }
             },
+            google_ads: {
+              contract_version: 1,
+              audited_at: "2026-10-30",
+              scopes: ["account", "campaign", "ad_group", "ad", "query"],
+              ui_dependencies: ["campaign_level", "adgroup_level", "ad_level", "device_level", "search_term_level"],
+              metrics: {
+                cached_additive: ["spend", "impressions", "clicks", "conversions"],
+                known_issue_conditional: ["conversion_value", "roas_purchase"],
+                derived_non_additive: ["ctr", "cpc", "cpm", "cost_per_conversion", "conversion_rate"],
+                source_only: ["video_views"]
+              },
+              dimensions: ["device", "campaignType", "query", "channeledCampaign", "adGroup", "ad"]
+            },
             facebook_marketing: {
-              hierarchy_rule: "Facebook Ads metrics are stored at the finest granularity ('ad' level) and roll up cleanly to ad_set, campaign, and account.",
-              dimensions: ["ad", "adGroup", "channeledCampaign", "channeledAccount", "dimensions.age", "dimensions.gender"],
-              safeguard: "Never mix age/gender breakdown with ad level attribution unless specifically analyzing demographic reach."
+              contract_version: 1,
+              audited_at: "2026-10-30",
+              scopes: ["account_level", "campaign_level", "adset_level", "ad_level"],
+              hierarchy_rule: "Facebook Ads metrics are stored at 'account_level', 'campaign_level', 'adset_level', and 'ad_level' (default). Optional breakdown passes exist for demographics (age, gender), geography (country), and placement (publisher_platform, platform_position).",
+              metrics: {
+                additive: ["spend", "clicks", "impressions", "results", "purchases", "purchase_value", "leads"],
+                non_additive: ["reach", "frequency", "cpm", "ctr", "cpc", "purchase_roas", "cost_per_result", "result_rate", "cost_per_purchase", "cost_per_lead"]
+              },
+              dimensions: ["ad", "adGroup", "channeledCampaign", "channeledAccount", "dimensions.age", "dimensions.gender", "dimensions.country", "dimensions.publisher_platform", "dimensions.platform_position"],
+              safeguard: "Never mix age/gender/placement breakdown passes with ad level attribution unless specifically analyzing demographic or placement slices."
             },
             facebook_organic: {
+              contract_version: 1,
+              audited_at: "2026-10-30",
               scopes: {
                 "instagram_account": {
                   description: "Metrics for the IG profile entity.",
-                  metrics: ["reach", "views", "follows", "profile_views", "website_clicks", "accounts_engaged", "total_interactions"]
+                  metrics: ["likes", "comments", "reach", "views", "content_views", "profile_views", "website_clicks", "profile_links_taps", "follows_and_unfollows", "saves", "shares", "total_interactions", "replies", "accounts_engaged", "follower_total"],
+                  dimensions: ["dimensions.media_product_type", "dimensions.follow_type", "dimensions.contact_button_type"]
                 },
-                "ig_post / media": {
-                  description: "Metrics scoped strictly to individual media / posts.",
-                  metrics: ["reach", "views", "likes", "comments", "shares", "saves", "replies", "profile_visits"],
-                  breakdown: "post"
+                "ig_post": {
+                  description: "Metrics scoped strictly to individual IG media / posts.",
+                  metrics: ["likes", "comments", "reach", "views", "saves", "shares", "total_interactions", "replies", "ig_reels_avg_watch_time", "ig_reels_video_view_total_time", "profile_activity", "profile_visits", "reposts", "follows"],
+                  breakdown: "ig_post"
                 },
                 "facebook_page": {
                   description: "Page-level organic performance.",
-                  metrics: ["reach", "page_views_total", "views", "follows", "likes", "total_interactions", "video_views"]
+                  metrics: ["likes", "comments", "reach", "views", "page_views_total", "video_views", "follows_and_unfollows", "shares", "total_interactions", "follower_total"],
+                  dimensions: ["dimensions.reaction_type"]
                 },
                 "fb_post": {
                   description: "Post-level organic performance.",
-                  metrics: ["reach", "views", "video_views", "likes", "post_clicks", "total_interactions", "comments", "shares"],
-                  breakdown: "post"
+                  metrics: ["likes", "comments", "reach", "views", "video_views", "shares", "total_interactions", "post_clicks", "post_video_avg_time_watched"],
+                  dimensions: ["fb_post", "dimensions.reaction_type"]
+                }
+              }
+            },
+            mailchimp: {
+              contract_version: 1,
+              audited_at: "2026-10-30",
+              scopes: {
+                "campaign_engagement": {
+                  description: "Campaign-level email performance, opens, clicks, bounces, unsubscribes, and URL slices.",
+                  metrics: ["sends", "opens", "opens_standard", "opens_proxy", "opens_unique_daily", "clicks", "clicks_unique", "bounces", "bounces_hard", "bounces_soft", "unsubscribes", "open_rate", "click_rate"],
+                  dimensions: ["channeledCampaign", "campaignType", "dimensions.page (clicks & clicks_unique only)"]
+                },
+                "store_conversions": {
+                  description: "Connected e-commerce store orders and revenue attributed within 30-day window.",
+                  metrics: ["orders", "revenue"],
+                  dimensions: ["dimensions.store_id", "dimensions.currency"]
                 }
               }
             }
@@ -1004,6 +1185,151 @@ function createMcpServer(role = "admin", userContext = null) {
             { name: "sessions", formula: "SUM(sessions)", description: "Web/Store Traffic Sessions" },
             { name: "conversions", formula: "SUM(conversions)", description: "Total Goal / Purchase Conversions" }
           ]
+        },
+        entity_measures: {
+          title: "Entity Measures Aggregation ('aggregate_entities' & Dashboard Widget Authoring)",
+          concept: "While 'summarize_performance' queries pre-aggregated daily channel metrics ('channeled_metrics'), 'aggregate_entities' (and dashboard widgets with source_type='entity_measure') executes Two-Stage dynamic aggregations directly over APIs Hub's 10 cached entity tables: 'orders', 'customers', 'stores', 'products', 'discounts' (aliases: 'promotions', 'promo-codes'), 'campaigns', 'ad-groups' (alias: 'ad-sets'), 'ads', 'posts', and 'events'.",
+          core_capabilities_and_safeguards: {
+            two_stage_canonical_deduplication: "A single physical order or customer can be referenced across multiple channels (e.g. Shopify, Mailchimp, Klaviyo, Google Analytics). When 'deduplicate_canonical' is true (default for cross-channel rollups without a 'channel' dimension), the engine collapses multi-channel references sharing the same canonical 'order_id' or 'customer_id' into a single record before summing revenue or computing AOV (MAX(amount) per canonical order). When 'dimensions: [\"channel\"]' is requested, each channel's attributed orders and revenue are compared side-by-side without collapsing across channels.",
+            multi_currency_safety_guard: "Monetary measures ('revenue', 'subtotal', 'total_tax', 'total_discount', 'aov', 'customer_ltv', 'avg_revenue_per_customer', 'average_price', 'min_price', 'max_price', 'total_budget', 'average_budget') are protected against cross-currency addition. If the queried scope spans multiple currencies (e.g. USD and EUR) and neither 'dimensions: [\"currency\"]' nor 'filters: { \"currency\": \"USD\" }' is provided, monetary measures return null and 'meta.currency_mixed: true' lists the detected currencies.",
+            customer_cross_channel_intelligence: "For 'customers', custom commerce measures ('customer_ltv', 'avg_revenue_per_customer', 'repeat_customer_count', 'high_frequency_customer_count', 'repeat_buyer_rate', 'repeat_frequency') join canonical customer orders across all connected stores, and 'pre_purchase_touches' attributes email/campaign touchpoints occurring prior to purchase."
+          },
+          supported_entity_families: {
+            orders: {
+              measures: ["order_count", "canonical_order_count", "unique_customers", "revenue", "subtotal", "total_tax", "total_discount", "aov"],
+              dimensions: ["store", "channel", "account", "product", "discount_code", "financial_status", "fulfillment_status", "currency", "shipping_country"],
+              time_buckets: ["day", "week", "month", "year"]
+            },
+            customers: {
+              measures: ["customer_count", "canonical_customer_count", "customer_ltv", "avg_revenue_per_customer", "repeat_customer_count", "high_frequency_customer_count", "repeat_buyer_rate", "repeat_frequency", "pre_purchase_touches"],
+              dimensions: ["store", "channel", "status", "account"],
+              time_buckets: ["day", "week", "month", "year"]
+            },
+            stores: {
+              measures: ["store_count"],
+              dimensions: ["channel", "currency", "account"],
+              time_buckets: ["day", "week", "month", "year"]
+            },
+            products: {
+              measures: ["product_count", "canonical_product_count", "average_price", "min_price", "max_price"],
+              dimensions: ["store", "channel", "vendor", "product_type", "sku", "currency"],
+              time_buckets: ["day", "week", "month", "year"]
+            },
+            discounts: {
+              aliases: ["promotions", "promo-codes"],
+              measures: ["discount_count", "total_usage"],
+              dimensions: ["store", "channel", "code", "status"],
+              time_buckets: ["day", "week", "month", "year"]
+            },
+            campaigns: {
+              measures: ["campaign_count", "total_budget", "average_budget"],
+              dimensions: ["status", "objective", "buying_type", "channel", "account"],
+              time_buckets: ["day", "week", "month", "year"]
+            },
+            "ad-groups": {
+              aliases: ["ad-sets"],
+              measures: ["ad_group_count"],
+              dimensions: ["status", "campaign", "optimization_goal", "billing_event", "channel", "account"],
+              time_buckets: ["day", "week", "month", "year"]
+            },
+            ads: {
+              measures: ["ad_count"],
+              dimensions: ["status", "campaign", "ad_group", "channel", "account"],
+              time_buckets: ["day", "week", "month", "year"]
+            },
+            posts: {
+              measures: ["post_count"],
+              dimensions: ["page", "media_type", "account"],
+              time_buckets: ["day", "week", "month", "year"]
+            },
+            events: {
+              measures: ["event_occurrence_count", "distinct_event_names"],
+              dimensions: ["channel", "action", "account"],
+              time_buckets: ["day", "week", "month", "year"]
+            }
+          },
+          dashboard_widget_authoring_blueprints: {
+            description: "Agents can add Entity Measures to custom dashboard widgets via 'create_dashboard_draft' and 'update_dashboard_draft' in two ways: (1) Direct 'source_type: \"entity_measure\"' widgets, or (2) Multi-series 'source_type: \"metric\"' widgets blending 'entity_measure' series with standard channel metrics.",
+            direct_scalar_tile_example: {
+              name: "Cross-Channel Canonical AOV",
+              title: "Average Order Value (AOV)",
+              widget_type: "tile",
+              source_type: "entity_measure",
+              source_config: {
+                entity_type: "orders",
+                measures: ["aov"],
+                deduplicate_canonical: true,
+                filters: { currency: "USD" }
+              },
+              grid_x: 0,
+              grid_y: 0,
+              grid_w: 3,
+              grid_h: 2
+            },
+            direct_time_series_chart_example: {
+              name: "Daily Canonical Orders Revenue",
+              title: "Orders Revenue Trend",
+              widget_type: "line_chart",
+              source_type: "entity_measure",
+              source_config: {
+                entity_type: "orders",
+                measures: ["revenue", "order_count"],
+                deduplicate_canonical: true,
+                granularity: "daily",
+                filters: { currency: "USD" }
+              },
+              grid_x: 3,
+              grid_y: 0,
+              grid_w: 9,
+              grid_h: 4
+            },
+            direct_dimensional_table_or_bar_chart_example: {
+              name: "Orders & Revenue by Channel",
+              title: "Channel Attribution Comparison",
+              widget_type: "table",
+              source_type: "entity_measure",
+              source_config: {
+                entity_type: "orders",
+                measures: ["order_count", "revenue", "aov"],
+                dimensions: ["channel"],
+                deduplicate_canonical: false,
+                filters: { currency: "USD" }
+              },
+              grid_x: 0,
+              grid_y: 4,
+              grid_w: 6,
+              grid_h: 4
+            },
+            multi_series_blended_chart_example: {
+              name: "Canonical Orders Revenue vs Meta Ad Spend",
+              title: "Store Revenue vs Ad Spend",
+              widget_type: "line_chart",
+              source_type: "metric",
+              source_config: {
+                granularity: "daily",
+                raw_series: [
+                  {
+                    type: "entity_measure",
+                    entity_type: "orders",
+                    measures: ["revenue"],
+                    deduplicate_canonical: true,
+                    filters: { currency: "USD" },
+                    label: "Canonical Orders Revenue"
+                  },
+                  {
+                    type: "metric",
+                    channel: "facebook_marketing",
+                    metrics: ["spend"],
+                    label: "Meta Ad Spend"
+                  }
+                ]
+              },
+              grid_x: 6,
+              grid_y: 4,
+              grid_w: 6,
+              grid_h: 4
+            }
+          }
         },
         derived_metrics: {
           title: "Predefined Derived Metrics (DMs) — Platform Reference Library & Evaluation",
@@ -1061,9 +1387,10 @@ function createMcpServer(role = "admin", userContext = null) {
             widgets: "Array of configured visualization widgets."
           },
           widget_sources: {
-            metric: "Direct raw OLAP metric aggregation (e.g., total spend, impressions, clicks from a specific channel).",
-            kpi: "Statistical Analytics Engine KPI (e.g. Anomaly detection, MACD momentum, Linear trendline, Granger causality).",
-            derived_metric: "Calculated series from an AST blueprint (e.g. CPA, Click Position Efficiency, Blended ROAS)."
+            metric: "Direct raw OLAP metric aggregation (e.g., total spend, impressions, clicks from a specific channel) OR multi-series blending via 'source_config.raw_series' (which can combine 'type: \"metric\"', 'type: \"entity_measure\"', and 'type: \"derived_metric\"' series on the same chart).",
+            entity_measure: "Two-Stage dynamic Entity Measures aggregation over cached entity tables ('orders', 'customers', 'stores', 'products', 'discounts', 'campaigns', 'ad-groups', 'ads', 'posts', 'events'). Configured via 'source_config: { entity_type, measures, dimensions, channel, deduplicate_canonical, granularity, filters }'.",
+            kpi: "Statistical Analytics Engine KPI (e.g. Anomaly detection, MACD momentum, Linear trendline, Granger causality). Can evaluate either standard channel metrics or entity measures.",
+            derived_metric: "Calculated series from an AST blueprint (e.g. CPA, Click Position Efficiency, Blended ROAS combining Canonical Orders Revenue from 'entity_measure' with Paid Ad Spend from 'metric')."
           },
           widget_types_and_roles: {
             tile: "Number Tile — Displays a single high-impact total or average with trend arrow. Ideal for executive summaries (e.g. total revenue, overall MER).",
@@ -1227,6 +1554,88 @@ function createMcpServer(role = "admin", userContext = null) {
                   unsubscribes: "unsubscribes"
                 }
               }
+            },
+            {
+              scenario: "Cross-Channel Canonical Orders Revenue, AOV, and Buying Customers (Entity Measures)",
+              tool: "aggregate_entities",
+              arguments: {
+                entity_type: "orders",
+                measures: ["canonical_order_count", "unique_customers", "revenue", "aov", "total_discount"],
+                deduplicate_canonical: true,
+                time_bucket: "day",
+                filters: {
+                  date_from: "2026-10-01",
+                  date_to: "2026-10-31",
+                  currency: "USD"
+                }
+              }
+            },
+            {
+              scenario: "Customer Lifetime Value (LTV), Repeat Buyer Rate & Pre-Purchase Multi-Channel Touches",
+              tool: "aggregate_entities",
+              arguments: {
+                entity_type: "customers",
+                measures: ["canonical_customer_count", "customer_ltv", "avg_revenue_per_customer", "repeat_buyer_rate", "pre_purchase_touches"],
+                filters: {
+                  currency: "USD"
+                }
+              }
+            },
+            {
+              scenario: "Stage a Custom Dashboard Draft with Entity Measures & Blended Multi-Series Widgets",
+              tool: "create_dashboard_draft",
+              arguments: {
+                name: "Cross-Channel Commerce & Attribution Overview",
+                target_audience: "executive",
+                account_mode: "blended",
+                widgets: [
+                  {
+                    name: "Canonical AOV Tile",
+                    title: "Average Order Value (AOV)",
+                    widget_type: "tile",
+                    source_type: "entity_measure",
+                    source_config: {
+                      entity_type: "orders",
+                      measures: ["aov"],
+                      deduplicate_canonical: true,
+                      filters: { currency: "USD" }
+                    },
+                    grid_x: 0,
+                    grid_y: 0,
+                    grid_w: 4,
+                    grid_h: 2
+                  },
+                  {
+                    name: "Orders Revenue vs Meta Ad Spend",
+                    title: "Canonical Store Revenue vs Ad Spend",
+                    widget_type: "line_chart",
+                    source_type: "metric",
+                    source_config: {
+                      granularity: "daily",
+                      raw_series: [
+                        {
+                          type: "entity_measure",
+                          entity_type: "orders",
+                          measures: ["revenue"],
+                          deduplicate_canonical: true,
+                          filters: { currency: "USD" },
+                          label: "Canonical Orders Revenue"
+                        },
+                        {
+                          type: "metric",
+                          channel: "facebook_marketing",
+                          metrics: ["spend"],
+                          label: "Meta Ad Spend"
+                        }
+                      ]
+                    },
+                    grid_x: 4,
+                    grid_y: 0,
+                    grid_w: 8,
+                    grid_h: 4
+                  }
+                ]
+              }
             }
           ]
         }
@@ -1267,6 +1676,314 @@ function createMcpServer(role = "admin", userContext = null) {
     if (name === "get_analytics_catalog") {
       const { scope, channel, section } = args;
       const catalog = {
+        catalog_versions: {
+          google_search_console: {
+            channel: "google_search_console",
+            contract_version: 1,
+            query_contract_version: null,
+            minimum_release: "1.18.3",
+            audited_at: "2026-10-30",
+            metrics_count: 4,
+            search_types: ["web", "image", "video", "news", "discover", "googleNews"],
+            scopes: ["non-searchAppearance", "searchAppearance"],
+            ui_dependencies: ["non-searchAppearance", "searchAppearance"]
+          },
+          google_analytics: {
+            channel: "google_analytics",
+            contract_version: 1,
+            query_contract_version: 1,
+            minimum_release: null,
+            audited_at: "2026-10-30",
+            metrics_count: 26,
+            scopes: [
+              "account",
+              "traffic_matrix",
+              "event_matrix",
+              "acquisition_matrix",
+              "ad_touchpoint_matrix",
+              "engagement_matrix",
+              "ecommerce_matrix",
+              "product_matrix"
+            ],
+            ui_dependencies: [
+              "traffic_matrix",
+              "acquisition_matrix",
+              "event_matrix",
+              "ad_touchpoint_matrix",
+              "engagement_matrix",
+              "ecommerce_matrix",
+              "product_matrix"
+            ]
+          },
+          google_ads: {
+            channel: "google_ads",
+            contract_version: 1,
+            query_contract_version: null,
+            minimum_release: null,
+            audited_at: "2026-10-30",
+            metrics_count: 12,
+            scopes: ["account", "campaign", "ad_group", "ad", "query"],
+            ui_dependencies: ["campaign_level", "adgroup_level", "ad_level", "device_level", "search_term_level"]
+          },
+          facebook_marketing: {
+            channel: "facebook_marketing",
+            contract_version: 1,
+            query_contract_version: null,
+            minimum_release: null,
+            audited_at: "2026-10-30",
+            metrics_count: 17,
+            scopes: ["account_level", "campaign_level", "adset_level", "ad_level"],
+            ui_dependencies: ["account_level", "campaign_level", "adset_level", "ad_level"]
+          },
+          facebook_organic: {
+            channel: "facebook_organic",
+            contract_version: 1,
+            query_contract_version: null,
+            minimum_release: null,
+            audited_at: "2026-10-30",
+            metrics_count: 25,
+            scopes: ["facebook_page", "instagram_account", "fb_post", "ig_post"],
+            ui_dependencies: ["instagram_account", "ig_post", "facebook_page", "fb_post"]
+          },
+          mailchimp: {
+            channel: "mailchimp",
+            contract_version: 1,
+            query_contract_version: null,
+            minimum_release: null,
+            audited_at: "2026-10-30",
+            metrics_count: 15,
+            scopes: ["campaign_engagement", "store_conversions"],
+            ui_dependencies: ["campaign_engagement", "store_conversions"]
+          }
+        },
+        channel_metrics_catalog: {
+          google_search_console: {
+            channel: "google_search_console",
+            contract_version: 1,
+            audited_at: "2026-10-30",
+            minimum_release: "1.18.3",
+            default_search_type: "web",
+            search_types: {
+              web: { label: "Web", metrics: ["clicks", "impressions", "ctr", "position"], tabs: ["queries", "pages", "countries", "devices", "appearances"], scopes: ["non-searchAppearance", "searchAppearance"] },
+              image: { label: "Images", metrics: ["clicks", "impressions", "ctr", "position"], tabs: ["queries", "pages", "countries", "devices", "appearances"], scopes: ["non-searchAppearance", "searchAppearance"] },
+              video: { label: "Videos", metrics: ["clicks", "impressions", "ctr", "position"], tabs: ["queries", "pages", "countries", "devices", "appearances"], scopes: ["non-searchAppearance", "searchAppearance"] },
+              news: { label: "News (Google Search tab)", metrics: ["clicks", "impressions", "ctr", "position"], tabs: ["queries", "pages", "countries", "devices", "appearances"], scopes: ["non-searchAppearance", "searchAppearance"] },
+              discover: { label: "Discover", metrics: ["clicks", "impressions", "ctr"], tabs: ["pages", "countries"], scopes: ["non-searchAppearance"] },
+              googleNews: { label: "Google News (site and app)", metrics: ["clicks", "impressions", "ctr"], tabs: ["pages", "countries"], scopes: ["non-searchAppearance"] }
+            },
+            metrics: {
+              clicks: { label: "Clicks", unit: "count", reducer: "sum", is_additive: true },
+              impressions: { label: "Impressions", unit: "count", reducer: "sum", is_additive: true },
+              ctr: { label: "CTR", unit: "ratio", reducer: "clicks / impressions", is_additive: false },
+              position: { label: "Average Position", unit: "rank", reducer: "impression_weighted_average", is_additive: false }
+            },
+            breakdowns: { queries: "query", pages: "dimensions.page", countries: "country", devices: "device", appearances: "dimensions.searchAppearance" },
+            scopes: {
+              "non-searchAppearance": { label: "Standard Search (Non-Appearance)", filter: { "dimensions.searchAppearance": "standard" }, aggregation_profiles: ["gsc_search_cube", "gsc_page_flow"] },
+              searchAppearance: { label: "Search Appearance", filter: { "dimensions.searchAppearance": { operator: "neq", value: "standard" } }, grain: ["daily", "dimensions.searchAppearance"], aggregation_profiles: ["gsc_search_cube_by_appearance"], overlaps_standard: true, merge_with_standard: false }
+            },
+            filters: { search_type: "dimensions.search_type", semantic: ["dimensions.intent", "dimensions.brand_relation", "dimensions.business_relevance"] }
+          },
+          google_analytics: {
+            channel: "google_analytics",
+            contract_version: 1,
+            query_contract_version: 1,
+            audited_at: "2026-10-30",
+            metrics: {
+              screenPageViews: { label: "Page and screen views", unit: "count", reducer: "sum", scopes: ["account", "traffic_matrix"], status: "cached", is_additive: true },
+              sessions: { label: "Sessions", unit: "count", reducer: "sum_within_one_scope", scopes: ["account", "traffic_matrix", "ad_touchpoint_matrix", "engagement_matrix"], status: "cached", is_additive: true },
+              bounceRate: { label: "Bounce rate", unit: "ratio", reducer: "session_weighted_average", scopes: ["account", "traffic_matrix"], status: "cached", caveats: ["GA-02"], is_additive: true },
+              totalRevenue: { label: "Total revenue", unit: "property_currency", reducer: "sum", scopes: ["account", "traffic_matrix", "ad_touchpoint_matrix"], status: "cached", is_additive: true },
+              averageSessionDuration: { label: "Average session duration", unit: "seconds", reducer: "session_weighted_average", scopes: ["traffic_matrix"], status: "cached", caveats: ["GA-02"], is_additive: true },
+              conversions: { label: "Key Events", sources: ["conversions", "keyEvents"], cache_name: "conversions", unit: "count", reducer: "sum", scopes: ["traffic_matrix", "event_matrix", "ad_touchpoint_matrix"], status: "cached", caveats: ["GA-04"], is_additive: true },
+              eventCount: { label: "Event count", unit: "count", reducer: "sum", scopes: ["event_matrix"], status: "cached", is_additive: true },
+              newUsers: { label: "New users", unit: "users", reducer: "source_distinct_for_requested_window", cached_reducer: "sum_of_reported_user_counts_not_window_unique", scopes: ["acquisition_matrix"], status: "cached", caveats: ["GA-02"], is_additive: false },
+              activeUsers: { label: "Active users", unit: "users", reducer: "source_distinct_for_requested_window", cached_reducer: "sum_of_reported_user_counts_not_window_unique", scopes: ["acquisition_matrix"], status: "cached", caveats: ["GA-02"], is_additive: false },
+              totalUsers: { label: "Total users", unit: "users", reducer: "source_distinct_for_requested_window", cached_reducer: "sum_of_reported_user_counts_not_window_unique", scopes: ["acquisition_matrix"], status: "cached", caveats: ["GA-02"], is_additive: false },
+              engagedSessions: { label: "Engaged sessions", unit: "count", reducer: "sum", scopes: ["engagement_matrix"], status: "conditional", is_additive: true },
+              userEngagementDuration: { label: "User engagement duration", unit: "seconds", reducer: "sum", scopes: ["engagement_matrix"], status: "conditional", is_additive: true },
+              engagementRate: { label: "Engagement rate", unit: "ratio", reducer: "session_weighted_average", scopes: ["engagement_matrix"], status: "conditional", is_additive: true },
+              ecommercePurchases: { label: "Purchases", unit: "count", reducer: "sum", scopes: ["ecommerce_matrix"], status: "conditional", is_additive: true },
+              transactions: { label: "Transactions", unit: "count", reducer: "sum", scopes: ["ecommerce_matrix"], status: "conditional", is_additive: true },
+              purchaseRevenue: { label: "Purchase revenue", unit: "property_currency", reducer: "sum", scopes: ["ecommerce_matrix"], status: "conditional", is_additive: true },
+              grossPurchaseRevenue: { label: "Gross purchase revenue", unit: "property_currency", reducer: "sum", scopes: ["ecommerce_matrix"], status: "conditional", is_additive: true },
+              refundAmount: { label: "Refund amount", unit: "property_currency", reducer: "sum", scopes: ["ecommerce_matrix"], status: "conditional", is_additive: true },
+              itemsViewed: { label: "Items viewed", unit: "count", reducer: "sum", scopes: ["product_matrix"], status: "conditional", is_additive: true },
+              itemsAddedToCart: { label: "Items added to cart", unit: "count", reducer: "sum", scopes: ["product_matrix"], status: "conditional", is_additive: true },
+              itemsPurchased: { label: "Items purchased", unit: "count", reducer: "sum", scopes: ["product_matrix"], status: "conditional", is_additive: true },
+              itemsRefunded: { label: "Items refunded", unit: "count", reducer: "sum", scopes: [], status: "conditional", is_additive: true },
+              itemRevenue: { label: "Item revenue", unit: "property_currency", reducer: "sum", scopes: ["product_matrix"], status: "conditional", is_additive: true },
+              grossItemRevenue: { label: "Gross item revenue", unit: "property_currency", reducer: "sum", scopes: ["product_matrix"], status: "conditional", is_additive: true },
+              itemRefundAmount: { label: "Item refund amount", unit: "property_currency", reducer: "sum", scopes: ["product_matrix"], status: "conditional", is_additive: true },
+              spend: { label: "Advertising spend", unit: "property_currency", reducer: "sum", scopes: [], status: "unsupported", caveats: ["GA-01"], is_additive: true }
+            },
+            scopes: {
+              account: { label: "Account", metrics: ["screenPageViews", "sessions", "bounceRate", "totalRevenue"], grain: ["daily"], filter: { "dimensions.scope": { operator: "is_null" } }, merge_with_other_scopes: false },
+              traffic_matrix: { label: "Traffic Matrix", metrics: ["screenPageViews", "sessions", "bounceRate", "averageSessionDuration", "totalRevenue", "conversions"], grain: ["daily", "dimensions.sessionDefaultChannelGroup", "dimensions.source", "dimensions.medium", "dimensions.landing_page", "channeledCampaign", "adGroup", "country", "device"], filter: { "dimensions.scope": "traffic_matrix" }, merge_with_other_scopes: false },
+              event_matrix: { label: "Event Matrix", metrics: ["eventCount", "conversions"], grain: ["daily", "event", "dimensions.page", "dimensions.sessionDefaultChannelGroup", "dimensions.source", "dimensions.medium", "channeledCampaign", "adGroup", "ad"], filter: { "dimensions.scope": "event_matrix" }, merge_with_other_scopes: false },
+              acquisition_matrix: { label: "Acquisition Matrix", metrics: ["newUsers", "activeUsers", "totalUsers"], grain: ["daily", "dimensions.firstUserDefaultChannelGroup", "dimensions.firstUserSourceMedium", "channeledCampaign", "adGroup", "ad"], filter: { "dimensions.scope": "acquisition_matrix" }, merge_with_other_scopes: false },
+              ad_touchpoint_matrix: { label: "Ad Touchpoint Matrix", metrics: ["sessions", "conversions", "totalRevenue"], grain: ["daily", "channeledCampaign", "adGroup", "ad"], filter: { "dimensions.scope": "ad_touchpoint_matrix" }, merge_with_other_scopes: false },
+              engagement_matrix: { label: "Engagement Matrix", metrics: ["sessions", "engagedSessions", "userEngagementDuration", "engagementRate"], grain: ["daily", "dimensions.sessionDefaultChannelGroup", "dimensions.sessionSourceMedium", "dimensions.landingPagePlusQueryString", "device", "country"], filter: { "dimensions.scope": "engagement_matrix", "dimensions.recipe_revision": "1" }, requires_opt_in: true, merge_with_other_scopes: false },
+              ecommerce_matrix: { label: "Ecommerce Matrix", metrics: ["ecommercePurchases", "purchaseRevenue", "grossPurchaseRevenue", "refundAmount", "transactions"], grain: ["daily", "dimensions.sessionDefaultChannelGroup", "dimensions.sessionSourceMedium", "dimensions.sessionCampaignName", "device", "country"], filter: { "dimensions.scope": "ecommerce_matrix", "dimensions.recipe_revision": "1" }, requires_opt_in: true, merge_with_other_scopes: false },
+              product_matrix: { label: "Product Matrix", metrics: ["itemsViewed", "itemsAddedToCart", "itemsPurchased", "itemRevenue", "grossItemRevenue", "itemRefundAmount"], grain: ["daily", "dimensions.itemId", "dimensions.itemName", "dimensions.itemBrand", "dimensions.itemCategory", "dimensions.itemVariant"], filter: { "dimensions.scope": "product_matrix", "dimensions.recipe_revision": "1" }, requires_opt_in: true, merge_with_other_scopes: false }
+            },
+            virtual_dimensions: {
+              "dimensions.sessionSourceMedium": { parts: ["dimensions.source", "dimensions.medium"], separator: " / ", scopes: ["traffic_matrix", "event_matrix"] }
+            },
+            canonical_aliases: {
+              sessions: "sessions", conversions: "conversions", reach: "activeUsers", impressions: "screenPageViews", new_users: "newUsers", revenue: "totalRevenue", bounce_rate: "bounceRate", average_session_duration: "averageSessionDuration", total_users: "totalUsers", event_count: "eventCount",
+              engaged_sessions: "engagedSessions", user_engagement_duration: "userEngagementDuration", engagement_rate: "engagementRate", ecommerce_purchases: "ecommercePurchases", purchase_revenue: "purchaseRevenue", gross_purchase_revenue: "grossPurchaseRevenue", refund_amount: "refundAmount", transactions: "transactions",
+              items_viewed: "itemsViewed", items_added_to_cart: "itemsAddedToCart", items_purchased: "itemsPurchased", item_revenue: "itemRevenue", gross_item_revenue: "grossItemRevenue", item_refund_amount: "itemRefundAmount"
+            },
+            caveats: {
+              "GA-01": "Cost metrics are unsupported; revenue is not advertising spend.",
+              "GA-02": "Reported user-count sums are not window uniques. Rates require complete same-grain session weights.",
+              "GA-03": "Combined session source/medium is virtual and requires tenant query contract v1.",
+              "GA-04": "Source key-event names are property-validated; cache identity remains conversions.",
+              "GA-05": "Quality metadata is retained on new observations; historical quality and report-level badges are not reconstructed."
+            }
+          },
+          google_ads: {
+            channel: "google_ads",
+            contract_version: 1,
+            audited_at: "2026-10-30",
+            metrics: {
+              spend: { label: "Spend", sources: ["metrics.cost_micros"], unit: "account_currency", reducer: "sum", scopes: ["account", "campaign", "ad_group", "ad", "query"], status: "cached", is_additive: true },
+              impressions: { label: "Impressions", sources: ["metrics.impressions"], unit: "count", reducer: "sum", scopes: ["account", "campaign", "ad_group", "ad", "query"], status: "cached", is_additive: true },
+              clicks: { label: "Clicks", sources: ["metrics.clicks"], unit: "count", reducer: "sum", scopes: ["account", "campaign", "ad_group", "ad", "query"], status: "cached", is_additive: true },
+              conversions: { label: "Conversions", sources: ["metrics.conversions"], unit: "count", reducer: "sum", scopes: ["account", "campaign", "ad_group", "ad", "query"], status: "cached", is_additive: true },
+              conversion_value: { label: "Conversion value", sources: ["metrics.conversions_value"], unit: "account_currency", reducer: "sum", scopes: ["account", "campaign", "ad_group", "ad", "query"], status: "known_issue", caveats: ["ADS-01"], is_additive: true },
+              roas_purchase: { label: "Return on ad spend", sources: ["metrics.conversions_value", "metrics.cost_micros"], unit: "ratio", reducer: "sum(conversion_value) / sum(spend)", scopes: ["account", "campaign", "ad_group", "ad", "query"], status: "known_issue", caveats: ["ADS-01"], is_additive: true },
+              ctr: { label: "CTR", unit: "ratio", reducer: "clicks / impressions", scopes: ["account", "campaign", "ad_group", "ad", "query"], status: "derived", caveats: ["ADS-02"], is_additive: true },
+              cpc: { label: "Cost per click", unit: "account_currency", reducer: "spend / clicks", scopes: ["account", "campaign", "ad_group", "ad", "query"], status: "derived", caveats: ["ADS-02"], is_additive: true },
+              cpm: { label: "Cost per thousand impressions", unit: "account_currency", reducer: "1000 * spend / impressions", scopes: ["account", "campaign", "ad_group", "ad", "query"], status: "derived", caveats: ["ADS-02"], is_additive: true },
+              cost_per_conversion: { label: "Cost per conversion", unit: "account_currency", reducer: "spend / conversions", scopes: ["account", "campaign", "ad_group", "ad", "query"], status: "derived", caveats: ["ADS-02"], is_additive: true },
+              conversion_rate: { label: "Conversion rate (click based)", unit: "ratio", reducer: "conversions / clicks", scopes: ["account", "campaign", "ad_group", "ad", "query"], status: "derived", caveats: ["ADS-02"], is_additive: true },
+              video_views: { label: "Video views", sources: ["metrics.video_views"], unit: "count", reducer: "sum", scopes: [], status: "source_only", caveats: ["ADS-03"], is_additive: true }
+            },
+            scopes: ["account", "campaign", "ad_group", "ad", "query"],
+            ui_dependencies: ["campaign_level", "adgroup_level", "ad_level", "device_level", "search_term_level"],
+            dimensions: {
+              device: { source: "segments.device", scopes: ["account", "campaign", "ad_group", "ad", "query"] },
+              campaignType: { source: "campaign.advertising_channel_type", scopes: ["campaign", "ad"] },
+              query: { source: "search_term_view.search_term", scopes: ["query"] }
+            },
+            filters: { account: "channeledAccount", semantic: ["dimensions.intent", "dimensions.brand_relation", "dimensions.business_relevance"] },
+            canonical_aliases: { revenue: "conversion_value", total_revenue: "conversion_value", search_term: "query (dimension, not a numeric metric)" },
+            caveats: {
+              "ADS-01": "Conversion value is assigned to ROAS; the default conversion_value key does not match the normalized conversions_value key.",
+              "ADS-02": "Ratios must be recomputed from totals. Click-based conversion rate is not necessarily Google interaction-based conversion rate.",
+              "ADS-03": "Requested metrics are not forwarded to the converter whitelist. Dictionary membership does not prove ingestion."
+            }
+          },
+          facebook_marketing: {
+            channel: "facebook_marketing",
+            contract_version: 1,
+            audited_at: "2026-10-30",
+            metrics: {
+              spend: { label: "Spend", unit: "currency", reducer: "sum", scopes: ["account_level", "campaign_level", "adset_level", "ad_level"], status: "conditional", is_additive: true },
+              clicks: { label: "Clicks", unit: "count", reducer: "sum", scopes: ["account_level", "campaign_level", "adset_level", "ad_level"], status: "conditional", is_additive: true },
+              impressions: { label: "Impressions", unit: "count", reducer: "sum", scopes: ["account_level", "campaign_level", "adset_level", "ad_level"], status: "conditional", is_additive: true },
+              reach: { label: "Reach", unit: "count", reducer: "provider_reach", scopes: ["account_level", "campaign_level", "adset_level", "ad_level"], status: "conditional", is_additive: false },
+              results: { label: "Results", unit: "count", reducer: "sum", scopes: ["account_level", "campaign_level", "adset_level", "ad_level"], status: "conditional", is_additive: true },
+              purchases: { label: "Purchases", unit: "count", reducer: "sum", scopes: ["account_level", "campaign_level", "adset_level", "ad_level"], status: "conditional", is_additive: true },
+              purchase_value: { label: "Purchase Value", unit: "currency", reducer: "sum", scopes: ["account_level", "campaign_level", "adset_level", "ad_level"], status: "conditional", is_additive: true },
+              leads: { label: "Leads", unit: "count", reducer: "sum", scopes: ["account_level", "campaign_level", "adset_level", "ad_level"], status: "conditional", is_additive: true },
+              frequency: { label: "Frequency", unit: "ratio", reducer: "impressions / reach", scopes: ["account_level", "campaign_level", "adset_level", "ad_level"], status: "conditional", is_additive: false },
+              cpm: { label: "CPM", unit: "currency", reducer: "1000 * spend / impressions", scopes: ["account_level", "campaign_level", "adset_level", "ad_level"], status: "conditional", is_additive: false },
+              ctr: { label: "CTR", unit: "ratio", reducer: "clicks / impressions", scopes: ["account_level", "campaign_level", "adset_level", "ad_level"], status: "conditional", is_additive: false },
+              cpc: { label: "CPC", unit: "currency", reducer: "spend / clicks", scopes: ["account_level", "campaign_level", "adset_level", "ad_level"], status: "conditional", is_additive: false },
+              purchase_roas: { label: "ROAS", unit: "ratio", reducer: "provider_purchase_roas", scopes: ["account_level", "campaign_level", "adset_level", "ad_level"], status: "conditional", is_additive: false },
+              cost_per_result: { label: "Cost per Result", unit: "currency", reducer: "spend / results", scopes: ["account_level", "campaign_level", "adset_level", "ad_level"], status: "conditional", is_additive: false },
+              result_rate: { label: "Result Rate", unit: "ratio", reducer: "results / impressions", scopes: ["account_level", "campaign_level", "adset_level", "ad_level"], status: "conditional", is_additive: false },
+              cost_per_purchase: { label: "Cost per Purchase", unit: "currency", reducer: "spend / purchases", scopes: ["account_level", "campaign_level", "adset_level", "ad_level"], status: "conditional", is_additive: false },
+              cost_per_lead: { label: "Cost per Lead", unit: "currency", reducer: "spend / leads", scopes: ["account_level", "campaign_level", "adset_level", "ad_level"], status: "conditional", is_additive: false }
+            },
+            scopes: ["account_level", "campaign_level", "adset_level", "ad_level"],
+            dimensions: {
+              channeledCampaign: { scopes: ["campaign_level", "adset_level", "ad_level"] },
+              adGroup: { scopes: ["adset_level", "ad_level"] },
+              ad: { scopes: ["ad_level"] },
+              "dimensions.age": { scopes: ["account_level", "campaign_level", "adset_level", "ad_level"], requires_pass: "demographics" },
+              "dimensions.gender": { scopes: ["account_level", "campaign_level", "adset_level", "ad_level"], requires_pass: "demographics" },
+              "dimensions.country": { scopes: ["account_level", "campaign_level", "adset_level", "ad_level"], requires_pass: "geography" },
+              "dimensions.publisher_platform": { scopes: ["account_level", "campaign_level", "adset_level", "ad_level"], requires_pass: "placement" },
+              "dimensions.platform_position": { scopes: ["account_level", "campaign_level", "adset_level", "ad_level"], requires_pass: "placement" }
+            }
+          },
+          facebook_organic: {
+            channel: "facebook_organic",
+            contract_version: 1,
+            audited_at: "2026-10-30",
+            metrics: {
+              likes: { label: "Likes / mapped reactions", unit: "count", reducer: "sum", scopes: ["facebook_page", "instagram_account", "fb_post", "ig_post"], is_additive: true },
+              comments: { label: "Comments", unit: "count", reducer: "sum", scopes: ["facebook_page", "instagram_account", "fb_post", "ig_post"], is_additive: true },
+              reach: { label: "Reach", unit: "users", reducer: "source_distinct_for_requested_window", scopes: ["facebook_page", "instagram_account", "fb_post", "ig_post"], caveats: ["ORG-03"], is_additive: true },
+              views: { label: "Views / plays", unit: "count", reducer: "sum", scopes: ["facebook_page", "instagram_account", "fb_post", "ig_post"], is_additive: true },
+              content_views: { label: "Content views", unit: "count", reducer: "sum", scopes: ["instagram_account"], is_additive: true },
+              page_views_total: { label: "Page views", unit: "count", reducer: "sum", scopes: ["facebook_page"], is_additive: true },
+              video_views: { label: "Video views", unit: "count", reducer: "sum", scopes: ["facebook_page", "fb_post"], is_additive: true },
+              profile_views: { label: "Profile views", unit: "count", reducer: "sum", scopes: ["instagram_account"], is_additive: true },
+              website_clicks: { label: "Website clicks", unit: "count", reducer: "sum", scopes: ["instagram_account"], is_additive: true },
+              profile_links_taps: { label: "Profile link taps", unit: "count", reducer: "sum", scopes: ["instagram_account"], is_additive: true },
+              follows_and_unfollows: { label: "Follows and unfollows", unit: "count", reducer: "preserve_follow_type", scopes: ["instagram_account", "facebook_page"], is_additive: true },
+              saves: { label: "Saves", unit: "count", reducer: "sum", scopes: ["instagram_account", "ig_post"], is_additive: true },
+              shares: { label: "Shares", unit: "count", reducer: "sum", scopes: ["facebook_page", "instagram_account", "fb_post", "ig_post"], is_additive: true },
+              total_interactions: { label: "Interactions", unit: "count", reducer: "sum", scopes: ["facebook_page", "instagram_account", "fb_post", "ig_post"], is_additive: true },
+              replies: { label: "Replies", unit: "count", reducer: "sum", scopes: ["instagram_account", "ig_post"], is_additive: true },
+              accounts_engaged: { label: "Accounts engaged", unit: "users", reducer: "source_distinct_for_requested_window", scopes: ["instagram_account"], caveats: ["ORG-03"], is_additive: true },
+              post_clicks: { label: "Post clicks", unit: "count", reducer: "sum", scopes: ["fb_post"], is_additive: true },
+              ig_reels_avg_watch_time: { label: "Reels average watch time", unit: "source_time_unit", reducer: "view_weighted_average", scopes: ["ig_post"], is_additive: true },
+              post_video_avg_time_watched: { label: "Average video watch time", unit: "source_time_unit", reducer: "view_weighted_average", scopes: ["fb_post"], is_additive: true },
+              ig_reels_video_view_total_time: { label: "Reels total watch time", unit: "source_time_unit", reducer: "sum", scopes: ["ig_post"], is_additive: true },
+              profile_activity: { label: "Profile activity", unit: "count", reducer: "sum", scopes: ["ig_post"], is_additive: true },
+              profile_visits: { label: "Profile visits", unit: "count", reducer: "sum", scopes: ["ig_post"], is_additive: true },
+              reposts: { label: "Reposts", unit: "count", reducer: "sum", scopes: ["ig_post"], is_additive: true },
+              follows: { label: "Follows", unit: "count", reducer: "sum", scopes: ["ig_post"], is_additive: true },
+              follower_total: { label: "Followers (snapshot)", unit: "count", reducer: "latest_snapshot_per_account", scopes: ["facebook_page", "instagram_account"], status: "conditional", is_additive: false }
+            },
+            scopes: ["facebook_page", "instagram_account", "fb_post", "ig_post"],
+            dimensions: {
+              "dimensions.media_product_type": { scopes: ["instagram_account"] },
+              "dimensions.follow_type": { scopes: ["instagram_account"] },
+              "dimensions.contact_button_type": { scopes: ["instagram_account"] },
+              "dimensions.reaction_type": { scopes: ["facebook_page", "fb_post"] }
+            }
+          },
+          mailchimp: {
+            channel: "mailchimp",
+            contract_version: 1,
+            audited_at: "2026-10-30",
+            metrics: {
+              sends: { label: "Sends", sources: ["sends"], unit: "count", reducer: "sum", scopes: ["campaign_engagement"], status: "preaggregated", is_additive: true },
+              opens: { label: "Opens", sources: ["opens_total"], unit: "count", reducer: "sum", scopes: ["campaign_engagement"], status: "preaggregated", is_additive: true },
+              opens_standard: { label: "Opens Standard", sources: ["opens_standard"], unit: "count", reducer: "sum", scopes: ["campaign_engagement"], status: "preaggregated", is_additive: true },
+              opens_proxy: { label: "Opens Proxy", sources: ["opens_proxy"], unit: "count", reducer: "sum", scopes: ["campaign_engagement"], status: "preaggregated", is_additive: true },
+              opens_unique_daily: { label: "Daily unique openers", sources: ["opens_unique_daily"], unit: "count", reducer: "distinct_identity_per_campaign_day", scopes: ["campaign_engagement"], status: "preaggregated", is_additive: false },
+              clicks: { label: "Clicks", sources: ["clicks_total"], unit: "count", reducer: "sum", scopes: ["campaign_engagement"], status: "preaggregated", is_additive: true },
+              clicks_unique: { label: "Clicks Unique", sources: ["clicks_unique"], unit: "count", reducer: "sum_of_daily_distinct_counts_within_slice", scopes: ["campaign_engagement"], status: "preaggregated", is_additive: true },
+              bounces: { label: "Bounces", sources: ["bounces_total"], unit: "count", reducer: "sum", scopes: ["campaign_engagement"], status: "preaggregated", is_additive: true },
+              bounces_hard: { label: "Bounces Hard", sources: ["bounces_hard"], unit: "count", reducer: "sum", scopes: ["campaign_engagement"], status: "preaggregated", is_additive: true },
+              bounces_soft: { label: "Bounces Soft", sources: ["bounces_soft"], unit: "count", reducer: "sum", scopes: ["campaign_engagement"], status: "preaggregated", is_additive: true },
+              unsubscribes: { label: "Unsubscribes", sources: ["unsubscribes"], unit: "count", reducer: "sum", scopes: ["campaign_engagement"], status: "preaggregated", is_additive: true },
+              open_rate: { label: "Open Rate", unit: "ratio", reducer: "opens / sends", scopes: ["campaign_engagement"], status: "derived", is_additive: true },
+              click_rate: { label: "Click Rate", unit: "ratio", reducer: "clicks / sends", scopes: ["campaign_engagement"], status: "derived", is_additive: true },
+              orders: { label: "Orders", sources: ["orders_count"], unit: "count", reducer: "sum", scopes: ["store_conversions"], status: "preaggregated", is_additive: true },
+              revenue: { label: "Revenue", sources: ["revenue"], unit: "store_currency", reducer: "sum", scopes: ["store_conversions"], status: "preaggregated", is_additive: true }
+            },
+            scopes: {
+              campaign_engagement: { label: "Campaign engagement", metrics: ["sends", "opens", "opens_standard", "opens_proxy", "opens_unique_daily", "clicks", "clicks_unique", "bounces", "bounces_hard", "bounces_soft", "unsubscribes", "open_rate", "click_rate"], grain: ["daily", "campaign", "optional URL slice"] },
+              store_conversions: { label: "Connected store orders", metrics: ["orders", "revenue"], grain: ["daily", "audience", "store_id", "currency"] }
+            },
+            dimensions: {
+              channeledCampaign: { scopes: ["campaign_engagement"] },
+              campaignType: { scopes: ["campaign_engagement"] },
+              "dimensions.page": { scopes: ["campaign_engagement"], metrics: ["clicks", "clicks_unique"] },
+              "dimensions.store_id": { scopes: ["store_conversions"] },
+              "dimensions.currency": { scopes: ["store_conversions"] }
+            }
+          }
+        },
         data_scopes: {
           scope_global: {
             name: "Global Scope",
@@ -1329,110 +2046,260 @@ function createMcpServer(role = "admin", userContext = null) {
         },
         channel_datascopes: {
           mailchimp: {
-            scopes: ["audience_level", "campaign_level", "store_level"],
-            default_scope: "audience_level",
+            contract_version: 1,
+            audited_at: "2026-10-30",
+            scopes: ["campaign_engagement", "store_conversions"],
+            default_scope: "campaign_engagement",
             scope_rules: {
-              "audience_level": {
-                description: "Audience/List-scoped aggregated engagement and subscriber metrics.",
-                metrics: ["sends", "opens", "clicks", "clicks_unique", "bounces", "unsubscribes"],
-                breakdowns: ["campaign", "dimensions.page"]
+              "campaign_engagement": {
+                description: "Campaign-level email performance, opens, clicks, bounces, unsubscribes, and URL slices.",
+                metrics: ["sends", "opens", "opens_standard", "opens_proxy", "opens_unique_daily", "clicks", "clicks_unique", "bounces", "bounces_hard", "bounces_soft", "unsubscribes", "open_rate", "click_rate"],
+                breakdowns: ["channeledCampaign", "campaignType", "dimensions.page"]
               },
-              "campaign_level": {
-                description: "Campaign-specific email performance, link clicks, and recipient engagement.",
-                metrics: ["sends", "opens", "opens_standard", "opens_proxy", "clicks", "clicks_unique", "bounces", "unsubscribes"],
-                breakdowns: ["campaign", "dimensions.page"]
-              },
-              "store_level": {
+              "store_conversions": {
                 description: "Connected eCommerce store attribution orders and revenue driven by campaigns.",
                 metrics: ["orders", "revenue"],
-                breakdowns: ["campaign"]
+                breakdowns: ["dimensions.store_id", "dimensions.currency"]
               }
             }
           },
           google_search_console: {
+            contract_version: 1,
+            minimum_release: "1.18.3",
+            audited_at: "2026-10-30",
+            search_types: ["web", "image", "video", "news", "discover", "googleNews"],
             scopes: ["non-searchAppearance", "searchAppearance"],
             default_scope: "non-searchAppearance",
             scope_rules: {
               "non-searchAppearance": {
-                description: "Standard web search queries, landing pages, devices, and countries. Always requires dimensions.searchAppearance='standard' to avoid duplicate counting across search features.",
+                description: "Standard search queries, landing pages, devices, and countries. Always requires dimensions.searchAppearance='standard' to avoid duplicate counting across search features.",
                 enforced_filter: { "dimensions.searchAppearance": "standard" },
                 metrics: ["clicks", "impressions", "ctr", "position"],
                 breakdowns: ["query", "dimensions.page", "country", "device"]
               },
               "searchAppearance": {
-                description: "Aggregations by Google Search feature (AMP, Good Page Experience, Review Snippets, etc). Cannot be combined with query/page dimensions without causing multi-attribution ambiguity.",
+                description: "Aggregations by Google Search feature (AMP, Good Page Experience, Review Snippets, etc). Overlaps standard scope; never merge with standard.",
                 metrics: ["clicks", "impressions", "ctr", "position"],
                 breakdowns: ["dimensions.searchAppearance"]
               }
             }
           },
           google_analytics: {
-            scopes: ["traffic_matrix", "acquisition_matrix", "event_matrix", "ad_touchpoint_matrix"],
+            contract_version: 1,
+            query_contract_version: 1,
+            audited_at: "2026-10-30",
+            scopes: ["account", "traffic_matrix", "acquisition_matrix", "event_matrix", "ad_touchpoint_matrix", "engagement_matrix", "ecommerce_matrix", "product_matrix"],
             default_scope: "traffic_matrix",
             scope_rules: {
+              "account": {
+                description: "Property-level daily totals (dimensions.scope IS NULL).",
+                metrics: ["screenPageViews", "sessions", "bounceRate", "totalRevenue"],
+                breakdowns: []
+              },
               "traffic_matrix": {
                 description: "Session-level traffic and landing page metrics.",
-                metrics: ["sessions", "bounce_rate", "average_session_duration", "screen_page_views"],
-                breakdowns: ["dimensions.sessionDefaultChannelGroup", "dimensions.sessionSourceMedium", "dimensions.landing_page", "device", "country"]
+                metrics: ["screenPageViews", "sessions", "bounceRate", "averageSessionDuration", "totalRevenue", "conversions"],
+                breakdowns: ["dimensions.sessionDefaultChannelGroup", "dimensions.sessionSourceMedium", "dimensions.source", "dimensions.medium", "dimensions.landing_page", "channeledCampaign", "adGroup", "device", "country"]
               },
               "acquisition_matrix": {
-                description: "First-user attribution and user acquisition.",
-                metrics: ["new_users", "total_users"],
-                breakdowns: ["dimensions.firstUserDefaultChannelGroup", "dimensions.firstUserSourceMedium"]
+                description: "First-user attribution and user acquisition (non-additive reported user counts).",
+                metrics: ["newUsers", "activeUsers", "totalUsers"],
+                breakdowns: ["dimensions.firstUserDefaultChannelGroup", "dimensions.firstUserSourceMedium", "channeledCampaign", "adGroup", "ad"]
               },
               "event_matrix": {
-                description: "Event-level interactions and goal conversions.",
-                metrics: ["event_count", "conversions"],
-                breakdowns: ["event"]
+                description: "Event-level interactions and key event conversions.",
+                metrics: ["eventCount", "conversions"],
+                breakdowns: ["event", "dimensions.page", "dimensions.sessionDefaultChannelGroup", "dimensions.sessionSourceMedium", "channeledCampaign", "adGroup", "ad"]
               },
               "ad_touchpoint_matrix": {
                 description: "Paid touchpoints linking campaigns, ad groups, and ads.",
-                metrics: ["conversions", "total_revenue"],
-                breakdowns: ["channeledCampaign", "channeledAdGroup", "channeledAd"]
+                metrics: ["sessions", "conversions", "totalRevenue"],
+                breakdowns: ["channeledCampaign", "adGroup", "ad"]
+              },
+              "engagement_matrix": {
+                description: "Opt-in engagement sessions, duration, and rate (recipe_revision='1').",
+                metrics: ["sessions", "engagedSessions", "userEngagementDuration", "engagementRate"],
+                breakdowns: ["dimensions.sessionDefaultChannelGroup", "dimensions.sessionSourceMedium", "dimensions.landingPagePlusQueryString", "device", "country"]
+              },
+              "ecommerce_matrix": {
+                description: "Opt-in purchase revenue, gross revenue, refunds, and transactions (recipe_revision='1').",
+                metrics: ["ecommercePurchases", "purchaseRevenue", "grossPurchaseRevenue", "refundAmount", "transactions"],
+                breakdowns: ["dimensions.sessionDefaultChannelGroup", "dimensions.sessionSourceMedium", "dimensions.sessionCampaignName", "device", "country"]
+              },
+              "product_matrix": {
+                description: "Opt-in item-level views, cart additions, purchases, and item revenue (recipe_revision='1').",
+                metrics: ["itemsViewed", "itemsAddedToCart", "itemsPurchased", "itemRevenue", "grossItemRevenue", "itemRefundAmount"],
+                breakdowns: ["dimensions.itemId", "dimensions.itemName", "dimensions.itemBrand", "dimensions.itemCategory", "dimensions.itemVariant"]
+              }
+            }
+          },
+          google_ads: {
+            contract_version: 1,
+            audited_at: "2026-10-30",
+            scopes: ["account", "campaign", "ad_group", "ad", "query"],
+            ui_dependencies: ["campaign_level", "adgroup_level", "ad_level", "device_level", "search_term_level"],
+            default_scope: "campaign",
+            scope_rules: {
+              "campaign": {
+                description: "Campaign-level Google Ads performance and conversions.",
+                metrics: ["spend", "impressions", "clicks", "conversions", "conversion_value", "roas_purchase", "ctr", "cpc", "cpm", "cost_per_conversion", "conversion_rate"],
+                breakdowns: ["channeledCampaign", "campaignType", "device"]
+              },
+              "query": {
+                description: "Search term view performance (opt-in, privacy-limited coverage).",
+                metrics: ["spend", "impressions", "clicks", "conversions", "conversion_value", "roas_purchase", "ctr", "cpc", "cpm", "cost_per_conversion", "conversion_rate"],
+                breakdowns: ["query", "device"]
               }
             }
           },
           facebook_marketing: {
+            contract_version: 1,
+            audited_at: "2026-10-30",
             scopes: ["ad_level", "adset_level", "campaign_level", "account_level"],
             default_scope: "ad_level",
             scope_rules: {
               "ad_level": {
                 description: "Finest atomized granularity. All metrics are collected at the ad level and roll up hierarchically.",
-                metrics: ["spend", "clicks", "impressions", "reach", "frequency", "ctr", "cpc", "cpm", "roas_purchase"],
-                breakdowns: ["ad", "adGroup", "channeledCampaign", "channeledAccount", "dimensions.age", "dimensions.gender"]
+                metrics: ["spend", "clicks", "impressions", "reach", "results", "purchases", "purchase_value", "leads", "frequency", "ctr", "cpc", "cpm", "purchase_roas", "cost_per_result", "result_rate", "cost_per_purchase", "cost_per_lead"],
+                breakdowns: ["ad", "adGroup", "channeledCampaign", "channeledAccount", "dimensions.age", "dimensions.gender", "dimensions.country", "dimensions.publisher_platform", "dimensions.platform_position"]
               }
             }
           },
           facebook_organic: {
+            contract_version: 1,
+            audited_at: "2026-10-30",
             scopes: ["instagram_account", "ig_post", "facebook_page", "fb_post"],
             default_scope: "instagram_account",
             scope_rules: {
               "instagram_account": {
-                description: "Account-level organic reach, views, and profile clicks.",
-                metrics: ["reach", "views", "follows", "profile_views", "website_clicks", "accounts_engaged", "total_interactions"],
-                breakdowns: ["dimensions.contact_button_type", "dimensions.follow_type"]
+                description: "Account-level organic reach, views, follower snapshots, and profile clicks.",
+                metrics: ["reach", "views", "content_views", "follows_and_unfollows", "profile_views", "website_clicks", "profile_links_taps", "accounts_engaged", "total_interactions", "likes", "comments", "saves", "shares", "replies", "follower_total"],
+                breakdowns: ["dimensions.contact_button_type", "dimensions.follow_type", "dimensions.media_product_type"]
               },
               "ig_post": {
-                description: "Media/post-level engagement and comments.",
-                metrics: ["reach", "views", "likes", "comments", "shares", "saves", "profile_visits"],
-                breakdowns: ["post", "dimensions.media_product_type"]
+                description: "Media/post-level engagement, reels watch time, and comments.",
+                metrics: ["reach", "views", "likes", "comments", "shares", "saves", "replies", "total_interactions", "ig_reels_avg_watch_time", "ig_reels_video_view_total_time", "profile_activity", "profile_visits", "reposts", "follows"],
+                breakdowns: ["post", "ig_post"]
               },
               "facebook_page": {
-                description: "Facebook Page aggregate metrics.",
-                metrics: ["reach", "page_views_total", "views", "follows", "likes", "total_interactions", "video_views"],
+                description: "Facebook Page aggregate metrics and follower snapshots.",
+                metrics: ["reach", "page_views_total", "views", "follows_and_unfollows", "likes", "comments", "shares", "total_interactions", "video_views", "follower_total"],
                 breakdowns: ["dimensions.reaction_type"]
               },
               "fb_post": {
-                description: "Facebook post interactions.",
-                metrics: ["reach", "views", "video_views", "likes", "post_clicks", "total_interactions", "comments", "shares"],
-                breakdowns: ["post"]
+                description: "Facebook post interactions and video watch time.",
+                metrics: ["reach", "views", "video_views", "likes", "post_clicks", "total_interactions", "comments", "shares", "post_video_avg_time_watched"],
+                breakdowns: ["post", "fb_post", "dimensions.reaction_type"]
               }
             }
           }
         },
         recipes_and_guidance: {
-          guide_tool: "Call 'get_mcp_guide' with topic='datascopes' or topic='examples' for detailed recipes.",
-          discovery_tool: "Call 'list_connected_assets' to discover exact asset IDs for filters: { channeledAccount: '<id>' }."
+          guide_tool: "Call 'get_mcp_guide' with topic='datascopes', topic='entity_measures', or topic='examples' for detailed recipes.",
+          discovery_tool: "Call 'list_connected_assets' to discover exact asset IDs for filters: { channeledAccount: '<id>' } or account_ids in 'aggregate_entities'."
+        },
+        entity_measures: {
+          description: "Two-Stage dynamic Entity Measures aggregation over APIs Hub's 10 cached entity tables. Can be queried directly via 'aggregate_entities' or added to Custom Dashboard widgets via 'create_dashboard_draft' / 'update_dashboard_draft' using source_type='entity_measure' or source_config.raw_series with type='entity_measure'.",
+          canonical_deduplication_rule: "Pass deduplicate_canonical=true (default when not grouping by 'channel') to deduplicate orders shared across multiple channels (e.g. Shopify, Mailchimp, Klaviyo, GA4) by canonical order_id before summing revenue or computing AOV. Pass dimensions=['channel'] with deduplicate_canonical=false to compare channel-attributed orders side-by-side.",
+          multi_currency_safety_rule: "Monetary measures ('revenue', 'subtotal', 'total_tax', 'total_discount', 'aov', 'customer_ltv', 'avg_revenue_per_customer', 'average_price', 'min_price', 'max_price', 'total_budget', 'average_budget') require a single currency in scope, filters.currency='USD', or dimensions=['currency']. If currencies are mixed without a filter/dimension, monetary measures return null and meta.currency_mixed=true.",
+          time_buckets: ["day", "week", "month", "year"],
+          entities: {
+            orders: {
+              label: "Orders",
+              measures: {
+                order_count: { label: "Order Count", type: "integer", reducer: "count", monetary: false },
+                canonical_order_count: { label: "Distinct Canonical Orders", type: "integer", reducer: "count", monetary: false },
+                unique_customers: { label: "Unique Buying Customers", type: "integer", reducer: "count", monetary: false },
+                revenue: { label: "Total Revenue", type: "float", reducer: "sum", monetary: true },
+                subtotal: { label: "Subtotal", type: "float", reducer: "sum", monetary: true },
+                total_tax: { label: "Total Tax", type: "float", reducer: "sum", monetary: true },
+                total_discount: { label: "Total Discount", type: "float", reducer: "sum", monetary: true },
+                aov: { label: "Average Order Value (AOV)", type: "float", reducer: "ratio (revenue / order_count)", monetary: true }
+              },
+              dimensions: ["store", "channel", "account", "product", "discount_code", "financial_status", "fulfillment_status", "currency", "shipping_country"]
+            },
+            customers: {
+              label: "Customers",
+              measures: {
+                customer_count: { label: "Source Profile Count", type: "integer", reducer: "count", monetary: false },
+                canonical_customer_count: { label: "Distinct Canonical Customers", type: "integer", reducer: "count", monetary: false },
+                customer_ltv: { label: "Cross-Store Customer Lifetime Value (LTV)", type: "float", reducer: "custom_customer_commerce", monetary: true },
+                avg_revenue_per_customer: { label: "Average Revenue per Customer", type: "float", reducer: "custom_customer_commerce", monetary: true },
+                repeat_customer_count: { label: "Repeat Buyers (>1 Order)", type: "integer", reducer: "custom_customer_commerce", monetary: false },
+                high_frequency_customer_count: { label: "High-Frequency Buyers (>=3 Orders)", type: "integer", reducer: "custom_customer_commerce", monetary: false },
+                repeat_buyer_rate: { label: "Repeat Buyer Rate (%)", type: "float", reducer: "custom_customer_commerce", monetary: false },
+                repeat_frequency: { label: "Customer Purchase Frequency Distribution", type: "distribution", reducer: "custom", monetary: false },
+                pre_purchase_touches: { label: "Pre-Purchase Touchpoints Attribution", type: "attribution", reducer: "custom", monetary: false }
+              },
+              dimensions: ["store", "channel", "status", "account"]
+            },
+            stores: {
+              label: "Stores",
+              measures: {
+                store_count: { label: "Connected Stores Count", type: "integer", reducer: "count", monetary: false }
+              },
+              dimensions: ["channel", "currency", "account"]
+            },
+            products: {
+              label: "Products",
+              measures: {
+                product_count: { label: "Product Count", type: "integer", reducer: "count", monetary: false },
+                canonical_product_count: { label: "Distinct Canonical Products", type: "integer", reducer: "count", monetary: false },
+                average_price: { label: "Average Price", type: "float", reducer: "avg", monetary: true },
+                min_price: { label: "Minimum Price", type: "float", reducer: "min", monetary: true },
+                max_price: { label: "Maximum Price", type: "float", reducer: "max", monetary: true }
+              },
+              dimensions: ["store", "channel", "vendor", "product_type", "sku", "currency"]
+            },
+            discounts: {
+              label: "Discounts & Promo Codes",
+              aliases: ["promotions", "promo-codes"],
+              measures: {
+                discount_count: { label: "Discount Codes Count", type: "integer", reducer: "count", monetary: false },
+                total_usage: { label: "Total Usage Count", type: "integer", reducer: "sum", monetary: false }
+              },
+              dimensions: ["store", "channel", "code", "status"]
+            },
+            campaigns: {
+              label: "Campaigns",
+              measures: {
+                campaign_count: { label: "Campaign Count", type: "integer", reducer: "count", monetary: false },
+                total_budget: { label: "Total Budget", type: "float", reducer: "sum", monetary: true },
+                average_budget: { label: "Average Budget", type: "float", reducer: "avg", monetary: true }
+              },
+              dimensions: ["status", "objective", "buying_type", "channel", "account"]
+            },
+            "ad-groups": {
+              label: "Ad Sets & Ad Groups",
+              aliases: ["ad-sets"],
+              measures: {
+                ad_group_count: { label: "Ad Sets / Groups Count", type: "integer", reducer: "count", monetary: false }
+              },
+              dimensions: ["status", "campaign", "optimization_goal", "billing_event", "channel", "account"]
+            },
+            ads: {
+              label: "Ads",
+              measures: {
+                ad_count: { label: "Ad Count", type: "integer", reducer: "count", monetary: false }
+              },
+              dimensions: ["status", "campaign", "ad_group", "channel", "account"]
+            },
+            posts: {
+              label: "Posts (Organic)",
+              measures: {
+                post_count: { label: "Published Posts Count", type: "integer", reducer: "count", monetary: false }
+              },
+              dimensions: ["page", "media_type", "account"]
+            },
+            events: {
+              label: "Events",
+              measures: {
+                event_occurrence_count: { label: "Event Occurrences Count", type: "integer", reducer: "count", monetary: false },
+                distinct_event_names: { label: "Distinct Event Names", type: "integer", reducer: "count", monetary: false }
+              },
+              dimensions: ["channel", "action", "account"]
+            }
+          }
         },
         benchmarks: {
           google_search_console: {
@@ -1465,6 +2332,18 @@ function createMcpServer(role = "admin", userContext = null) {
         if (fileExists) {
           const raw = fs.readFileSync(filePath, "utf-8");
           const ctx = JSON.parse(raw);
+          if (ctx.catalog_versions && typeof ctx.catalog_versions === "object") {
+            catalog.catalog_versions = {
+              ...catalog.catalog_versions,
+              ...ctx.catalog_versions
+            };
+          }
+          if (ctx.channel_metrics_catalog && typeof ctx.channel_metrics_catalog === "object") {
+            catalog.channel_metrics_catalog = {
+              ...catalog.channel_metrics_catalog,
+              ...ctx.channel_metrics_catalog
+            };
+          }
           if (ctx.reference_library) {
             catalog.reference_library = {
               notice: "These predefined KPIs and Derived Metrics are platform-wide reference definitions and templates provided for analytical inspiration and deep analysis. They are NOT active custom KPIs created specifically for this project.",
@@ -1559,13 +2438,23 @@ function createMcpServer(role = "admin", userContext = null) {
       }
 
       if (channel) {
-        const channelCapabilities = catalog.supported_channels[channel];
-        const datascopes = catalog.channel_datascopes[channel] || null;
+        const normalizedChannel =
+          channel === "google_analytics_4"
+            ? "google_analytics"
+            : channel === "meta_organic"
+            ? "facebook_organic"
+            : channel;
+        const channelCapabilities = catalog.supported_channels[normalizedChannel] || catalog.supported_channels[channel];
+        const datascopes = catalog.channel_datascopes[normalizedChannel] || null;
+        const metricsCatalog = catalog.channel_metrics_catalog[normalizedChannel] || null;
+        const catalogVersion = catalog.catalog_versions[normalizedChannel] || null;
         return {
           content: [{
             type: "text",
             text: JSON.stringify({
-              channel,
+              channel: normalizedChannel,
+              catalog_version: catalogVersion,
+              metrics_catalog: metricsCatalog,
               capabilities: channelCapabilities || "Channel not specifically registered or uses generic adapter",
               datascopes: datascopes || "Channel uses unified un-scoped metrics",
               available_canonical_metrics: catalog.canonical_metrics,
@@ -2003,6 +2892,91 @@ function createMcpServer(role = "admin", userContext = null) {
         return {
           content: [
             { type: "text", text: `Aggregation failed: ${error.message}` },
+          ],
+          isError: true,
+        };
+      }
+    }
+
+    if (name === "aggregate_entities") {
+      const {
+        entity_type,
+        measures,
+        dimensions = [],
+        time_bucket = null,
+        channel = null,
+        account_ids = null,
+        deduplicate_canonical,
+        filters = {},
+        limit = 100,
+      } = args;
+
+      if (!entity_type || !Array.isArray(measures) || measures.length === 0) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: "Error: 'entity_type' and a non-empty 'measures' array are required for aggregate_entities.",
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      const payload = {
+        entity_type,
+        measures,
+        dimensions: Array.isArray(dimensions) ? dimensions : [],
+        time_bucket: time_bucket || null,
+        filters: filters && typeof filters === "object" ? { ...filters } : {},
+        deduplicate_canonical:
+          deduplicate_canonical !== undefined
+            ? Boolean(deduplicate_canonical)
+            : !channel && !(Array.isArray(dimensions) && dimensions.includes("channel")),
+        limit: Number(limit) || 100,
+      };
+
+      if (channel) {
+        payload.channel = channel;
+        if (!payload.filters.channel) {
+          payload.filters.channel = channel;
+        }
+      }
+      if (Array.isArray(account_ids) && account_ids.length > 0) {
+        payload.account_ids = account_ids;
+      }
+
+      // Enforce user-scoped asset isolation if caller is restricted
+      if (userContext && userContext.allowedAssets && Object.keys(userContext.allowedAssets).length > 0) {
+        const scopedChannels = {};
+        for (const [ch, ids] of Object.entries(userContext.allowedAssets)) {
+          if (Array.isArray(ids) && ids.length > 0) {
+            if (!channel || channel === ch) {
+              scopedChannels[ch] = { account_ids: ids };
+            }
+          }
+        }
+        payload.authorized_scope = { channels: scopedChannels };
+      }
+
+      const payloadJson = JSON.stringify(payload);
+      const cacheKey = JSON.stringify({ tool: "aggregate_entities", payloadJson, userId: userContext?.userId });
+      const cached = getCachedAggregation(cacheKey);
+      if (cached) {
+        return { content: [{ type: "text", text: cached }] };
+      }
+
+      const escapedPayload = payloadJson.replace(/'/g, "'\\''");
+      const cmd = `php bin/cli.php app:aggregate-catalog --payload='${escapedPayload}' --pretty`;
+
+      try {
+        const stdout = await runCliCommand(cmd);
+        setCachedAggregation(cacheKey, stdout);
+        return { content: [{ type: "text", text: stdout }] };
+      } catch (error) {
+        return {
+          content: [
+            { type: "text", text: `Entity aggregation failed: ${error.message}` },
           ],
           isError: true,
         };

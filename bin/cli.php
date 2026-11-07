@@ -23,6 +23,7 @@
     use Commands\Analytics\RetryFailedJobCommand;
     use Commands\Analytics\RetryFailedJobsCommand;
     use Commands\Analytics\ListAssetsCommand;
+    use Commands\Analytics\AggregateCatalogEntitiesCommand;
     use Commands\Analytics\SwooleWorkerCommand;
     use Commands\Analytics\EvaluateAlertsCommand;
     use Commands\HealthCheckCommand;
@@ -126,6 +127,7 @@
             new EvaluateAlertsCommand($entityManager),
             new ClassifyQueriesCommand($entityManager),
             new ListAssetsCommand(),
+            new AggregateCatalogEntitiesCommand(),
         ];
 
         foreach ($commands as $command) {
